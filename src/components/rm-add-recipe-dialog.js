@@ -250,17 +250,17 @@ class RmAddRecipeDialog extends LitElement {
             <strong>Recipe Keeper import</strong><br/>
             Export your recipes from the Recipe Keeper app
             (<em>Menu → Export → Recipe Keeper File</em>), then select the
-            <code>.rkeeper</code> file below. Recipe photos will be saved
+            exported <code>.zip</code> file below. Recipe photos will be saved
             locally if available.
           </div>
         </div>
 
         <label class="file-label">
           <ha-icon icon="mdi:file-import-outline"></ha-icon>
-          ${this._importFile ? this._importFile.name : 'Choose .rkeeper file…'}
+          ${this._importFile ? this._importFile.name : 'Choose .zip file…'}
           <input
             type="file"
-            accept=".rkeeper"
+            accept=".zip,application/zip"
             class="file-input"
             @change=${this._handleImportFileChange}
           />
