@@ -117,4 +117,19 @@ export class RecipeManagerAPI {
   async getShoppingLists() {
     return this.hass.callWS({ type: 'shopping_list_manager/lists/get_all' });
   }
+
+  // -- Import ---------------------------------------------------------------
+
+  /**
+   * Import recipes from a .rkeeper file.
+   * fileContent: base64-encoded file bytes (from FileReader.readAsDataURL, strip prefix)
+   * downloadImages: whether to save bundled images locally (default true)
+   */
+  async importRecipeKeeper(fileContent, downloadImages = true) {
+    return this.hass.callWS({
+      type: 'recipe_manager/import/recipe_keeper',
+      file_content: fileContent,
+      download_images: downloadImages,
+    });
+  }
 }

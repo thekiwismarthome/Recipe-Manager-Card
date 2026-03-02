@@ -202,6 +202,11 @@ class RecipeManagerCard extends LitElement {
     await this._loadTags();
   }
 
+  async _handleImportDone() {
+    await this._loadRecipes();
+    await this._loadTags();
+  }
+
   async _handleAddToShopping(e) {
     const { ingredients, listId } = e.detail;
     try {
@@ -300,6 +305,7 @@ class RecipeManagerCard extends LitElement {
           <rm-add-recipe-dialog
             .api=${this._api}
             @rm-add-recipe=${this._handleAddRecipe}
+            @rm-import-done=${this._handleImportDone}
             @rm-close=${() => { this._showAddDialog = false; }}
           ></rm-add-recipe-dialog>
         ` : ''}

@@ -6,13 +6,19 @@ import { LitElement, html, css } from 'lit';
 class RmAddRecipeDialog extends LitElement {
   static properties = {
     api: { type: Object },
-    _mode: { type: String },   // 'url' | 'manual'
+    _mode: { type: String },   // 'url' | 'manual' | 'import'
     _url: { type: String },
     _scraping: { type: Boolean },
     _scrapeError: { type: String },
     _form: { type: Object },
     _saving: { type: Boolean },
     _ingredientInput: { type: String },
+    // Import state
+    _importFile: { type: Object },
+    _importing: { type: Boolean },
+    _importResult: { type: Object },  // { imported, failed } or null
+    _importError: { type: String },
+    _importDownloadImages: { type: Boolean },
   };
 
   constructor() {
@@ -25,6 +31,11 @@ class RmAddRecipeDialog extends LitElement {
     this._saving = false;
     this._ingredientInput = '';
     this._form = this._emptyForm();
+    this._importFile = null;
+    this._importing = false;
+    this._importResult = null;
+    this._importError = null;
+    this._importDownloadImages = true;
   }
 
   _emptyForm() {
@@ -76,6 +87,47 @@ class RmAddRecipeDialog extends LitElement {
       this._scrapeError = err.message || 'Scraping failed.';
     } finally {
       this._scraping = false;
+    }
+  }
+
+  _handleImportFileChange(e) {
+    this._importFile = e.target.files[0] || null;
+    this._importResult = null;
+    this._importError = null;
+  }
+
+  async _handleImport() {
+    if (!this._importFile || this._importing) return;
+    this._importing = true;
+    this._importResult = null;
+    this._importError = null;
+
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          // readAsDataURL gives "data:application/zip;base64,XXXX" — strip prefix
+          const result = reader.result;
+          const comma = result.indexOf(',');
+          resolve(comma >= 0 ? result.slice(comma + 1) : result);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(this._importFile);
+      });
+
+      const result = await this.api.importRecipeKeeper(base64, this._importDownloadImages);
+      this._importResult = result;
+
+      if (result.imported > 0) {
+        // Notify parent to refresh recipe list
+        this.dispatchEvent(new CustomEvent('rm-import-done', {
+          bubbles: true, composed: true,
+        }));
+      }
+    } catch (err) {
+      this._importError = err.message || 'Import failed.';
+    } finally {
+      this._importing = false;
     }
   }
 
@@ -156,12 +208,17 @@ class RmAddRecipeDialog extends LitElement {
               <button class="mode-btn ${this._mode === 'manual' ? 'active' : ''}" @click=${() => { this._mode = 'manual'; }}>
                 <ha-icon icon="mdi:pencil-outline"></ha-icon> Manual
               </button>
+              <button class="mode-btn ${this._mode === 'import' ? 'active' : ''}" @click=${() => { this._mode = 'import'; }}>
+                <ha-icon icon="mdi:import"></ha-icon> Import
+              </button>
             </div>
             <button class="icon-btn" @click=${this._close}><ha-icon icon="mdi:close"></ha-icon></button>
           </div>
 
           <div class="dialog-body">
-            ${this._mode === 'url' ? this._renderUrlMode() : this._renderManualMode()}
+            ${this._mode === 'url' ? this._renderUrlMode()
+              : this._mode === 'import' ? this._renderImportMode()
+              : this._renderManualMode()}
           </div>
 
           ${this._mode === 'manual' ? html`
@@ -180,6 +237,68 @@ class RmAddRecipeDialog extends LitElement {
             </div>
           ` : ''}
         </div>
+      </div>
+    `;
+  }
+
+  _renderImportMode() {
+    return html`
+      <div class="import-mode">
+        <div class="import-info">
+          <ha-icon icon="mdi:information-outline"></ha-icon>
+          <div>
+            <strong>Recipe Keeper import</strong><br/>
+            Export your recipes from the Recipe Keeper app
+            (<em>Menu → Export → Recipe Keeper File</em>), then select the
+            <code>.rkeeper</code> file below. Recipe photos will be saved
+            locally if available.
+          </div>
+        </div>
+
+        <label class="file-label">
+          <ha-icon icon="mdi:file-import-outline"></ha-icon>
+          ${this._importFile ? this._importFile.name : 'Choose .rkeeper file…'}
+          <input
+            type="file"
+            accept=".rkeeper"
+            class="file-input"
+            @change=${this._handleImportFileChange}
+          />
+        </label>
+
+        <label class="toggle-row">
+          <input
+            type="checkbox"
+            ?checked=${this._importDownloadImages}
+            @change=${e => { this._importDownloadImages = e.target.checked; }}
+          />
+          Save recipe photos locally
+        </label>
+
+        ${this._importResult ? html`
+          <div class="import-result ${this._importResult.failed > 0 ? 'partial' : 'success'}">
+            <ha-icon icon="${this._importResult.failed > 0 ? 'mdi:alert-circle-outline' : 'mdi:check-circle-outline'}"></ha-icon>
+            <div>
+              <strong>${this._importResult.imported} recipe${this._importResult.imported !== 1 ? 's' : ''} imported</strong>
+              ${this._importResult.failed > 0 ? html`<br/><small>${this._importResult.failed} failed — check HA logs for details</small>` : ''}
+            </div>
+          </div>
+        ` : this._importError ? html`
+          <div class="import-result error">
+            <ha-icon icon="mdi:alert-circle-outline"></ha-icon>
+            <div><strong>Import failed</strong><br/><small>${this._importError}</small></div>
+          </div>
+        ` : ''}
+
+        <button
+          class="action-btn primary import-btn"
+          ?disabled=${!this._importFile || this._importing}
+          @click=${this._handleImport}
+        >
+          ${this._importing
+            ? html`<ha-circular-progress active size="tiny"></ha-circular-progress> Importing…`
+            : html`<ha-icon icon="mdi:import"></ha-icon> Import Recipes`}
+        </button>
       </div>
     `;
   }
@@ -507,6 +626,72 @@ class RmAddRecipeDialog extends LitElement {
     .action-btn.primary { background: var(--rm-accent, #ff6b35); border-color: var(--rm-accent, #ff6b35); color: #fff; }
     .action-btn.sm { padding: 6px 10px; font-size: 13px; }
     .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Import mode */
+    .import-mode { display: flex; flex-direction: column; gap: 16px; }
+    .import-info {
+      display: flex;
+      gap: 12px;
+      background: var(--rm-surface, #2c2c2e);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: var(--rm-text-secondary, #8e8e93);
+      line-height: 1.5;
+    }
+    .import-info ha-icon { --mdc-icon-size: 20px; flex-shrink: 0; margin-top: 2px; }
+    .import-info strong { color: var(--rm-text, #e5e5ea); }
+    .import-info code {
+      background: rgba(255,255,255,0.08);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 12px;
+    }
+
+    .file-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--rm-surface, #2c2c2e);
+      border: 2px dashed var(--rm-border, rgba(255,255,255,0.15));
+      border-radius: 10px;
+      padding: 16px 14px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--rm-text, #e5e5ea);
+      transition: border-color 0.15s;
+    }
+    .file-label:hover { border-color: var(--rm-accent, #ff6b35); }
+    .file-label ha-icon { --mdc-icon-size: 22px; color: var(--rm-accent, #ff6b35); }
+    .file-input { display: none; }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--rm-text-secondary, #8e8e93);
+      cursor: pointer;
+    }
+    .toggle-row input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+
+    .import-result {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 13px;
+    }
+    .import-result ha-icon { --mdc-icon-size: 20px; flex-shrink: 0; margin-top: 1px; }
+    .import-result.success { background: rgba(76, 175, 80, 0.12); color: var(--success-color, #4caf50); }
+    .import-result.partial { background: rgba(255, 152, 0, 0.12); color: #ff9800; }
+    .import-result.error { background: rgba(207, 102, 121, 0.12); color: var(--error-color, #cf6679); }
+    .import-result strong { display: block; }
+    .import-result small { opacity: 0.85; }
+
+    .import-btn { width: 100%; justify-content: center; gap: 8px; }
+    .import-btn ha-icon { --mdc-icon-size: 18px; }
 
     .dialog-footer {
       display: flex;
