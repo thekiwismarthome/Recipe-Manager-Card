@@ -9,6 +9,7 @@
     "watch": "rollup -c -w"
   },
   "dependencies": {
+    "jszip": "^3.10.1",
     "lit": "^3.0.0"
   },
   "devDependencies": {

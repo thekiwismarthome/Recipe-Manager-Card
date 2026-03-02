@@ -2,6 +2,7 @@
  * Add Recipe dialog — URL scrape or manual entry.
  */
 import { LitElement, html, css } from 'lit';
+import JSZip from 'jszip';
 
 class RmAddRecipeDialog extends LitElement {
   static properties = {
@@ -103,29 +104,66 @@ class RmAddRecipeDialog extends LitElement {
     this._importError = null;
 
     try {
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          // readAsDataURL gives "data:application/zip;base64,XXXX" — strip prefix
-          const result = reader.result;
-          const comma = result.indexOf(',');
-          resolve(comma >= 0 ? result.slice(comma + 1) : result);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(this._importFile);
-      });
+      // Parse the ZIP in the browser — avoids sending the whole file over WebSocket
+      // which would exceed HA's message size limit for exports with many photos.
+      let zip;
+      try {
+        zip = await JSZip.loadAsync(this._importFile);
+      } catch (zipErr) {
+        throw new Error(`Could not open ZIP file: ${zipErr.message}`);
+      }
 
-      const result = await this.api.importRecipeKeeper(base64, this._importDownloadImages);
-      this._importResult = result;
+      // Find the HTML file (Recipe Keeper exports it as recipebook.html or similar)
+      const htmlEntry = Object.values(zip.files).find(
+        f => !f.dir && f.name.endsWith('.html'),
+      );
+      if (!htmlEntry) {
+        throw new Error('No HTML file found inside the ZIP — is this a valid Recipe Keeper export?');
+      }
+      const htmlContent = await htmlEntry.async('text');
+      console.log(`[Recipe Keeper Import] HTML extracted (${htmlContent.length} chars), sending to backend`);
+
+      // Phase 1: send HTML → backend parses recipes, returns which ones need images
+      const result = await this.api.importRecipeKeeper(htmlContent);
+      console.log(`[Recipe Keeper Import] Phase 1 done: ${result.imported} imported, ${result.failed} failed, ${result.recipe_images?.length ?? 0} need images`);
+
+      // Phase 2: upload images one by one (avoids large single message)
+      let imagesSaved = 0;
+      let imagesFailed = 0;
+      if (this._importDownloadImages && result.recipe_images?.length) {
+        const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp']);
+
+        for (const { recipe_id, image_filename } of result.recipe_images) {
+          // Look up the image in the ZIP by its exact path or basename
+          const imgEntry = zip.files[image_filename]
+            ?? Object.values(zip.files).find(f => {
+              const base = image_filename.split('/').pop();
+              return !f.dir && f.name.split('/').pop() === base
+                && IMAGE_EXTS.has(f.name.slice(f.name.lastIndexOf('.')).toLowerCase());
+            });
+
+          if (!imgEntry) continue;
+
+          try {
+            const b64 = await imgEntry.async('base64');
+            await this.api.uploadRecipeImage(recipe_id, b64);
+            imagesSaved++;
+          } catch (imgErr) {
+            console.warn(`[Recipe Keeper Import] Could not save image for recipe ${recipe_id}:`, imgErr);
+            imagesFailed++;
+          }
+        }
+        console.log(`[Recipe Keeper Import] Phase 2 done: ${imagesSaved} images saved, ${imagesFailed} failed`);
+      }
+
+      this._importResult = { ...result, imagesSaved };
 
       if (result.imported > 0) {
-        // Notify parent to refresh recipe list
-        this.dispatchEvent(new CustomEvent('rm-import-done', {
-          bubbles: true, composed: true,
-        }));
+        this.dispatchEvent(new CustomEvent('rm-import-done', { bubbles: true, composed: true }));
       }
     } catch (err) {
-      this._importError = err.message || 'Import failed.';
+      console.error('[Recipe Keeper Import] Failed:', err);
+      this._importError = err.message || String(err) || 'Import failed.';
     } finally {
       this._importing = false;
     }
@@ -280,6 +318,7 @@ class RmAddRecipeDialog extends LitElement {
             <ha-icon icon="${this._importResult.failed > 0 ? 'mdi:alert-circle-outline' : 'mdi:check-circle-outline'}"></ha-icon>
             <div>
               <strong>${this._importResult.imported} recipe${this._importResult.imported !== 1 ? 's' : ''} imported</strong>
+              ${this._importResult.imagesSaved > 0 ? html` with ${this._importResult.imagesSaved} photo${this._importResult.imagesSaved !== 1 ? 's' : ''}` : ''}
               ${this._importResult.failed > 0 ? html`<br/><small>${this._importResult.failed} failed — check HA logs for details</small>` : ''}
             </div>
           </div>

@@ -121,15 +121,27 @@ export class RecipeManagerAPI {
   // -- Import ---------------------------------------------------------------
 
   /**
-   * Import recipes from a .rkeeper file.
-   * fileContent: base64-encoded file bytes (from FileReader.readAsDataURL, strip prefix)
-   * downloadImages: whether to save bundled images locally (default true)
+   * Import recipes from Recipe Keeper HTML content.
+   * The caller extracts the HTML from the ZIP in the browser (via JSZip) and
+   * sends only the text here to stay under the WebSocket message size limit.
+   * Returns { imported, failed, recipe_images: [{recipe_id, image_filename}] }
    */
-  async importRecipeKeeper(fileContent, downloadImages = true) {
+  async importRecipeKeeper(htmlContent) {
     return this.hass.callWS({
       type: 'recipe_manager/import/recipe_keeper',
-      file_content: fileContent,
-      download_images: downloadImages,
+      html_content: htmlContent,
+    });
+  }
+
+  /**
+   * Upload a single recipe image (base64-encoded) and save it locally.
+   * Returns { image_url }
+   */
+  async uploadRecipeImage(recipeId, imageData) {
+    return this.hass.callWS({
+      type: 'recipe_manager/recipes/upload_image',
+      recipe_id: recipeId,
+      image_data: imageData,
     });
   }
 }
