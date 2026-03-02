@@ -5,11 +5,13 @@ import { LitElement, html, css } from 'lit';
 
 class RmRecipeGrid extends LitElement {
   static properties = {
-    recipes: { type: Array },
-    allRecipes: { type: Array },
-    tags: { type: Array },
-    searchQuery: { type: String },
-    activeTag: { type: String },
+    recipes:        { type: Array },
+    allRecipes:     { type: Array },
+    tags:           { type: Array },
+    searchQuery:    { type: String },
+    activeTag:      { type: String },
+    columns:        { type: Number },
+    showFavourites: { type: Boolean },
   };
 
   constructor() {
@@ -19,6 +21,8 @@ class RmRecipeGrid extends LitElement {
     this.tags = [];
     this.searchQuery = '';
     this.activeTag = null;
+    this.columns = 3;
+    this.showFavourites = true;
   }
 
   _handleSearchInput(e) {
@@ -119,8 +123,9 @@ class RmRecipeGrid extends LitElement {
 
   render() {
     const favourites = this.recipes.filter(r => r.is_favourite);
-    const showFavSection = !this.activeTag && !this.searchQuery && favourites.length > 0;
+    const showFavSection = this.showFavourites && !this.activeTag && !this.searchQuery && favourites.length > 0;
     const mainList = showFavSection ? this.recipes.filter(r => !r.is_favourite) : this.recipes;
+    const gridStyle = `grid-template-columns: var(--rm-grid-columns, repeat(${this.columns}, minmax(0, 1fr)));`;
 
     return html`
       <div class="grid-container">
@@ -166,14 +171,14 @@ class RmRecipeGrid extends LitElement {
             <!-- Favourites section -->
             ${showFavSection ? html`
               <div class="section-label">Favourites</div>
-              <div class="recipe-grid">
+              <div class="recipe-grid" style=${gridStyle}>
                 ${favourites.map(r => this._renderRecipeCard(r))}
               </div>
               ${mainList.length ? html`<div class="section-label">All Recipes</div>` : ''}
             ` : ''}
 
             <!-- Main grid -->
-            <div class="recipe-grid">
+            <div class="recipe-grid" style=${gridStyle}>
               ${mainList.map(r => this._renderRecipeCard(r))}
             </div>
           `}
@@ -274,7 +279,7 @@ class RmRecipeGrid extends LitElement {
 
     .recipe-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr)); /* overridden inline */
       gap: 12px;
       margin-bottom: 12px;
     }
