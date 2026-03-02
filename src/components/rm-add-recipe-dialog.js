@@ -14,10 +14,11 @@ class RmAddRecipeDialog extends LitElement {
     _form: { type: Object },
     _saving: { type: Boolean },
     _ingredientInput: { type: String },
+    _ratingHover: { type: Number },
     // Import state
     _importFile: { type: Object },
     _importing: { type: Boolean },
-    _importResult: { type: Object },  // { imported, failed } or null
+    _importResult: { type: Object },
     _importError: { type: String },
     _importDownloadImages: { type: Boolean },
   };
@@ -31,6 +32,7 @@ class RmAddRecipeDialog extends LitElement {
     this._scrapeError = null;
     this._saving = false;
     this._ingredientInput = '';
+    this._ratingHover = 0;
     this._form = this._emptyForm();
     this._importFile = null;
     this._importing = false;
@@ -44,14 +46,20 @@ class RmAddRecipeDialog extends LitElement {
       name: '',
       description: '',
       source_url: '',
-      servings: 4,
+      servings: '',
       prep_time: '',
       cook_time: '',
-      tags: '',
-      notes: '',
       image_url: '',
+      tags: '',
+      courses: '',
+      categories: '',
+      collections: '',
+      rating: 0,
+      notes: '',
       ingredients: [],
       instructions: [],
+      // Nutrition (flat for form; serialized to object on save)
+      cal: '', fat: '', satf: '', chol: '', sod: '', carb: '', fib: '', sug: '', prot: '',
     };
   }
 
@@ -67,20 +75,35 @@ class RmAddRecipeDialog extends LitElement {
       const result = await this.api.scrapeRecipe(this._url.trim());
       if (result?.recipe) {
         const r = result.recipe;
+        const n = r.nutrition || {};
         this._form = {
-          name: r.name || '',
-          description: r.description || '',
-          source_url: r.source_url || this._url.trim(),
-          servings: r.servings || 4,
-          prep_time: r.prep_time || '',
-          cook_time: r.cook_time || '',
-          tags: (r.tags || []).join(', '),
-          notes: r.notes || '',
-          image_url: r.image_url || '',
-          ingredients: r.ingredients || [],
+          name:         r.name || '',
+          description:  r.description || '',
+          source_url:   r.source_url || this._url.trim(),
+          servings:     r.servings || '',
+          prep_time:    r.prep_time || '',
+          cook_time:    r.cook_time || '',
+          image_url:    r.image_url || '',
+          tags:         (r.tags || []).join(', '),
+          courses:      (r.courses || []).join(', '),
+          categories:   (r.categories || []).join(', '),
+          collections:  (r.collections || []).join(', '),
+          rating:       r.rating || 0,
+          notes:        r.notes || '',
+          ingredients:  r.ingredients || [],
           instructions: r.instructions || [],
+          // Nutrition
+          cal:  n.calories      ?? '',
+          fat:  n.fat           ?? '',
+          satf: n.saturated_fat ?? '',
+          chol: n.cholesterol   ?? '',
+          sod:  n.sodium        ?? '',
+          carb: n.carbohydrates ?? '',
+          fib:  n.fiber         ?? '',
+          sug:  n.sugar         ?? '',
+          prot: n.protein       ?? '',
         };
-        this._mode = 'manual';  // show form to review/edit before saving
+        this._mode = 'manual';
       } else {
         this._scrapeError = result?.error || 'Could not extract recipe from this URL.';
       }
@@ -104,8 +127,6 @@ class RmAddRecipeDialog extends LitElement {
     this._importError = null;
 
     try {
-      // Parse the ZIP in the browser — avoids sending the whole file over WebSocket
-      // which would exceed HA's message size limit for exports with many photos.
       let zip;
       try {
         zip = await JSZip.loadAsync(this._importFile);
@@ -113,7 +134,6 @@ class RmAddRecipeDialog extends LitElement {
         throw new Error(`Could not open ZIP file: ${zipErr.message}`);
       }
 
-      // Find the HTML file (Recipe Keeper exports it as recipebook.html or similar)
       const htmlEntry = Object.values(zip.files).find(
         f => !f.dir && f.name.endsWith('.html'),
       );
@@ -123,18 +143,15 @@ class RmAddRecipeDialog extends LitElement {
       const htmlContent = await htmlEntry.async('text');
       console.log(`[Recipe Keeper Import] HTML extracted (${htmlContent.length} chars), sending to backend`);
 
-      // Phase 1: send HTML → backend parses recipes, returns which ones need images
       const result = await this.api.importRecipeKeeper(htmlContent);
       console.log(`[Recipe Keeper Import] Phase 1 done: ${result.imported} imported, ${result.failed} failed, ${result.recipe_images?.length ?? 0} need images`);
 
-      // Phase 2: upload images one by one (avoids large single message)
       let imagesSaved = 0;
       let imagesFailed = 0;
       if (this._importDownloadImages && result.recipe_images?.length) {
         const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp']);
 
         for (const { recipe_id, image_filename } of result.recipe_images) {
-          // Look up the image in the ZIP by its exact path or basename
           const imgEntry = zip.files[image_filename]
             ?? Object.values(zip.files).find(f => {
               const base = image_filename.split('/').pop();
@@ -173,15 +190,41 @@ class RmAddRecipeDialog extends LitElement {
     if (!this._form.name.trim() || this._saving) return;
     this._saving = true;
     try {
-      const data = {
-        ...this._form,
-        servings: parseInt(this._form.servings) || 4,
-        prep_time: parseInt(this._form.prep_time) || null,
-        cook_time: parseInt(this._form.cook_time) || null,
-        tags: this._form.tags
-          ? this._form.tags.split(',').map(t => t.trim()).filter(Boolean)
-          : [],
+      const f = this._form;
+      const splitList = v => v ? v.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+      const nMap = {
+        cal: 'calories', fat: 'fat', satf: 'saturated_fat', chol: 'cholesterol',
+        sod: 'sodium', carb: 'carbohydrates', fib: 'fiber', sug: 'sugar', prot: 'protein',
       };
+      const nutrition = {};
+      let hasNutrition = false;
+      for (const [k, nk] of Object.entries(nMap)) {
+        if (f[k] !== '' && f[k] != null) {
+          nutrition[nk] = f[k];
+          hasNutrition = true;
+        }
+      }
+
+      const data = {
+        name:         f.name,
+        description:  f.description,
+        source_url:   f.source_url,
+        image_url:    f.image_url,
+        servings:     parseInt(f.servings) || null,
+        prep_time:    parseInt(f.prep_time) || null,
+        cook_time:    parseInt(f.cook_time) || null,
+        tags:         splitList(f.tags),
+        courses:      splitList(f.courses),
+        categories:   splitList(f.categories),
+        collections:  splitList(f.collections),
+        rating:       f.rating || null,
+        notes:        f.notes,
+        ingredients:  f.ingredients,
+        instructions: f.instructions,
+        nutrition:    hasNutrition ? nutrition : null,
+      };
+
       this.dispatchEvent(new CustomEvent('rm-add-recipe', {
         detail: { data },
         bubbles: true,
@@ -199,7 +242,6 @@ class RmAddRecipeDialog extends LitElement {
   _addIngredient() {
     const raw = this._ingredientInput.trim();
     if (!raw) return;
-    // simple parse: "2 cups flour" -> {amount:'2', unit:'cups', name:'flour'}
     const parts = raw.split(/\s+/);
     let amount = '', unit = '', name = '';
     if (parts.length >= 3 && !isNaN(parseFloat(parts[0]))) {
@@ -220,8 +262,7 @@ class RmAddRecipeDialog extends LitElement {
   }
 
   _removeIngredient(idx) {
-    const updated = this._form.ingredients.filter((_, i) => i !== idx);
-    this._form = { ...this._form, ingredients: updated };
+    this._form = { ...this._form, ingredients: this._form.ingredients.filter((_, i) => i !== idx) };
   }
 
   _addStep(text) {
@@ -230,8 +271,7 @@ class RmAddRecipeDialog extends LitElement {
   }
 
   _removeStep(idx) {
-    const updated = this._form.instructions.filter((_, i) => i !== idx);
-    this._form = { ...this._form, instructions: updated };
+    this._form = { ...this._form, instructions: this._form.instructions.filter((_, i) => i !== idx) };
   }
 
   render() {
@@ -254,9 +294,9 @@ class RmAddRecipeDialog extends LitElement {
           </div>
 
           <div class="dialog-body">
-            ${this._mode === 'url' ? this._renderUrlMode()
-              : this._mode === 'import' ? this._renderImportMode()
-              : this._renderManualMode()}
+            ${this._mode === 'url'    ? this._renderUrlMode()    : ''}
+            ${this._mode === 'import' ? this._renderImportMode() : ''}
+            ${this._mode === 'manual' ? this._renderManualMode() : ''}
           </div>
 
           ${this._mode === 'manual' ? html`
@@ -384,52 +424,106 @@ class RmAddRecipeDialog extends LitElement {
 
   _renderManualMode() {
     const f = this._form;
+    const starRating = this._ratingHover || f.rating || 0;
+
     return html`
       <div class="manual-mode">
-        <!-- Name (required) -->
+
+        <!-- Name -->
         <div class="field">
           <label>Recipe Name *</label>
-          <input type="text" .value=${f.name} @input=${e => this._setField('name', e.target.value)} placeholder="e.g. Spaghetti Bolognese" />
+          <input type="text" .value=${f.name}
+            @input=${e => this._setField('name', e.target.value)}
+            placeholder="e.g. Spaghetti Bolognese" />
         </div>
 
         <!-- Description -->
         <div class="field">
           <label>Description</label>
-          <textarea rows="2" .value=${f.description} @input=${e => this._setField('description', e.target.value)} placeholder="Short description…"></textarea>
+          <textarea rows="2" .value=${f.description}
+            @input=${e => this._setField('description', e.target.value)}
+            placeholder="Short description…"></textarea>
         </div>
 
-        <!-- Source URL -->
-        <div class="field">
-          <label>Source URL</label>
-          <input type="url" .value=${f.source_url} @input=${e => this._setField('source_url', e.target.value)} placeholder="https://…" />
-        </div>
-
-        <!-- Image URL -->
-        <div class="field">
-          <label>Image URL</label>
-          <input type="url" .value=${f.image_url} @input=${e => this._setField('image_url', e.target.value)} placeholder="https://…/image.jpg" />
-        </div>
-
-        <!-- Times + servings row -->
+        <!-- Source URL + Image URL -->
         <div class="field-row">
           <div class="field">
+            <label>Source URL</label>
+            <input type="url" .value=${f.source_url}
+              @input=${e => this._setField('source_url', e.target.value)}
+              placeholder="https://…" />
+          </div>
+          <div class="field">
+            <label>Image URL</label>
+            <input type="url" .value=${f.image_url}
+              @input=${e => this._setField('image_url', e.target.value)}
+              placeholder="https://…/image.jpg" />
+          </div>
+        </div>
+
+        <!-- Times + servings -->
+        <div class="field-row-3">
+          <div class="field">
             <label>Prep (min)</label>
-            <input type="number" .value=${String(f.prep_time)} @input=${e => this._setField('prep_time', e.target.value)} placeholder="15" min="0" />
+            <input type="number" .value=${String(f.prep_time)}
+              @input=${e => this._setField('prep_time', e.target.value)} placeholder="15" min="0" />
           </div>
           <div class="field">
             <label>Cook (min)</label>
-            <input type="number" .value=${String(f.cook_time)} @input=${e => this._setField('cook_time', e.target.value)} placeholder="30" min="0" />
+            <input type="number" .value=${String(f.cook_time)}
+              @input=${e => this._setField('cook_time', e.target.value)} placeholder="30" min="0" />
           </div>
           <div class="field">
             <label>Servings</label>
-            <input type="number" .value=${String(f.servings)} @input=${e => this._setField('servings', e.target.value)} placeholder="4" min="1" />
+            <input type="number" .value=${String(f.servings)}
+              @input=${e => this._setField('servings', e.target.value)} placeholder="4" min="1" />
           </div>
         </div>
 
-        <!-- Tags -->
+        <!-- Rating -->
+        <div class="field">
+          <label>Rating</label>
+          <div class="star-row"
+            @mouseleave=${() => { this._ratingHover = 0; }}>
+            ${[1,2,3,4,5].map(n => html`
+              <span
+                class="star ${n <= starRating ? 'filled' : ''}"
+                @mouseenter=${() => { this._ratingHover = n; }}
+                @click=${() => this._setField('rating', f.rating === n ? 0 : n)}
+              >★</span>
+            `)}
+            ${f.rating ? html`<button class="clear-rating" @click=${() => this._setField('rating', 0)}>Clear</button>` : ''}
+          </div>
+        </div>
+
+        <!-- Categorisation row -->
         <div class="field">
           <label>Tags (comma-separated)</label>
-          <input type="text" .value=${f.tags} @input=${e => this._setField('tags', e.target.value)} placeholder="dinner, italian, pasta" />
+          <input type="text" .value=${f.tags}
+            @input=${e => this._setField('tags', e.target.value)}
+            placeholder="quick, weeknight, family" />
+        </div>
+
+        <div class="field">
+          <label>Courses (comma-separated)</label>
+          <input type="text" .value=${f.courses}
+            @input=${e => this._setField('courses', e.target.value)}
+            placeholder="Dinner, Main Course" />
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Categories (comma-separated)</label>
+            <input type="text" .value=${f.categories}
+              @input=${e => this._setField('categories', e.target.value)}
+              placeholder="Italian, Gluten Free" />
+          </div>
+          <div class="field">
+            <label>Collections (comma-separated)</label>
+            <input type="text" .value=${f.collections}
+              @input=${e => this._setField('collections', e.target.value)}
+              placeholder="30 Minutes, Summer" />
+          </div>
         </div>
 
         <!-- Ingredients -->
@@ -440,7 +534,9 @@ class RmAddRecipeDialog extends LitElement {
               ${f.ingredients.map((ing, i) => html`
                 <li>
                   <span class="ing-text">${ing.amount ? `${ing.amount} ${ing.unit} ` : ''}${ing.name}</span>
-                  <button class="remove-btn" @click=${() => this._removeIngredient(i)}><ha-icon icon="mdi:close"></ha-icon></button>
+                  <button class="remove-btn" @click=${() => this._removeIngredient(i)}>
+                    <ha-icon icon="mdi:close"></ha-icon>
+                  </button>
                 </li>
               `)}
             </ul>
@@ -457,15 +553,17 @@ class RmAddRecipeDialog extends LitElement {
           </div>
         </div>
 
-        <!-- Instructions -->
+        <!-- Directions -->
         <div class="field">
-          <label>Instructions (${f.instructions.length} steps)</label>
+          <label>Directions (${f.instructions.length} steps)</label>
           ${f.instructions.length ? html`
             <ol class="steps-edit">
               ${f.instructions.map((step, i) => html`
                 <li>
                   <span class="step-text">${step}</span>
-                  <button class="remove-btn" @click=${() => this._removeStep(i)}><ha-icon icon="mdi:close"></ha-icon></button>
+                  <button class="remove-btn" @click=${() => this._removeStep(i)}>
+                    <ha-icon icon="mdi:close"></ha-icon>
+                  </button>
                 </li>
               `)}
             </ol>
@@ -487,8 +585,65 @@ class RmAddRecipeDialog extends LitElement {
         <!-- Notes -->
         <div class="field">
           <label>Notes</label>
-          <textarea rows="3" .value=${f.notes} @input=${e => this._setField('notes', e.target.value)} placeholder="Variations, tips…"></textarea>
+          <textarea rows="2" .value=${f.notes}
+            @input=${e => this._setField('notes', e.target.value)}
+            placeholder="Variations, tips…"></textarea>
         </div>
+
+        <!-- Nutrition -->
+        <div class="section-divider">Nutrition Facts (per serving — optional)</div>
+        <div class="field-row-3">
+          <div class="field">
+            <label>Calories (kcal)</label>
+            <input type="number" .value=${String(f.cal)}
+              @input=${e => this._setField('cal', e.target.value)} placeholder="0" min="0" />
+          </div>
+          <div class="field">
+            <label>Protein (g)</label>
+            <input type="number" .value=${String(f.prot)}
+              @input=${e => this._setField('prot', e.target.value)} placeholder="0" min="0" />
+          </div>
+          <div class="field">
+            <label>Fat (g)</label>
+            <input type="number" .value=${String(f.fat)}
+              @input=${e => this._setField('fat', e.target.value)} placeholder="0" min="0" />
+          </div>
+        </div>
+        <div class="field-row-3">
+          <div class="field">
+            <label>Saturated Fat (g)</label>
+            <input type="number" .value=${String(f.satf)}
+              @input=${e => this._setField('satf', e.target.value)} placeholder="0" min="0" />
+          </div>
+          <div class="field">
+            <label>Carbohydrates (g)</label>
+            <input type="number" .value=${String(f.carb)}
+              @input=${e => this._setField('carb', e.target.value)} placeholder="0" min="0" />
+          </div>
+          <div class="field">
+            <label>Dietary Fiber (g)</label>
+            <input type="number" .value=${String(f.fib)}
+              @input=${e => this._setField('fib', e.target.value)} placeholder="0" min="0" />
+          </div>
+        </div>
+        <div class="field-row-3">
+          <div class="field">
+            <label>Sugars (g)</label>
+            <input type="number" .value=${String(f.sug)}
+              @input=${e => this._setField('sug', e.target.value)} placeholder="0" min="0" />
+          </div>
+          <div class="field">
+            <label>Sodium (mg)</label>
+            <input type="number" .value=${String(f.sod)}
+              @input=${e => this._setField('sod', e.target.value)} placeholder="0" min="0" />
+          </div>
+          <div class="field">
+            <label>Cholesterol (mg)</label>
+            <input type="number" .value=${String(f.chol)}
+              @input=${e => this._setField('chol', e.target.value)} placeholder="0" min="0" />
+          </div>
+        </div>
+
       </div>
     `;
   }
@@ -510,7 +665,7 @@ class RmAddRecipeDialog extends LitElement {
       background: var(--rm-bg, #1c1c1e);
       border-radius: var(--rm-radius, 12px) var(--rm-radius, 12px) 0 0;
       width: 100%;
-      max-width: 600px;
+      max-width: 620px;
       max-height: 90vh;
       display: flex;
       flex-direction: column;
@@ -597,9 +752,15 @@ class RmAddRecipeDialog extends LitElement {
     .error-msg ha-icon { --mdc-icon-size: 16px; }
 
     /* Manual form */
-    .manual-mode { display: flex; flex-direction: column; gap: 14px; }
+    .manual-mode { display: flex; flex-direction: column; gap: 12px; }
     .field { display: flex; flex-direction: column; gap: 4px; }
-    .field label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--rm-text-secondary, #8e8e93); }
+    .field label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--rm-text-secondary, #8e8e93);
+    }
     .field input, .field textarea {
       background: var(--rm-surface, #2c2c2e);
       border: 1px solid var(--rm-border, rgba(255,255,255,0.12));
@@ -611,9 +772,49 @@ class RmAddRecipeDialog extends LitElement {
       resize: vertical;
     }
     .field input:focus, .field textarea:focus { outline: none; border-color: var(--rm-accent, #ff6b35); }
-    .field-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 
-    /* Ingredient list in form */
+    .field-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+    /* Star rating */
+    .star-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 0;
+    }
+    .star {
+      font-size: 28px;
+      color: var(--rm-border, rgba(255,255,255,0.2));
+      cursor: pointer;
+      line-height: 1;
+      transition: color 0.1s;
+    }
+    .star.filled { color: #f5a623; }
+    .star:hover  { color: #f5a623; }
+    .clear-rating {
+      margin-left: 8px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 11px;
+      color: var(--rm-text-secondary, #8e8e93);
+      text-decoration: underline;
+      padding: 0;
+    }
+
+    /* Section divider */
+    .section-divider {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--rm-text-secondary, #8e8e93);
+      padding-top: 8px;
+      border-top: 1px solid var(--rm-border, rgba(255,255,255,0.08));
+    }
+
+    /* Ingredient / step lists */
     .ing-list, .steps-edit { list-style: none; padding: 0; margin: 0 0 6px; }
     .ing-list li, .steps-edit li {
       display: flex;
@@ -725,7 +926,7 @@ class RmAddRecipeDialog extends LitElement {
     .import-result ha-icon { --mdc-icon-size: 20px; flex-shrink: 0; margin-top: 1px; }
     .import-result.success { background: rgba(76, 175, 80, 0.12); color: var(--success-color, #4caf50); }
     .import-result.partial { background: rgba(255, 152, 0, 0.12); color: #ff9800; }
-    .import-result.error { background: rgba(207, 102, 121, 0.12); color: var(--error-color, #cf6679); }
+    .import-result.error   { background: rgba(207, 102, 121, 0.12); color: var(--error-color, #cf6679); }
     .import-result strong { display: block; }
     .import-result small { opacity: 0.85; }
 

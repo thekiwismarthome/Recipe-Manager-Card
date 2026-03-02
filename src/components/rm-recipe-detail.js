@@ -1,23 +1,36 @@
 /**
- * Recipe detail view — full recipe with ingredients, steps, and actions.
+ * Recipe detail view — full recipe with ingredients, directions, nutrition, and actions.
  */
 import { LitElement, html, css } from 'lit';
 
+const NUTRITION_FIELDS = [
+  { key: 'calories',      label: 'Calories',         unit: 'kcal', bold: true },
+  { key: 'fat',           label: 'Total Fat',         unit: 'g' },
+  { key: 'saturated_fat', label: 'Saturated Fat',     unit: 'g', indent: true },
+  { key: 'cholesterol',   label: 'Cholesterol',       unit: 'mg' },
+  { key: 'sodium',        label: 'Sodium',            unit: 'mg' },
+  { key: 'carbohydrates', label: 'Total Carbohydrate',unit: 'g' },
+  { key: 'fiber',         label: 'Dietary Fiber',     unit: 'g', indent: true },
+  { key: 'sugar',         label: 'Total Sugars',      unit: 'g', indent: true },
+  { key: 'protein',       label: 'Protein',           unit: 'g' },
+];
+
 class RmRecipeDetail extends LitElement {
   static properties = {
-    recipe: { type: Object },
-    api: { type: Object },
-    shoppingLists: { type: Array },
-    _editing: { type: Boolean },
-    _editData: { type: Object },
-    _servingMult: { type: Number },
-    _activeTab: { type: String },  // 'ingredients' | 'steps' | 'notes'
-    _showShoppingPicker: { type: Boolean },
-    _selectedListId: { type: String },
-    _shoppingAdding: { type: Boolean },
-    _shoppingResult: { type: String },
-    _confirmDelete: { type: Boolean },
-    _downloading: { type: Boolean },
+    recipe:             { type: Object },
+    api:                { type: Object },
+    shoppingLists:      { type: Array },
+    _editing:           { type: Boolean },
+    _editData:          { type: Object },
+    _servingMult:       { type: Number },
+    _activeTab:         { type: String },  // 'ingredients'|'directions'|'notes'|'nutrition'
+    _showShoppingPicker:{ type: Boolean },
+    _selectedListId:    { type: String },
+    _shoppingAdding:    { type: Boolean },
+    _shoppingResult:    { type: String },
+    _confirmDelete:     { type: Boolean },
+    _downloading:       { type: Boolean },
+    _hoverRating:       { type: Number },
   };
 
   constructor() {
@@ -35,6 +48,7 @@ class RmRecipeDetail extends LitElement {
     this._shoppingResult = null;
     this._confirmDelete = false;
     this._downloading = false;
+    this._hoverRating = 0;
   }
 
   updated(changedProps) {
@@ -66,15 +80,30 @@ class RmRecipeDetail extends LitElement {
   // -- Actions ------------------------------------------------------------------
 
   _startEdit() {
+    const n = this.recipe.nutrition || {};
     this._editData = {
-      name: this.recipe.name || '',
-      description: this.recipe.description || '',
-      source_url: this.recipe.source_url || '',
-      servings: this.recipe.servings || 4,
-      prep_time: this.recipe.prep_time || '',
-      cook_time: this.recipe.cook_time || '',
-      tags: (this.recipe.tags || []).join(', '),
-      notes: this.recipe.notes || '',
+      name:          this.recipe.name || '',
+      description:   this.recipe.description || '',
+      source_url:    this.recipe.source_url || '',
+      servings:      this.recipe.servings || '',
+      prep_time:     this.recipe.prep_time || '',
+      cook_time:     this.recipe.cook_time || '',
+      tags:          (this.recipe.tags || []).join(', '),
+      courses:       (this.recipe.courses || []).join(', '),
+      categories:    (this.recipe.categories || []).join(', '),
+      collections:   (this.recipe.collections || []).join(', '),
+      notes:         this.recipe.notes || '',
+      rating:        this.recipe.rating || 0,
+      // Nutrition
+      cal:  n.calories      || '',
+      fat:  n.fat           || '',
+      satf: n.saturated_fat || '',
+      chol: n.cholesterol   || '',
+      sod:  n.sodium        || '',
+      carb: n.carbohydrates || '',
+      fib:  n.fiber         || '',
+      sug:  n.sugar         || '',
+      prot: n.protein       || '',
     };
     this._editing = true;
   }
@@ -89,14 +118,34 @@ class RmRecipeDetail extends LitElement {
   }
 
   async _saveEdit() {
+    const d = this._editData;
+    const splitList = v => v ? v.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+    const nutrition = {};
+    const nMap = { cal:'calories', fat:'fat', satf:'saturated_fat', chol:'cholesterol',
+                   sod:'sodium', carb:'carbohydrates', fib:'fiber', sug:'sugar', prot:'protein' };
+    let hasNutrition = false;
+    for (const [k, nk] of Object.entries(nMap)) {
+      if (d[k] !== '' && d[k] != null) {
+        nutrition[nk] = d[k];
+        hasNutrition = true;
+      }
+    }
+
     const data = {
-      ...this._editData,
-      servings: parseInt(this._editData.servings) || 4,
-      prep_time: parseInt(this._editData.prep_time) || null,
-      cook_time: parseInt(this._editData.cook_time) || null,
-      tags: this._editData.tags
-        ? this._editData.tags.split(',').map(t => t.trim()).filter(Boolean)
-        : [],
+      name:        d.name,
+      description: d.description,
+      source_url:  d.source_url,
+      servings:    parseInt(d.servings) || null,
+      prep_time:   parseInt(d.prep_time) || null,
+      cook_time:   parseInt(d.cook_time) || null,
+      tags:        splitList(d.tags),
+      courses:     splitList(d.courses),
+      categories:  splitList(d.categories),
+      collections: splitList(d.collections),
+      notes:       d.notes,
+      rating:      d.rating || null,
+      nutrition:   hasNutrition ? nutrition : null,
     };
     this.dispatchEvent(new CustomEvent('rm-update-recipe', {
       detail: { recipeId: this.recipe.id, data },
@@ -114,8 +163,17 @@ class RmRecipeDetail extends LitElement {
     }));
   }
 
+  _handleSetRating(rating) {
+    const newRating = this.recipe.rating === rating ? null : rating;
+    this.dispatchEvent(new CustomEvent('rm-update-recipe', {
+      detail: { recipeId: this.recipe.id, data: { rating: newRating } },
+      bubbles: true,
+      composed: true,
+    }));
+  }
+
   async _handleDownloadImage() {
-    if (!this.recipe.source_url && !this.recipe.image_url) return;
+    if (!this.recipe.image_url) return;
     this._downloading = true;
     try {
       const result = await this.api.downloadRecipeImage(this.recipe.id, this.recipe.image_url);
@@ -168,6 +226,32 @@ class RmRecipeDetail extends LitElement {
 
   // -- Render -------------------------------------------------------------------
 
+  _renderStars(rating, interactive = false) {
+    const current = this._hoverRating || rating || 0;
+    return html`
+      <div class="stars ${interactive ? 'stars-interactive' : ''}">
+        ${[1,2,3,4,5].map(n => html`
+          <span
+            class="star ${n <= current ? 'filled' : ''}"
+            @mouseenter=${interactive ? () => { this._hoverRating = n; } : undefined}
+            @mouseleave=${interactive ? () => { this._hoverRating = 0; } : undefined}
+            @click=${interactive ? () => this._handleSetRating(n) : undefined}
+          >★</span>
+        `)}
+      </div>
+    `;
+  }
+
+  _renderChipGroup(label, items, cssClass) {
+    if (!items?.length) return '';
+    return html`
+      <div class="chip-group">
+        <span class="chip-group-label">${label}:</span>
+        ${items.map(t => html`<span class="chip ${cssClass}">${t}</span>`)}
+      </div>
+    `;
+  }
+
   render() {
     if (!this.recipe) return html``;
     const r = this.recipe;
@@ -186,18 +270,20 @@ class RmRecipeDetail extends LitElement {
             </div>
           `}
           <div class="hero-actions">
-            <button class="hero-btn ${r.is_favourite ? 'fav-active' : ''}" @click=${this._handleToggleFav}>
+            <button class="hero-btn ${r.is_favourite ? 'fav-active' : ''}" @click=${this._handleToggleFav}
+              title="${r.is_favourite ? 'Remove from favourites' : 'Add to favourites'}">
               <ha-icon icon="${r.is_favourite ? 'mdi:heart' : 'mdi:heart-outline'}"></ha-icon>
             </button>
             ${r.source_url ? html`
-              <a class="hero-btn" href="${r.source_url}" target="_blank" rel="noopener">
+              <a class="hero-btn" href="${r.source_url}" target="_blank" rel="noopener" title="Open source">
                 <ha-icon icon="mdi:open-in-new"></ha-icon>
               </a>
             ` : ''}
-            <button class="hero-btn" @click=${this._startEdit}>
+            <button class="hero-btn" @click=${this._startEdit} title="Edit">
               <ha-icon icon="mdi:pencil-outline"></ha-icon>
             </button>
-            <button class="hero-btn delete-btn ${this._confirmDelete ? 'confirm' : ''}" @click=${this._handleDeleteRecipe}>
+            <button class="hero-btn delete-btn ${this._confirmDelete ? 'confirm' : ''}" @click=${this._handleDeleteRecipe}
+              title="${this._confirmDelete ? 'Confirm delete' : 'Delete recipe'}">
               <ha-icon icon="${this._confirmDelete ? 'mdi:check' : 'mdi:trash-can-outline'}"></ha-icon>
             </button>
           </div>
@@ -208,6 +294,9 @@ class RmRecipeDetail extends LitElement {
           <div class="detail-head">
             <h2 class="detail-name">${r.name}</h2>
             ${r.description ? html`<p class="detail-desc">${r.description}</p>` : ''}
+
+            <!-- Star rating (inline, interactive) -->
+            ${this._renderStars(r.rating, true)}
 
             <div class="meta-row">
               ${r.prep_time ? html`
@@ -231,7 +320,7 @@ class RmRecipeDetail extends LitElement {
               ${r.servings ? html`
                 <div class="meta-item">
                   <span class="meta-label">Serves</span>
-                  <span class="meta-val">${r.servings}</span>
+                  <span class="meta-val">${r.servings_text || r.servings}</span>
                 </div>
               ` : ''}
             </div>
@@ -241,6 +330,10 @@ class RmRecipeDetail extends LitElement {
                 ${r.tags.map(t => html`<span class="tag-chip">${t}</span>`)}
               </div>
             ` : ''}
+
+            ${this._renderChipGroup('Courses', r.courses, 'chip-course')}
+            ${this._renderChipGroup('Categories', r.categories, 'chip-category')}
+            ${this._renderChipGroup('Collections', r.collections, 'chip-collection')}
           </div>
 
           <!-- Serving scaler -->
@@ -261,82 +354,130 @@ class RmRecipeDetail extends LitElement {
 
           <!-- Tabs -->
           <div class="tabs-row">
-            ${['ingredients', 'steps', 'notes'].map(tab => html`
+            ${[['ingredients','Ingredients'],['directions','Directions'],['notes','Notes'],['nutrition','Nutrition']].map(([val, lbl]) => html`
               <button
-                class="tab-btn ${this._activeTab === tab ? 'active' : ''}"
-                @click=${() => { this._activeTab = tab; }}
-              >${tab.charAt(0).toUpperCase() + tab.slice(1)}</button>
+                class="tab-btn ${this._activeTab === val ? 'active' : ''}"
+                @click=${() => { this._activeTab = val; }}
+              >${lbl}</button>
             `)}
           </div>
 
           <!-- Tab content -->
           <div class="tab-content">
-            ${this._activeTab === 'ingredients' ? html`
-              ${r.ingredients?.length ? html`
-                <ul class="ingredient-list">
-                  ${r.ingredients.map(ing => html`
-                    <li class="ingredient-item">
-                      <span class="ing-amount">${this._scaleAmount(ing.amount) || ''} ${ing.unit || ''}</span>
-                      <span class="ing-name">${ing.name}</span>
-                    </li>
-                  `)}
-                </ul>
-              ` : html`<p class="empty-tab">No ingredients listed.</p>`}
-
-              <!-- Add to shopping -->
-              ${this.shoppingLists.length ? html`
-                <div class="shopping-section">
-                  ${this._shoppingResult === 'success' ? html`
-                    <div class="shopping-success">
-                      <ha-icon icon="mdi:check-circle-outline"></ha-icon>
-                      Added to shopping list!
-                    </div>
-                  ` : this._showShoppingPicker ? html`
-                    <div class="shopping-picker">
-                      <select class="list-select" .value=${this._selectedListId} @change=${e => { this._selectedListId = e.target.value; }}>
-                        ${this.shoppingLists.map(l => html`
-                          <option value="${l.id}" ?selected=${l.id === this._selectedListId}>${l.name}</option>
-                        `)}
-                      </select>
-                      <button class="action-btn primary" ?disabled=${this._shoppingAdding} @click=${this._handleAddToShopping}>
-                        ${this._shoppingAdding ? html`<ha-circular-progress active size="tiny"></ha-circular-progress>` : 'Add'}
-                      </button>
-                      <button class="action-btn" @click=${() => { this._showShoppingPicker = false; }}>Cancel</button>
-                    </div>
-                  ` : html`
-                    <button class="action-btn primary shopping-btn" @click=${() => { this._showShoppingPicker = true; }}>
-                      <ha-icon icon="mdi:cart-plus"></ha-icon>
-                      Add to Shopping List
-                    </button>
-                  `}
-                </div>
-              ` : ''}
-            ` : this._activeTab === 'steps' ? html`
-              ${r.instructions?.length ? html`
-                <ol class="steps-list">
-                  ${r.instructions.map((step, i) => html`
-                    <li class="step-item">
-                      <span class="step-num">${i + 1}</span>
-                      <span class="step-text">${step}</span>
-                    </li>
-                  `)}
-                </ol>
-              ` : html`<p class="empty-tab">No instructions listed.</p>`}
-            ` : html`
-              ${r.notes ? html`
-                <p class="notes-text">${r.notes}</p>
-              ` : html`<p class="empty-tab">No notes.</p>`}
-            `}
+            ${this._activeTab === 'ingredients' ? this._renderIngredients(r) : ''}
+            ${this._activeTab === 'directions'  ? this._renderDirections(r)  : ''}
+            ${this._activeTab === 'notes'       ? this._renderNotes(r)       : ''}
+            ${this._activeTab === 'nutrition'   ? this._renderNutrition(r)   : ''}
           </div>
         </div>
 
-        <!-- Edit dialog (inline) -->
+        <!-- Edit panel (inline overlay) -->
         ${this._editing ? this._renderEditPanel() : ''}
       </div>
     `;
   }
 
+  _renderIngredients(r) {
+    return html`
+      ${r.ingredients?.length ? html`
+        <ul class="ingredient-list">
+          ${r.ingredients.map(ing => html`
+            <li class="ingredient-item">
+              <span class="ing-amount">${this._scaleAmount(ing.amount) || ''} ${ing.unit || ''}</span>
+              <span class="ing-name">${ing.name}${ing.notes ? html` <em class="ing-notes">(${ing.notes})</em>` : ''}</span>
+            </li>
+          `)}
+        </ul>
+      ` : html`<p class="empty-tab">No ingredients listed.</p>`}
+
+      <!-- Add to shopping list -->
+      ${this.shoppingLists.length ? html`
+        <div class="shopping-section">
+          ${this._shoppingResult === 'success' ? html`
+            <div class="shopping-success">
+              <ha-icon icon="mdi:check-circle-outline"></ha-icon>
+              Added to shopping list!
+            </div>
+          ` : this._showShoppingPicker ? html`
+            <div class="shopping-picker">
+              <select class="list-select" .value=${this._selectedListId}
+                @change=${e => { this._selectedListId = e.target.value; }}>
+                ${this.shoppingLists.map(l => html`
+                  <option value="${l.id}" ?selected=${l.id === this._selectedListId}>${l.name}</option>
+                `)}
+              </select>
+              <button class="action-btn primary" ?disabled=${this._shoppingAdding} @click=${this._handleAddToShopping}>
+                ${this._shoppingAdding ? html`<ha-circular-progress active size="tiny"></ha-circular-progress>` : 'Add'}
+              </button>
+              <button class="action-btn" @click=${() => { this._showShoppingPicker = false; }}>Cancel</button>
+            </div>
+          ` : html`
+            <button class="action-btn primary shopping-btn" @click=${() => { this._showShoppingPicker = true; }}>
+              <ha-icon icon="mdi:cart-plus"></ha-icon>
+              Add to Shopping List
+            </button>
+          `}
+        </div>
+      ` : ''}
+    `;
+  }
+
+  _renderDirections(r) {
+    return html`
+      ${r.instructions?.length ? html`
+        <ol class="steps-list">
+          ${r.instructions.map((step, i) => html`
+            <li class="step-item">
+              <span class="step-num">${i + 1}</span>
+              <span class="step-text">${step}</span>
+            </li>
+          `)}
+        </ol>
+      ` : html`<p class="empty-tab">No directions listed.</p>`}
+    `;
+  }
+
+  _renderNotes(r) {
+    return html`
+      ${r.notes
+        ? html`<p class="notes-text">${r.notes}</p>`
+        : html`<p class="empty-tab">No notes.</p>`}
+    `;
+  }
+
+  _renderNutrition(r) {
+    const n = r.nutrition || {};
+    const hasAny = NUTRITION_FIELDS.some(f => n[f.key] != null && n[f.key] !== '');
+    if (!hasAny) {
+      return html`
+        <div class="empty-tab">
+          <p>No nutrition info. Add it via the edit panel.</p>
+        </div>
+      `;
+    }
+    const perServing = r.servings ? `Per serving (${r.servings_text || r.servings})` : 'Per serving';
+    return html`
+      <div class="nutrition-panel">
+        <div class="nutr-header">Nutrition Facts</div>
+        <div class="nutr-sub">${perServing}</div>
+        <div class="nutr-divider thick"></div>
+        ${NUTRITION_FIELDS.map(f => {
+          const val = n[f.key];
+          if (val == null || val === '') return '';
+          return html`
+            <div class="nutr-row ${f.bold ? 'nutr-bold' : ''} ${f.indent ? 'nutr-indent' : ''}">
+              <span class="nutr-label">${f.label}</span>
+              <span class="nutr-val">${val}${f.unit !== 'kcal' ? html`<em> ${f.unit}</em>` : ''}</span>
+            </div>
+            <div class="nutr-divider"></div>
+          `;
+        })}
+      </div>
+    `;
+  }
+
   _renderEditPanel() {
+    const d = this._editData;
     return html`
       <div class="edit-overlay" @click=${(e) => { if (e.target === e.currentTarget) this._cancelEdit(); }}>
         <div class="edit-panel">
@@ -345,16 +486,53 @@ class RmRecipeDetail extends LitElement {
             <button class="icon-btn" @click=${this._cancelEdit}><ha-icon icon="mdi:close"></ha-icon></button>
           </div>
           <div class="edit-body">
+
             ${this._renderField('Name', 'name', 'text')}
             ${this._renderField('Description', 'description', 'textarea')}
             ${this._renderField('Source URL', 'source_url', 'url')}
-            <div class="edit-row-2">
-              ${this._renderField('Prep time (min)', 'prep_time', 'number')}
-              ${this._renderField('Cook time (min)', 'cook_time', 'number')}
+
+            <div class="edit-row-3">
+              ${this._renderField('Prep (min)', 'prep_time', 'number')}
+              ${this._renderField('Cook (min)', 'cook_time', 'number')}
               ${this._renderField('Servings', 'servings', 'number')}
             </div>
+
+            <!-- Star rating picker -->
+            <div class="edit-field">
+              <label>Rating</label>
+              <div class="edit-stars">
+                ${[1,2,3,4,5].map(n => html`
+                  <span class="edit-star ${n <= (d.rating || 0) ? 'filled' : ''}"
+                    @click=${() => this._handleEditField('rating', d.rating === n ? 0 : n)}
+                  >★</span>
+                `)}
+              </div>
+            </div>
+
             ${this._renderField('Tags (comma-separated)', 'tags', 'text')}
+            ${this._renderField('Courses (comma-separated)', 'courses', 'text')}
+            ${this._renderField('Categories (comma-separated)', 'categories', 'text')}
+            ${this._renderField('Collections (comma-separated)', 'collections', 'text')}
             ${this._renderField('Notes', 'notes', 'textarea')}
+
+            <!-- Nutrition section -->
+            <div class="edit-section-label">Nutrition Facts (per serving)</div>
+            <div class="edit-row-3">
+              ${this._renderField('Calories (kcal)', 'cal', 'number')}
+              ${this._renderField('Protein (g)', 'prot', 'number')}
+              ${this._renderField('Fat (g)', 'fat', 'number')}
+            </div>
+            <div class="edit-row-3">
+              ${this._renderField('Saturated Fat (g)', 'satf', 'number')}
+              ${this._renderField('Carbs (g)', 'carb', 'number')}
+              ${this._renderField('Fiber (g)', 'fib', 'number')}
+            </div>
+            <div class="edit-row-3">
+              ${this._renderField('Sugar (g)', 'sug', 'number')}
+              ${this._renderField('Sodium (mg)', 'sod', 'number')}
+              ${this._renderField('Cholesterol (mg)', 'chol', 'number')}
+            </div>
+
           </div>
           <div class="edit-footer">
             <button class="action-btn" @click=${this._cancelEdit}>Cancel</button>
@@ -410,12 +588,8 @@ class RmRecipeDetail extends LitElement {
       background: var(--rm-surface, #2c2c2e);
       overflow: hidden;
     }
-    .hero.no-image { height: 100px; }
-    .hero img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
+    .hero.no-image { height: 80px; }
+    .hero img { width: 100%; height: 100%; object-fit: cover; }
     .hero-overlay {
       position: absolute;
       inset: 0;
@@ -461,24 +635,43 @@ class RmRecipeDetail extends LitElement {
     .detail-scroll {
       flex: 1;
       overflow-y: auto;
-      padding: 16px 16px 24px;
+      padding: 14px 16px 24px;
       scrollbar-width: thin;
       scrollbar-color: var(--rm-border, rgba(255,255,255,0.08)) transparent;
     }
 
     .detail-head { margin-bottom: 12px; }
     .detail-name {
-      margin: 0 0 6px;
+      margin: 0 0 4px;
       font-size: 20px;
       font-weight: 700;
       color: var(--rm-text, #e5e5ea);
     }
     .detail-desc {
-      margin: 0 0 10px;
+      margin: 0 0 8px;
       font-size: 14px;
       color: var(--rm-text-secondary, #8e8e93);
       line-height: 1.5;
     }
+
+    /* Stars */
+    .stars {
+      display: flex;
+      gap: 2px;
+      margin-bottom: 8px;
+    }
+    .star {
+      font-size: 20px;
+      color: var(--rm-border, rgba(255,255,255,0.2));
+      line-height: 1;
+      transition: color 0.1s;
+    }
+    .star.filled { color: #f5a623; }
+    .stars-interactive .star { cursor: pointer; }
+    .stars-interactive .star:hover,
+    .stars-interactive .star:hover ~ .star { color: var(--rm-border, rgba(255,255,255,0.2)); }
+    .stars-interactive:hover .star { color: #f5a623; }
+    .stars-interactive .star:hover ~ .star { color: var(--rm-border, rgba(255,255,255,0.2)) !important; }
 
     .meta-row {
       display: flex;
@@ -498,7 +691,7 @@ class RmRecipeDetail extends LitElement {
     .meta-label { font-size: 10px; color: var(--rm-text-secondary, #8e8e93); text-transform: uppercase; letter-spacing: 0.05em; }
     .meta-val { font-size: 14px; font-weight: 600; color: var(--rm-text, #e5e5ea); }
 
-    .tags-row { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tags-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
     .tag-chip {
       background: var(--rm-accent-soft, rgba(255,107,53,0.15));
       color: var(--rm-accent, #ff6b35);
@@ -506,6 +699,30 @@ class RmRecipeDetail extends LitElement {
       padding: 3px 10px;
       font-size: 12px;
     }
+
+    /* Chip groups (courses, categories, collections) */
+    .chip-group {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 5px;
+    }
+    .chip-group-label {
+      font-size: 11px;
+      color: var(--rm-text-secondary, #8e8e93);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .chip {
+      border-radius: 20px;
+      padding: 2px 9px;
+      font-size: 12px;
+    }
+    .chip-course    { background: rgba(88,166,255,0.15); color: #58a6ff; }
+    .chip-category  { background: rgba(63,185,80,0.15);  color: #3fb950; }
+    .chip-collection{ background: rgba(210,153,34,0.15); color: #d2a01e; }
 
     /* Scaler */
     .scaler-row {
@@ -545,10 +762,11 @@ class RmRecipeDetail extends LitElement {
       border-bottom: 2px solid transparent;
       padding: 8px 4px;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 500;
       color: var(--rm-text-secondary, #8e8e93);
       transition: color 0.15s, border-color 0.15s;
+      white-space: nowrap;
     }
     .tab-btn.active {
       color: var(--rm-accent, #ff6b35);
@@ -573,14 +791,11 @@ class RmRecipeDetail extends LitElement {
       flex-shrink: 0;
     }
     .ing-name { font-size: 14px; color: var(--rm-text, #e5e5ea); }
+    .ing-notes { font-size: 12px; color: var(--rm-text-secondary, #8e8e93); font-style: italic; }
 
     /* Shopping */
     .shopping-section { margin-top: 12px; }
-    .shopping-btn {
-      width: 100%;
-      justify-content: center;
-      gap: 6px;
-    }
+    .shopping-btn { width: 100%; justify-content: center; gap: 6px; }
     .shopping-btn ha-icon { --mdc-icon-size: 18px; }
     .shopping-picker { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .list-select {
@@ -603,8 +818,8 @@ class RmRecipeDetail extends LitElement {
     }
     .shopping-success ha-icon { --mdc-icon-size: 20px; }
 
-    /* Steps */
-    .steps-list { list-style: none; padding: 0; margin: 0; counter-reset: steps; }
+    /* Directions */
+    .steps-list { list-style: none; padding: 0; margin: 0; }
     .step-item {
       display: flex;
       gap: 12px;
@@ -628,7 +843,42 @@ class RmRecipeDetail extends LitElement {
 
     /* Notes */
     .notes-text { font-size: 14px; color: var(--rm-text, #e5e5ea); line-height: 1.6; white-space: pre-wrap; }
-    .empty-tab { font-size: 14px; color: var(--rm-text-secondary, #8e8e93); text-align: center; padding: 20px 0; }
+    .empty-tab { font-size: 14px; color: var(--rm-text-secondary, #8e8e93); text-align: center; padding: 20px 0; margin: 0; }
+
+    /* Nutrition */
+    .nutrition-panel {
+      max-width: 340px;
+      border: 2px solid var(--rm-text, #e5e5ea);
+      border-radius: 4px;
+      padding: 8px 12px;
+      margin: 0 auto;
+    }
+    .nutr-header {
+      font-size: 28px;
+      font-weight: 900;
+      color: var(--rm-text, #e5e5ea);
+      line-height: 1;
+      margin-bottom: 2px;
+    }
+    .nutr-sub {
+      font-size: 11px;
+      color: var(--rm-text-secondary, #8e8e93);
+      margin-bottom: 6px;
+    }
+    .nutr-divider { border-top: 1px solid var(--rm-border, rgba(255,255,255,0.15)); margin: 2px 0; }
+    .nutr-divider.thick { border-top: 6px solid var(--rm-text, #e5e5ea); margin: 4px 0; }
+    .nutr-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 2px 0;
+      font-size: 13px;
+      color: var(--rm-text, #e5e5ea);
+    }
+    .nutr-bold { font-weight: 700; font-size: 15px; }
+    .nutr-indent { padding-left: 14px; font-size: 12px; }
+    .nutr-val { font-weight: 600; white-space: nowrap; }
+    .nutr-val em { font-style: normal; font-size: 11px; color: var(--rm-text-secondary, #8e8e93); }
 
     /* Buttons */
     .action-btn {
@@ -670,7 +920,7 @@ class RmRecipeDetail extends LitElement {
       background: var(--rm-bg, #1c1c1e);
       border-radius: var(--rm-radius, 12px) var(--rm-radius, 12px) 0 0;
       width: 100%;
-      max-height: 80vh;
+      max-height: 82vh;
       display: flex;
       flex-direction: column;
     }
@@ -681,7 +931,9 @@ class RmRecipeDetail extends LitElement {
       padding: 14px 16px;
       border-bottom: 1px solid var(--rm-border, rgba(255,255,255,0.08));
       font-weight: 600;
+      font-size: 16px;
       color: var(--rm-text, #e5e5ea);
+      flex-shrink: 0;
     }
     .edit-body {
       flex: 1;
@@ -691,9 +943,19 @@ class RmRecipeDetail extends LitElement {
       flex-direction: column;
       gap: 12px;
     }
-    .edit-row-2 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .edit-section-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--rm-text-muted, #8e8e93);
+      margin-top: 4px;
+      padding-top: 8px;
+      border-top: 1px solid var(--rm-border, rgba(255,255,255,0.08));
+    }
+    .edit-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
     .edit-field { display: flex; flex-direction: column; gap: 4px; }
-    .edit-field label { font-size: 12px; color: var(--rm-text-secondary, #8e8e93); text-transform: uppercase; letter-spacing: 0.05em; }
+    .edit-field label { font-size: 11px; color: var(--rm-text-secondary, #8e8e93); text-transform: uppercase; letter-spacing: 0.05em; }
     .edit-field input, .edit-field textarea {
       background: var(--rm-surface, #2c2c2e);
       border: 1px solid var(--rm-border, rgba(255,255,255,0.12));
@@ -708,12 +970,27 @@ class RmRecipeDetail extends LitElement {
       outline: none;
       border-color: var(--rm-accent, #ff6b35);
     }
+    .edit-stars {
+      display: flex;
+      gap: 4px;
+      padding: 4px 0;
+    }
+    .edit-star {
+      font-size: 26px;
+      color: var(--rm-border, rgba(255,255,255,0.2));
+      cursor: pointer;
+      transition: color 0.12s;
+      line-height: 1;
+    }
+    .edit-star.filled { color: #f5a623; }
+    .edit-star:hover { color: #f5a623; }
     .edit-footer {
       display: flex;
       gap: 8px;
       justify-content: flex-end;
       padding: 12px 16px;
       border-top: 1px solid var(--rm-border, rgba(255,255,255,0.08));
+      flex-shrink: 0;
     }
   `;
 }
