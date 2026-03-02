@@ -9,5 +9,5 @@ export default {
     format: 'es',
     sourcemap: false
   },
-  plugins: [resolve(), commonjs(), terser()]
+  plugins: [resolve({ browser: true }), commonjs(), terser()]
 };
