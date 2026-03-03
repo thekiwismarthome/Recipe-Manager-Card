@@ -1,5 +1,5 @@
 /**
- * Recipe detail view — full recipe with ingredients, directions, nutrition, and actions.
+ * Recipe detail view — full recipe with ingredients, directions, nutrition, photos and actions.
  */
 import { LitElement, html, css } from 'lit';
 
@@ -15,6 +15,26 @@ const NUTRITION_FIELDS = [
   { key: 'protein',       label: 'Protein',           unit: 'g' },
 ];
 
+// Regex to find time mentions in directions text
+// Matches: "10 minutes", "1 hour", "30 mins", "2 hrs", "45 seconds", "1 hour 30 minutes"
+const TIME_RE = /(\d+\s*(?:hours?|hrs?)\s*(?:and\s*)?\d*\s*(?:minutes?|mins?)?|\d+\s*(?:minutes?|mins?|seconds?|secs?|hours?|hrs?))/gi;
+
+function parseTimeToSeconds(text) {
+  const t = text.toLowerCase();
+  let total = 0;
+  const hourM = t.match(/(\d+)\s*h(?:ours?|rs?)?/);
+  if (hourM) total += parseInt(hourM[1]) * 3600;
+  const minM = t.match(/(\d+)\s*m(?:in(?:utes?)?)?(?!\s*l)/);
+  if (minM) total += parseInt(minM[1]) * 60;
+  const secM = t.match(/(\d+)\s*s(?:ec(?:onds?)?)?/);
+  if (secM) total += parseInt(secM[1]);
+  if (!total) {
+    const bare = t.match(/^(\d+)$/);
+    if (bare) total = parseInt(bare[1]) * 60;
+  }
+  return total || 0;
+}
+
 class RmRecipeDetail extends LitElement {
   static properties = {
     recipe:              { type: Object },
@@ -24,7 +44,7 @@ class RmRecipeDetail extends LitElement {
     _editing:            { type: Boolean },
     _editData:           { type: Object },
     _servingMult:        { type: Number },
-    _activeTab:          { type: String },  // 'ingredients'|'directions'|'notes'|'nutrition'
+    _activeTab:          { type: String },  // 'ingredients'|'directions'|'notes'|'nutrition'|'photos'
     _showShoppingPicker: { type: Boolean },
     _selectedListId:     { type: String },
     _checkedIngredients: { type: Object },  // Set of indices
@@ -33,6 +53,8 @@ class RmRecipeDetail extends LitElement {
     _confirmDelete:      { type: Boolean },
     _downloading:        { type: Boolean },
     _hoverRating:        { type: Number },
+    _photoUrlInput:      { type: String },
+    _addingPhotoUrl:     { type: Boolean },
   };
 
   constructor() {
@@ -53,6 +75,8 @@ class RmRecipeDetail extends LitElement {
     this._confirmDelete = false;
     this._downloading = false;
     this._hoverRating = 0;
+    this._photoUrlInput = '';
+    this._addingPhotoUrl = false;
   }
 
   updated(changedProps) {
@@ -63,6 +87,7 @@ class RmRecipeDetail extends LitElement {
       this._shoppingResult = null;
       this._showShoppingPicker = false;
       this._checkedIngredients = null;
+      this._photoUrlInput = '';
     }
     if (changedProps.has('shoppingLists') && this.shoppingLists.length && !this._selectedListId) {
       this._selectedListId = this.shoppingLists[0]?.id ?? '';
@@ -169,15 +194,6 @@ class RmRecipeDetail extends LitElement {
     }));
   }
 
-  _handleSetRating(rating) {
-    const newRating = this.recipe.rating === rating ? null : rating;
-    this.dispatchEvent(new CustomEvent('rm-update-recipe', {
-      detail: { recipeId: this.recipe.id, data: { rating: newRating } },
-      bubbles: true,
-      composed: true,
-    }));
-  }
-
   async _handleDownloadImage() {
     if (!this.recipe.image_url) return;
     this._downloading = true;
@@ -211,8 +227,8 @@ class RmRecipeDetail extends LitElement {
   }
 
   _openShoppingPicker() {
-    const count = this.recipe?.ingredients?.length ?? 0;
-    this._checkedIngredients = new Set([...Array(count).keys()]);
+    // Default: NO items checked — user selects what they need
+    this._checkedIngredients = new Set();
     this._showShoppingPicker = true;
   }
 
@@ -224,6 +240,15 @@ class RmRecipeDetail extends LitElement {
       newSet.add(index);
     }
     this._checkedIngredients = newSet;
+  }
+
+  _selectAllIngredients() {
+    const count = this.recipe?.ingredients?.length ?? 0;
+    this._checkedIngredients = new Set([...Array(count).keys()]);
+  }
+
+  _clearAllIngredients() {
+    this._checkedIngredients = new Set();
   }
 
   async _handleAddToShopping() {
@@ -251,23 +276,88 @@ class RmRecipeDetail extends LitElement {
     setTimeout(() => { this._shoppingResult = null; }, 2500);
   }
 
-  // -- Render -------------------------------------------------------------------
+  // -- Timer helpers ----------------------------------------------------------
 
-  _renderStars(rating, interactive = false) {
-    const current = this._hoverRating || rating || 0;
-    return html`
-      <div class="stars ${interactive ? 'stars-interactive' : ''}">
-        ${[1,2,3,4,5].map(n => html`
-          <span
-            class="star ${n <= current ? 'filled' : ''}"
-            @mouseenter=${interactive ? () => { this._hoverRating = n; } : undefined}
-            @mouseleave=${interactive ? () => { this._hoverRating = 0; } : undefined}
-            @click=${interactive ? () => this._handleSetRating(n) : undefined}
-          >★</span>
-        `)}
-      </div>
-    `;
+  _fireTimer(seconds, label) {
+    this.dispatchEvent(new CustomEvent('rm-start-timer', {
+      detail: { seconds, label },
+      bubbles: true,
+      composed: true,
+    }));
   }
+
+  // -- Photos -----------------------------------------------------------------
+
+  async _handleAddPhotoUrl() {
+    const url = this._photoUrlInput.trim();
+    if (!url) return;
+    this._addingPhotoUrl = true;
+    try {
+      // For now, set it as the main image_url (first photo sets main image)
+      const existingPhotos = this.recipe.photos || [];
+      const newPhotos = [...existingPhotos, url];
+      const updateData = { photos: newPhotos };
+      // If no main image, also set it as image_url
+      if (!this.recipe.image_url) updateData.image_url = url;
+      this.dispatchEvent(new CustomEvent('rm-update-recipe', {
+        detail: { recipeId: this.recipe.id, data: updateData },
+        bubbles: true,
+        composed: true,
+      }));
+      this._photoUrlInput = '';
+    } finally {
+      this._addingPhotoUrl = false;
+    }
+  }
+
+  _handleCameraCapture(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const b64 = ev.target.result.split(',')[1];
+      try {
+        const result = await this.api.uploadRecipeImage(this.recipe.id, b64);
+        if (result?.image_url || result?.local_url) {
+          const newUrl = result.image_url || result.local_url;
+          const newPhotos = [...(this.recipe.photos || []), newUrl];
+          const updateData = { photos: newPhotos };
+          if (!this.recipe.image_url) updateData.image_url = newUrl;
+          this.dispatchEvent(new CustomEvent('rm-update-recipe', {
+            detail: { recipeId: this.recipe.id, data: updateData },
+            bubbles: true,
+            composed: true,
+          }));
+        }
+      } catch (err) {
+        console.warn('Camera upload failed:', err);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  _setMainPhoto(url) {
+    this.dispatchEvent(new CustomEvent('rm-update-recipe', {
+      detail: { recipeId: this.recipe.id, data: { image_url: url } },
+      bubbles: true,
+      composed: true,
+    }));
+  }
+
+  _removePhoto(url) {
+    const newPhotos = (this.recipe.photos || []).filter(p => p !== url);
+    const updateData = { photos: newPhotos };
+    if (this.recipe.image_url === url) {
+      updateData.image_url = newPhotos[0] || null;
+    }
+    this.dispatchEvent(new CustomEvent('rm-update-recipe', {
+      detail: { recipeId: this.recipe.id, data: updateData },
+      bubbles: true,
+      composed: true,
+    }));
+  }
+
+  // -- Render -------------------------------------------------------------------
 
   _renderChipGroup(label, items, cssClass) {
     if (!items?.length) return '';
@@ -317,13 +407,9 @@ class RmRecipeDetail extends LitElement {
         </div>
 
         <div class="detail-scroll">
-          <!-- Recipe name + meta -->
+          <!-- Recipe meta (description, times, tags — name is shown in parent header) -->
           <div class="detail-head">
-            <h2 class="detail-name">${r.name}</h2>
             ${r.description ? html`<p class="detail-desc">${r.description}</p>` : ''}
-
-            <!-- Star rating (inline, interactive) -->
-            ${this._renderStars(r.rating, true)}
 
             <div class="meta-row">
               ${r.prep_time ? html`
@@ -381,7 +467,7 @@ class RmRecipeDetail extends LitElement {
 
           <!-- Tabs -->
           <div class="tabs-row">
-            ${[['ingredients','Ingredients'],['directions','Directions'],['notes','Notes'],['nutrition','Nutrition']].map(([val, lbl]) => html`
+            ${[['ingredients','Ingredients'],['directions','Directions'],['notes','Notes'],['nutrition','Nutrition'],['photos','Photos']].map(([val, lbl]) => html`
               <button
                 class="tab-btn ${this._activeTab === val ? 'active' : ''}"
                 @click=${() => { this._activeTab = val; }}
@@ -395,6 +481,7 @@ class RmRecipeDetail extends LitElement {
             ${this._activeTab === 'directions'  ? this._renderDirections(r)  : ''}
             ${this._activeTab === 'notes'       ? this._renderNotes(r)       : ''}
             ${this._activeTab === 'nutrition'   ? this._renderNutrition(r)   : ''}
+            ${this._activeTab === 'photos'      ? this._renderPhotos(r)      : ''}
           </div>
         </div>
 
@@ -436,16 +523,20 @@ class RmRecipeDetail extends LitElement {
           </div>
         ` : picking ? html`
           <div class="shopping-picker-panel">
-            ${this.slmAvailable && this.shoppingLists.length ? html`
-              <select class="list-select" .value=${this._selectedListId}
-                @change=${e => { this._selectedListId = e.target.value; }}>
-                ${this.shoppingLists.map(l => html`
-                  <option value="${l.id}" ?selected=${l.id === this._selectedListId}>${l.name}</option>
-                `)}
-              </select>
-            ` : this.slmAvailable ? html`
-              <span class="shopping-note">No lists found in Shopping List Manager</span>
-            ` : ''}
+            <div class="picker-select-row">
+              <button class="picker-sel-btn" @click=${this._selectAllIngredients}>Select All</button>
+              <button class="picker-sel-btn" @click=${this._clearAllIngredients}>Clear All</button>
+              ${this.slmAvailable && this.shoppingLists.length ? html`
+                <select class="list-select" .value=${this._selectedListId}
+                  @change=${e => { this._selectedListId = e.target.value; }}>
+                  ${this.shoppingLists.map(l => html`
+                    <option value="${l.id}" ?selected=${l.id === this._selectedListId}>${l.name}</option>
+                  `)}
+                </select>
+              ` : this.slmAvailable ? html`
+                <span class="shopping-note">No lists found in Shopping List Manager</span>
+              ` : ''}
+            </div>
             <div class="picker-btns">
               <button class="action-btn" @click=${() => { this._showShoppingPicker = false; }}>Cancel</button>
               <button class="action-btn primary"
@@ -468,18 +559,46 @@ class RmRecipeDetail extends LitElement {
   }
 
   _renderDirections(r) {
+    if (!r.instructions?.length) {
+      return html`<p class="empty-tab">No directions listed.</p>`;
+    }
     return html`
-      ${r.instructions?.length ? html`
-        <ol class="steps-list">
-          ${r.instructions.map((step, i) => html`
-            <li class="step-item">
-              <span class="step-num">${i + 1}</span>
-              <span class="step-text">${step}</span>
-            </li>
-          `)}
-        </ol>
-      ` : html`<p class="empty-tab">No directions listed.</p>`}
+      <ol class="steps-list">
+        ${r.instructions.map((step, i) => html`
+          <li class="step-item">
+            <span class="step-num">${i + 1}</span>
+            <span class="step-text">${this._renderStepWithTimers(step)}</span>
+          </li>
+        `)}
+      </ol>
     `;
+  }
+
+  _renderStepWithTimers(text) {
+    // Split text by time mentions and wrap them in clickable timer chips
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+    TIME_RE.lastIndex = 0;
+    while ((match = TIME_RE.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(text.slice(lastIndex, match.index));
+      }
+      const timeText = match[0];
+      const seconds = parseTimeToSeconds(timeText);
+      if (seconds > 0) {
+        parts.push(html`<button class="time-chip" @click=${(e) => { e.stopPropagation(); this._fireTimer(seconds, timeText); }} title="Start timer for ${timeText}">
+          <ha-icon icon="mdi:timer-outline"></ha-icon>${timeText}
+        </button>`);
+      } else {
+        parts.push(timeText);
+      }
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < text.length) {
+      parts.push(text.slice(lastIndex));
+    }
+    return parts;
   }
 
   _renderNotes(r) {
@@ -517,6 +636,66 @@ class RmRecipeDetail extends LitElement {
             <div class="nutr-divider"></div>
           `;
         })}
+      </div>
+    `;
+  }
+
+  _renderPhotos(r) {
+    const photos = r.photos || [];
+    const mainImage = r.image_url;
+    // Combine main image with extra photos (deduplicated)
+    const allPhotos = mainImage
+      ? [mainImage, ...photos.filter(p => p !== mainImage)]
+      : photos;
+
+    return html`
+      <div class="photos-tab">
+        ${allPhotos.length ? html`
+          <div class="photos-grid">
+            ${allPhotos.map(url => html`
+              <div class="photo-item ${url === mainImage ? 'main-photo' : ''}">
+                <img src="${url}" alt="Recipe photo" loading="lazy" />
+                ${url === mainImage ? html`<span class="photo-badge">Main</span>` : html`
+                  <button class="photo-action set-main" @click=${() => this._setMainPhoto(url)} title="Set as main photo">
+                    <ha-icon icon="mdi:star-outline"></ha-icon>
+                  </button>
+                `}
+                <button class="photo-action remove-photo" @click=${() => this._removePhoto(url)} title="Remove photo">
+                  <ha-icon icon="mdi:close"></ha-icon>
+                </button>
+              </div>
+            `)}
+          </div>
+        ` : html`
+          <div class="empty-tab">
+            <ha-icon icon="mdi:image-off-outline"></ha-icon>
+            <p>No photos yet.</p>
+          </div>
+        `}
+
+        <div class="photo-add-section">
+          <div class="photo-add-label">Add a photo</div>
+          <div class="photo-url-row">
+            <input
+              type="url"
+              class="photo-url-input"
+              placeholder="Paste image URL…"
+              .value=${this._photoUrlInput}
+              @input=${e => { this._photoUrlInput = e.target.value; }}
+              @keydown=${e => { if (e.key === 'Enter') this._handleAddPhotoUrl(); }}
+            />
+            <button class="action-btn primary" ?disabled=${!this._photoUrlInput.trim() || this._addingPhotoUrl}
+              @click=${this._handleAddPhotoUrl}>
+              Add
+            </button>
+          </div>
+          <label class="camera-btn">
+            <ha-icon icon="mdi:camera-plus-outline"></ha-icon>
+            Take / Upload Photo
+            <input type="file" accept="image/*" capture="environment" class="camera-input"
+              @change=${this._handleCameraCapture} />
+          </label>
+        </div>
       </div>
     `;
   }
@@ -686,37 +865,12 @@ class RmRecipeDetail extends LitElement {
     }
 
     .detail-head { margin-bottom: 12px; }
-    .detail-name {
-      margin: 0 0 4px;
-      font-size: 20px;
-      font-weight: 700;
-      color: var(--rm-text, #e5e5ea);
-    }
     .detail-desc {
       margin: 0 0 8px;
       font-size: 14px;
       color: var(--rm-text-secondary, #8e8e93);
       line-height: 1.5;
     }
-
-    /* Stars */
-    .stars {
-      display: flex;
-      gap: 2px;
-      margin-bottom: 8px;
-    }
-    .star {
-      font-size: 20px;
-      color: var(--rm-border, rgba(255,255,255,0.2));
-      line-height: 1;
-      transition: color 0.1s;
-    }
-    .star.filled { color: #f5a623; }
-    .stars-interactive .star { cursor: pointer; }
-    .stars-interactive .star:hover,
-    .stars-interactive .star:hover ~ .star { color: var(--rm-border, rgba(255,255,255,0.2)); }
-    .stars-interactive:hover .star { color: #f5a623; }
-    .stars-interactive .star:hover ~ .star { color: var(--rm-border, rgba(255,255,255,0.2)) !important; }
 
     .meta-row {
       display: flex;
@@ -728,7 +882,7 @@ class RmRecipeDetail extends LitElement {
       display: flex;
       flex-direction: column;
       align-items: center;
-      background: var(--rm-surface, #2c2c2e);
+      background: var(--rm-bg-elevated, #2c2c2e);
       border-radius: 8px;
       padding: 6px 12px;
       min-width: 60px;
@@ -779,7 +933,7 @@ class RmRecipeDetail extends LitElement {
     .scaler-label { font-size: 13px; color: var(--rm-text-secondary, #8e8e93); }
     .scaler-ctrl { display: flex; align-items: center; gap: 8px; }
     .scaler-btn {
-      background: var(--rm-surface, #2c2c2e);
+      background: var(--rm-bg-elevated, #2c2c2e);
       border: 1px solid var(--rm-border, rgba(255,255,255,0.08));
       border-radius: 50%;
       width: 28px;
@@ -799,13 +953,16 @@ class RmRecipeDetail extends LitElement {
       display: flex;
       border-bottom: 1px solid var(--rm-border, rgba(255,255,255,0.08));
       margin-bottom: 14px;
+      overflow-x: auto;
+      scrollbar-width: none;
     }
+    .tabs-row::-webkit-scrollbar { display: none; }
     .tab-btn {
-      flex: 1;
+      flex-shrink: 0;
       background: none;
       border: none;
       border-bottom: 2px solid transparent;
-      padding: 8px 4px;
+      padding: 8px 10px;
       cursor: pointer;
       font-size: 12px;
       font-weight: 500;
@@ -872,11 +1029,27 @@ class RmRecipeDetail extends LitElement {
       border-radius: 10px;
       padding: 10px;
     }
+    .picker-select-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .picker-sel-btn {
+      background: none;
+      border: 1px solid var(--rm-border, rgba(255,255,255,0.12));
+      border-radius: 6px;
+      color: var(--rm-text-secondary, #8e8e93);
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .picker-sel-btn:hover { background: var(--rm-accent-soft); color: var(--rm-text); }
     .picker-btns { display: flex; gap: 8px; justify-content: flex-end; }
     .shopping-note { font-size: 12px; color: var(--rm-text-secondary, #8e8e93); }
     .list-select {
       flex: 1;
-      background: var(--rm-surface, #2c2c2e);
+      background: var(--rm-bg-elevated, #2c2c2e);
       border: 1px solid var(--rm-border, rgba(255,255,255,0.12));
       border-radius: 8px;
       color: var(--rm-text, #e5e5ea);
@@ -917,9 +1090,40 @@ class RmRecipeDetail extends LitElement {
     }
     .step-text { font-size: 14px; color: var(--rm-text, #e5e5ea); line-height: 1.6; }
 
+    /* Timer chip in directions */
+    .time-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      background: var(--rm-accent-soft, rgba(255,107,53,0.15));
+      color: var(--rm-accent, #ff6b35);
+      border: 1px solid var(--rm-accent, #ff6b35);
+      border-radius: 12px;
+      padding: 1px 7px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      vertical-align: middle;
+    }
+    .time-chip ha-icon { --mdc-icon-size: 12px; }
+    .time-chip:hover { background: var(--rm-accent, #ff6b35); color: #fff; }
+
     /* Notes */
     .notes-text { font-size: 14px; color: var(--rm-text, #e5e5ea); line-height: 1.6; white-space: pre-wrap; }
-    .empty-tab { font-size: 14px; color: var(--rm-text-secondary, #8e8e93); text-align: center; padding: 20px 0; margin: 0; }
+    .empty-tab {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: var(--rm-text-secondary, #8e8e93);
+      text-align: center;
+      padding: 20px 0;
+      margin: 0;
+    }
+    .empty-tab ha-icon { --mdc-icon-size: 40px; opacity: 0.35; }
+    .empty-tab p { margin: 0; }
 
     /* Nutrition */
     .nutrition-panel {
@@ -956,9 +1160,98 @@ class RmRecipeDetail extends LitElement {
     .nutr-val { font-weight: 600; white-space: nowrap; }
     .nutr-val em { font-style: normal; font-size: 11px; color: var(--rm-text-secondary, #8e8e93); }
 
+    /* Photos tab */
+    .photos-tab { display: flex; flex-direction: column; gap: 16px; }
+    .photos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+    }
+    .photo-item {
+      position: relative;
+      aspect-ratio: 4/3;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 2px solid transparent;
+    }
+    .photo-item.main-photo { border-color: var(--rm-accent, #ff6b35); }
+    .photo-item img { width: 100%; height: 100%; object-fit: cover; }
+    .photo-badge {
+      position: absolute;
+      bottom: 4px;
+      left: 4px;
+      background: var(--rm-accent, #ff6b35);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .photo-action {
+      position: absolute;
+      background: rgba(0,0,0,0.6);
+      border: none;
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      padding: 0;
+      transition: background 0.15s;
+    }
+    .photo-action ha-icon { --mdc-icon-size: 14px; }
+    .photo-action:hover { background: rgba(0,0,0,0.85); }
+    .remove-photo { top: 4px; right: 4px; }
+    .set-main { bottom: 4px; left: 4px; }
+
+    .photo-add-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-top: 8px;
+      border-top: 1px solid var(--rm-border, rgba(255,255,255,0.08));
+    }
+    .photo-add-label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--rm-text-secondary, #8e8e93);
+    }
+    .photo-url-row { display: flex; gap: 8px; }
+    .photo-url-input {
+      flex: 1;
+      background: var(--rm-bg-elevated, #2c2c2e);
+      border: 1px solid var(--rm-border, rgba(255,255,255,0.12));
+      border-radius: 8px;
+      color: var(--rm-text, #e5e5ea);
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+    .photo-url-input:focus { outline: none; border-color: var(--rm-accent, #ff6b35); }
+    .camera-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--rm-bg-elevated, #2c2c2e);
+      border: 1px dashed var(--rm-border, rgba(255,255,255,0.2));
+      border-radius: 8px;
+      color: var(--rm-text-secondary, #8e8e93);
+      padding: 10px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .camera-btn:hover { border-color: var(--rm-accent, #ff6b35); color: var(--rm-text); }
+    .camera-btn ha-icon { --mdc-icon-size: 20px; color: var(--rm-accent, #ff6b35); }
+    .camera-input { display: none; }
+
     /* Buttons */
     .action-btn {
-      background: var(--rm-surface, #2c2c2e);
+      background: var(--rm-bg-elevated, #2c2c2e);
       border: 1px solid var(--rm-border, rgba(255,255,255,0.12));
       border-radius: 8px;
       color: var(--rm-text, #e5e5ea);
@@ -993,7 +1286,7 @@ class RmRecipeDetail extends LitElement {
       z-index: 10;
     }
     .edit-panel {
-      background: var(--rm-bg, #1c1c1e);
+      background: var(--rm-bg-surface, #1c1c1e);
       border-radius: var(--rm-radius, 12px) var(--rm-radius, 12px) 0 0;
       width: 100%;
       max-height: 82vh;
@@ -1033,7 +1326,7 @@ class RmRecipeDetail extends LitElement {
     .edit-field { display: flex; flex-direction: column; gap: 4px; }
     .edit-field label { font-size: 11px; color: var(--rm-text-secondary, #8e8e93); text-transform: uppercase; letter-spacing: 0.05em; }
     .edit-field input, .edit-field textarea {
-      background: var(--rm-surface, #2c2c2e);
+      background: var(--rm-bg-elevated, #2c2c2e);
       border: 1px solid var(--rm-border, rgba(255,255,255,0.12));
       border-radius: 8px;
       color: var(--rm-text, #e5e5ea);

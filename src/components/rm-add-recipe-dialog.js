@@ -6,7 +6,8 @@ import JSZip from 'jszip';
 
 class RmAddRecipeDialog extends LitElement {
   static properties = {
-    api: { type: Object },
+    api:     { type: Object },
+    asPanel: { type: Boolean },  // true = right-side panel (wide), false = bottom sheet
     _mode: { type: String },   // 'url' | 'manual' | 'import'
     _url: { type: String },
     _scraping: { type: Boolean },
@@ -26,6 +27,7 @@ class RmAddRecipeDialog extends LitElement {
   constructor() {
     super();
     this.api = null;
+    this.asPanel = false;
     this._mode = 'url';
     this._url = '';
     this._scraping = false;
@@ -276,7 +278,7 @@ class RmAddRecipeDialog extends LitElement {
 
   render() {
     return html`
-      <div class="dialog-overlay" @click=${(e) => { if (e.target === e.currentTarget) this._close(); }}>
+      <div class="dialog-overlay ${this.asPanel ? 'panel-mode' : ''}" @click=${(e) => { if (e.target === e.currentTarget) this._close(); }}>
         <div class="dialog-panel">
           <div class="dialog-header">
             <div class="mode-toggle">
@@ -661,14 +663,30 @@ class RmAddRecipeDialog extends LitElement {
       z-index: 1000;
     }
 
+    /* Right-side panel mode (wide/tablet layout) */
+    .dialog-overlay.panel-mode {
+      align-items: stretch;
+      justify-content: flex-end;
+      background: rgba(0,0,0,0.45);
+    }
+
     .dialog-panel {
-      background: var(--rm-bg, #1c1c1e);
+      background: var(--rm-bg-surface, #1c1c1e);
       border-radius: var(--rm-radius, 12px) var(--rm-radius, 12px) 0 0;
       width: 100%;
       max-width: 620px;
       max-height: 90vh;
       display: flex;
       flex-direction: column;
+    }
+
+    .panel-mode .dialog-panel {
+      border-radius: 0;
+      max-width: 420px;
+      max-height: 100%;
+      height: 100%;
+      border-left: 1px solid var(--rm-border, rgba(0,0,0,0.1));
+      box-shadow: -4px 0 24px rgba(0,0,0,0.2);
     }
 
     .dialog-header {

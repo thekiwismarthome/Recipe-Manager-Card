@@ -54,13 +54,19 @@ class RmShoppingView extends LitElement {
   }
 
   async _toggleSlmItem(item) {
+    // Optimistic update first to prevent double-tap delay
+    const newChecked = !item.checked;
+    this._slmItems = this._slmItems.map(i =>
+      i.id === item.id ? { ...i, checked: newChecked } : i
+    );
     try {
-      await this.api.checkSlmItem(item.id, !item.checked);
-      this._slmItems = this._slmItems.map(i =>
-        i.id === item.id ? { ...i, checked: !item.checked } : i
-      );
+      await this.api.checkSlmItem(item.id, newChecked);
     } catch (err) {
+      // Revert on failure
       console.warn('Failed to check SLM item:', err);
+      this._slmItems = this._slmItems.map(i =>
+        i.id === item.id ? { ...i, checked: !newChecked } : i
+      );
     }
   }
 
@@ -373,6 +379,8 @@ class RmShoppingView extends LitElement {
       cursor: pointer;
       transition: background 0.12s;
       border-bottom: 1px solid var(--rm-border);
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
     .sv-item:last-child { border-bottom: none; }
     .sv-item:hover { background: var(--rm-accent-soft); }
