@@ -347,10 +347,10 @@ class RecipeManagerCard extends LitElement {
   }
 
   async _handleAddToShopping(e) {
-    const { ingredients, listId } = e.detail;
+    const { ingredients, listId, recipeName } = e.detail;
     if (this._slmAvailable && listId) {
       try {
-        const res = await this._api.addIngredientsToShoppingList(listId, ingredients);
+        const res = await this._api.addIngredientsToShoppingList(listId, ingredients, recipeName);
         if (res.filter(r => !r.success).length) console.warn('Some ingredients failed to add to SLM');
       } catch (err) { console.error('Shopping list error:', err); }
     } else {

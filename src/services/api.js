@@ -2,6 +2,63 @@
  * Recipe Manager WebSocket API service.
  * Mirrors the pattern from Shopping List Manager's api.js.
  */
+
+// ---------------------------------------------------------------------------
+// SLM ingredient helpers
+// ---------------------------------------------------------------------------
+
+const _SLM_UNIT_RE = /^[½¼¾⅓⅔⅛⅜⅝⅞\d][\d.,/½¼¾⅓⅔⅛⅜⅝⅞\s]*\s*(?:tsp|tbsp|tablespoons?|teaspoons?|cups?|oz|lbs?|g|kg|ml|L|litres?|liters?|pints?|quarts?|gallons?|fl\.?\s*oz|cans?|bunches?|heads?|cloves?|slices?|pieces?|sheets?|pinch(?:es)?|dash(?:es)?|handfuls?|sprigs?|stalks?)\s*/i;
+
+/**
+ * Return a clean ingredient name suitable for an SLM item title.
+ * When the Python parser failed to split a Unicode fraction (e.g. "½ tsp baking powder"
+ * ended up as the full name), this strips the leading measurement so SLM gets
+ * "Baking Powder" rather than "½ tsp baking powder".
+ */
+function _slmCleanName(ing) {
+  // If the parser captured amount/unit separately, ing.name is already clean.
+  if (ing.amount || ing.unit) return ing.name;
+  // Otherwise try to strip an embedded measurement prefix.
+  const cleaned = ing.name.replace(_SLM_UNIT_RE, '').trim();
+  return cleaned || ing.name;
+}
+
+/**
+ * Build the full ingredient string for the recipe note (amount + unit + name).
+ * e.g. "1/2 tsp baking powder"
+ */
+function _slmIngString(ing, cleanName) {
+  if (!ing.amount && !ing.unit) {
+    // Name may already contain the measurement (malformed parse) — use as-is.
+    return ing.name;
+  }
+  return [ing.amount, ing.unit, cleanName].filter(Boolean).join(' ');
+}
+
+/**
+ * Build the "[RM] RecipeName — ½ tsp baking powder" note string.
+ */
+function _slmBuildNote(recipeName, ing, cleanName) {
+  return `[RM] ${recipeName} \u2014 ${_slmIngString(ing, cleanName)}`;
+}
+
+/**
+ * Parse an ingredient amount string to a numeric quantity for SLM.
+ * Handles ASCII fractions ("1/2"), Unicode fractions ("½"), mixed numbers ("1 1/2").
+ */
+function _slmParseQty(amount) {
+  if (!amount) return 1;
+  const fracMap = { '½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 1/3, '⅔': 2/3,
+                    '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875 };
+  let s = String(amount).trim();
+  for (const [c, v] of Object.entries(fracMap)) s = s.replace(c, String(v));
+  const mixed = s.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  if (mixed) return parseInt(mixed[1]) + parseInt(mixed[2]) / parseInt(mixed[3]);
+  const frac = s.match(/^(\d+)\/(\d+)$/);
+  if (frac) return parseInt(frac[1]) / parseInt(frac[2]);
+  return parseFloat(s) || 1;
+}
+
 export class RecipeManagerAPI {
   constructor(hass) {
     this.hass = hass;
@@ -91,27 +148,66 @@ export class RecipeManagerAPI {
 
   /**
    * Push a list of ingredients to the Shopping Manager's active list.
+   * - Cleans malformed ingredient names (e.g. "½ tsp baking powder" → name:"baking powder")
+   * - Adds a recipe-sourced note: "[RM] RecipeName — ½ tsp baking powder"
+   * - If an unchecked item with the same name already exists, appends the note
+   *   rather than creating a duplicate.
+   *
    * ingredients: [{name, amount, unit}]
    * listId: Shopping Manager list ID
+   * recipeName: name of the source recipe (for the note)
    */
-  async addIngredientsToShoppingList(listId, ingredients) {
+  async addIngredientsToShoppingList(listId, ingredients, recipeName = null) {
+    // Fetch existing unchecked items to detect duplicates
+    let existingItems = [];
+    try {
+      const r = await this.getSlmItems(listId);
+      existingItems = (r?.items ?? []).filter(i => !i.checked);
+    } catch { /* proceed without dedup if SLM items unavailable */ }
+
     const results = [];
     for (const ing of ingredients) {
       try {
-        const result = await this.hass.callWS({
-          type: 'shopping_list_manager/items/add',
-          list_id: listId,
-          name: ing.name,
-          quantity: ing.amount ? parseFloat(ing.amount) || 1 : 1,
-          unit: ing.unit || 'units',
-          category_id: 'other',
-        });
-        results.push({ success: true, name: ing.name, result });
+        const cleanName = _slmCleanName(ing);
+        const note = recipeName ? _slmBuildNote(recipeName, ing, cleanName) : null;
+
+        // Try to match an existing unchecked item by name (case-insensitive)
+        const match = existingItems.find(
+          item => item.name.toLowerCase().trim() === cleanName.toLowerCase().trim()
+        );
+
+        if (match && note) {
+          // Append recipe note to existing item instead of duplicating
+          const combined = match.note ? `${match.note}\n${note}` : note;
+          await this.hass.callWS({
+            type: 'shopping_list_manager/items/update',
+            item_id: match.id,
+            note: combined,
+          });
+          results.push({ success: true, name: cleanName, merged: true });
+        } else {
+          // Create new item
+          const payload = {
+            type: 'shopping_list_manager/items/add',
+            list_id: listId,
+            name: cleanName,
+            quantity: _slmParseQty(ing.amount),
+            unit: ing.unit || 'units',
+            category_id: 'other',
+          };
+          if (note) payload.note = note;
+          await this.hass.callWS(payload);
+          results.push({ success: true, name: cleanName });
+        }
       } catch (err) {
         results.push({ success: false, name: ing.name, error: err.message });
       }
     }
     return results;
+  }
+
+  async updateSlmItem(itemId, data) {
+    return this.hass.callWS({ type: 'shopping_list_manager/items/update', item_id: itemId, ...data });
   }
 
   async getShoppingLists() {

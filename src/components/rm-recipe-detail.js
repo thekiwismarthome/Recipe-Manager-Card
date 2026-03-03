@@ -240,7 +240,7 @@ class RmRecipeDetail extends LitElement {
     this._shoppingAdding = true;
     this._shoppingResult = null;
     this.dispatchEvent(new CustomEvent('rm-add-to-shopping', {
-      detail: { ingredients, listId: this._selectedListId || null },
+      detail: { ingredients, listId: this._selectedListId || null, recipeName: this.recipe.name },
       bubbles: true,
       composed: true,
     }));
