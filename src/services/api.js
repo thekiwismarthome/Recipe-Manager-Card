@@ -118,6 +118,18 @@ export class RecipeManagerAPI {
     return this.hass.callWS({ type: 'shopping_list_manager/lists/get_all' });
   }
 
+  async getSlmItems(listId) {
+    return this.hass.callWS({ type: 'shopping_list_manager/items/get', list_id: listId });
+  }
+
+  async checkSlmItem(itemId, checked) {
+    return this.hass.callWS({ type: 'shopping_list_manager/items/check', item_id: itemId, checked });
+  }
+
+  async clearSlmChecked(listId) {
+    return this.hass.callWS({ type: 'shopping_list_manager/items/clear_checked', list_id: listId });
+  }
+
   // -- Import ---------------------------------------------------------------
 
   /**

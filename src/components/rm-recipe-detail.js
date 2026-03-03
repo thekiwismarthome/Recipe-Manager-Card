@@ -17,20 +17,22 @@ const NUTRITION_FIELDS = [
 
 class RmRecipeDetail extends LitElement {
   static properties = {
-    recipe:             { type: Object },
-    api:                { type: Object },
-    shoppingLists:      { type: Array },
-    _editing:           { type: Boolean },
-    _editData:          { type: Object },
-    _servingMult:       { type: Number },
-    _activeTab:         { type: String },  // 'ingredients'|'directions'|'notes'|'nutrition'
-    _showShoppingPicker:{ type: Boolean },
-    _selectedListId:    { type: String },
-    _shoppingAdding:    { type: Boolean },
-    _shoppingResult:    { type: String },
-    _confirmDelete:     { type: Boolean },
-    _downloading:       { type: Boolean },
-    _hoverRating:       { type: Number },
+    recipe:              { type: Object },
+    api:                 { type: Object },
+    shoppingLists:       { type: Array },
+    slmAvailable:        { type: Boolean },
+    _editing:            { type: Boolean },
+    _editData:           { type: Object },
+    _servingMult:        { type: Number },
+    _activeTab:          { type: String },  // 'ingredients'|'directions'|'notes'|'nutrition'
+    _showShoppingPicker: { type: Boolean },
+    _selectedListId:     { type: String },
+    _checkedIngredients: { type: Object },  // Set of indices
+    _shoppingAdding:     { type: Boolean },
+    _shoppingResult:     { type: String },
+    _confirmDelete:      { type: Boolean },
+    _downloading:        { type: Boolean },
+    _hoverRating:        { type: Number },
   };
 
   constructor() {
@@ -38,12 +40,14 @@ class RmRecipeDetail extends LitElement {
     this.recipe = null;
     this.api = null;
     this.shoppingLists = [];
+    this.slmAvailable = false;
     this._editing = false;
     this._editData = {};
     this._servingMult = 1;
     this._activeTab = 'ingredients';
     this._showShoppingPicker = false;
     this._selectedListId = '';
+    this._checkedIngredients = null;
     this._shoppingAdding = false;
     this._shoppingResult = null;
     this._confirmDelete = false;
@@ -57,6 +61,8 @@ class RmRecipeDetail extends LitElement {
       this._editing = false;
       this._confirmDelete = false;
       this._shoppingResult = null;
+      this._showShoppingPicker = false;
+      this._checkedIngredients = null;
     }
     if (changedProps.has('shoppingLists') && this.shoppingLists.length && !this._selectedListId) {
       this._selectedListId = this.shoppingLists[0]?.id ?? '';
@@ -204,16 +210,37 @@ class RmRecipeDetail extends LitElement {
     }));
   }
 
+  _openShoppingPicker() {
+    const count = this.recipe?.ingredients?.length ?? 0;
+    this._checkedIngredients = new Set([...Array(count).keys()]);
+    this._showShoppingPicker = true;
+  }
+
+  _toggleIngredient(index) {
+    const newSet = new Set(this._checkedIngredients);
+    if (newSet.has(index)) {
+      newSet.delete(index);
+    } else {
+      newSet.add(index);
+    }
+    this._checkedIngredients = newSet;
+  }
+
   async _handleAddToShopping() {
-    if (!this._selectedListId) return;
-    const ingredients = (this.recipe.ingredients || []).map(ing => ({
-      ...ing,
-      amount: this._scaleAmount(ing.amount),
-    }));
+    const checked = this._checkedIngredients;
+    if (!checked?.size) return;
+
+    const ingredients = (this.recipe.ingredients || [])
+      .filter((_, i) => checked.has(i))
+      .map(ing => ({
+        ...ing,
+        amount: this._scaleAmount(ing.amount),
+      }));
+
     this._shoppingAdding = true;
     this._shoppingResult = null;
     this.dispatchEvent(new CustomEvent('rm-add-to-shopping', {
-      detail: { ingredients, listId: this._selectedListId },
+      detail: { ingredients, listId: this._selectedListId || null },
       bubbles: true,
       composed: true,
     }));
@@ -378,11 +405,21 @@ class RmRecipeDetail extends LitElement {
   }
 
   _renderIngredients(r) {
+    const picking = this._showShoppingPicker;
+    const checkedSet = this._checkedIngredients;
+    const checkedCount = checkedSet?.size ?? 0;
+
     return html`
       ${r.ingredients?.length ? html`
         <ul class="ingredient-list">
-          ${r.ingredients.map(ing => html`
-            <li class="ingredient-item">
+          ${r.ingredients.map((ing, i) => html`
+            <li class="ingredient-item ${picking ? 'selectable' : ''}"
+              @click=${picking ? () => this._toggleIngredient(i) : undefined}>
+              ${picking ? html`
+                <span class="ing-check ${checkedSet?.has(i) ? 'checked' : ''}">
+                  ${checkedSet?.has(i) ? html`<ha-icon icon="mdi:check"></ha-icon>` : ''}
+                </span>
+              ` : ''}
               <span class="ing-amount">${this._scaleAmount(ing.amount) || ''} ${ing.unit || ''}</span>
               <span class="ing-name">${ing.name}${ing.notes ? html` <em class="ing-notes">(${ing.notes})</em>` : ''}</span>
             </li>
@@ -390,35 +427,43 @@ class RmRecipeDetail extends LitElement {
         </ul>
       ` : html`<p class="empty-tab">No ingredients listed.</p>`}
 
-      <!-- Add to shopping list -->
-      ${this.shoppingLists.length ? html`
-        <div class="shopping-section">
-          ${this._shoppingResult === 'success' ? html`
-            <div class="shopping-success">
-              <ha-icon icon="mdi:check-circle-outline"></ha-icon>
-              Added to shopping list!
-            </div>
-          ` : this._showShoppingPicker ? html`
-            <div class="shopping-picker">
+      <!-- Shopping section (always shown) -->
+      <div class="shopping-section">
+        ${this._shoppingResult === 'success' ? html`
+          <div class="shopping-success">
+            <ha-icon icon="mdi:check-circle-outline"></ha-icon>
+            Added to shopping list!
+          </div>
+        ` : picking ? html`
+          <div class="shopping-picker-panel">
+            ${this.slmAvailable && this.shoppingLists.length ? html`
               <select class="list-select" .value=${this._selectedListId}
                 @change=${e => { this._selectedListId = e.target.value; }}>
                 ${this.shoppingLists.map(l => html`
                   <option value="${l.id}" ?selected=${l.id === this._selectedListId}>${l.name}</option>
                 `)}
               </select>
-              <button class="action-btn primary" ?disabled=${this._shoppingAdding} @click=${this._handleAddToShopping}>
-                ${this._shoppingAdding ? html`<ha-circular-progress active size="tiny"></ha-circular-progress>` : 'Add'}
-              </button>
+            ` : this.slmAvailable ? html`
+              <span class="shopping-note">No lists found in Shopping List Manager</span>
+            ` : ''}
+            <div class="picker-btns">
               <button class="action-btn" @click=${() => { this._showShoppingPicker = false; }}>Cancel</button>
+              <button class="action-btn primary"
+                ?disabled=${this._shoppingAdding || !checkedCount}
+                @click=${this._handleAddToShopping}>
+                ${this._shoppingAdding
+                  ? html`<ha-circular-progress active size="tiny"></ha-circular-progress>`
+                  : `Add${checkedCount ? ` (${checkedCount})` : ''}`}
+              </button>
             </div>
-          ` : html`
-            <button class="action-btn primary shopping-btn" @click=${() => { this._showShoppingPicker = true; }}>
-              <ha-icon icon="mdi:cart-plus"></ha-icon>
-              Add to Shopping List
-            </button>
-          `}
-        </div>
-      ` : ''}
+          </div>
+        ` : html`
+          <button class="action-btn primary shopping-btn" @click=${this._openShoppingPicker}>
+            <ha-icon icon="mdi:cart-plus"></ha-icon>
+            Add to Shopping List
+          </button>
+        `}
+      </div>
     `;
   }
 
@@ -793,11 +838,42 @@ class RmRecipeDetail extends LitElement {
     .ing-name { font-size: 14px; color: var(--rm-text, #e5e5ea); }
     .ing-notes { font-size: 12px; color: var(--rm-text-secondary, #8e8e93); font-style: italic; }
 
+    /* Ingredient checkbox selection */
+    .ingredient-item.selectable { cursor: pointer; border-radius: 6px; padding-left: 4px; }
+    .ingredient-item.selectable:hover { background: var(--rm-accent-soft, rgba(255,107,53,0.1)); }
+    .ing-check {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid var(--rm-border, rgba(255,255,255,0.15));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .ing-check.checked {
+      background: var(--rm-accent, #ff6b35);
+      border-color: var(--rm-accent, #ff6b35);
+      color: #fff;
+    }
+    .ing-check ha-icon { --mdc-icon-size: 12px; }
+
     /* Shopping */
     .shopping-section { margin-top: 12px; }
     .shopping-btn { width: 100%; justify-content: center; gap: 6px; }
     .shopping-btn ha-icon { --mdc-icon-size: 18px; }
-    .shopping-picker { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .shopping-picker-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: var(--rm-bg-elevated, #2c2c2e);
+      border: 1px solid var(--rm-border, rgba(255,255,255,0.12));
+      border-radius: 10px;
+      padding: 10px;
+    }
+    .picker-btns { display: flex; gap: 8px; justify-content: flex-end; }
+    .shopping-note { font-size: 12px; color: var(--rm-text-secondary, #8e8e93); }
     .list-select {
       flex: 1;
       background: var(--rm-surface, #2c2c2e);
