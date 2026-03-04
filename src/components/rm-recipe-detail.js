@@ -35,12 +35,42 @@ function parseTimeToSeconds(text) {
   return total || 0;
 }
 
+// Imperial → metric conversion factors
+const IMPERIAL_TO_METRIC = {
+  'oz':     { factor: 28.3495, to: 'g',  toFull: 'g'  },
+  'lb':     { factor: 453.592, to: 'g',  toFull: 'g', thresholdKg: 500 },
+  'cup':    { factor: 236.588, to: 'ml', toFull: 'ml' },
+  'cups':   { factor: 236.588, to: 'ml', toFull: 'ml' },
+  'fl oz':  { factor: 29.5735, to: 'ml', toFull: 'ml' },
+  'pt':     { factor: 473.176, to: 'ml', toFull: 'ml' },
+  'qt':     { factor: 946.353, to: 'ml', toFull: 'ml' },
+};
+
+function convertToMetric(amount, unit) {
+  if (!amount || !unit) return null;
+  const num = parseFloat(amount);
+  if (isNaN(num)) return null;
+  const key = unit.toLowerCase().trim();
+  const conv = IMPERIAL_TO_METRIC[key];
+  if (!conv) return null;
+  let result = num * conv.factor;
+  let resultUnit = conv.to;
+  // For lb → use kg if ≥ 500g
+  if (key === 'lb' && result >= 500) { result = result / 1000; resultUnit = 'kg'; }
+  // For ml → use L if ≥ 1000ml
+  if (resultUnit === 'ml' && result >= 1000) { result = result / 1000; resultUnit = 'L'; }
+  // Round sensibly
+  const rounded = result >= 10 ? Math.round(result) : Math.round(result * 10) / 10;
+  return { amount: String(rounded), unit: resultUnit };
+}
+
 class RmRecipeDetail extends LitElement {
   static properties = {
     recipe:              { type: Object },
     api:                 { type: Object },
     shoppingLists:       { type: Array },
     slmAvailable:        { type: Boolean },
+    settings:            { type: Object },
     _editing:            { type: Boolean },
     _editData:           { type: Object },
     _servingMult:        { type: Number },
@@ -55,6 +85,8 @@ class RmRecipeDetail extends LitElement {
     _hoverRating:        { type: Number },
     _photoUrlInput:      { type: String },
     _addingPhotoUrl:     { type: Boolean },
+    _metricMode:         { type: Boolean },
+    _wakeActive:         { type: Boolean },
   };
 
   constructor() {
@@ -63,6 +95,7 @@ class RmRecipeDetail extends LitElement {
     this.api = null;
     this.shoppingLists = [];
     this.slmAvailable = false;
+    this.settings = {};
     this._editing = false;
     this._editData = {};
     this._servingMult = 1;
@@ -77,6 +110,36 @@ class RmRecipeDetail extends LitElement {
     this._hoverRating = 0;
     this._photoUrlInput = '';
     this._addingPhotoUrl = false;
+    this._metricMode = false;
+    this._wakeActive = false;
+    this._wakeLockSentinel = null;
+    this._wakeLockTimeout = null;
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this._releaseWakeLock();
+  }
+
+  // -- Wake Lock -----------------------------------------------------------
+
+  async _requestWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      this._wakeLockSentinel = await navigator.wakeLock.request('screen');
+      this._wakeActive = true;
+      const durationMin = this.settings?.wakeLockDuration ?? 60;
+      this._wakeLockTimeout = setTimeout(() => this._releaseWakeLock(), durationMin * 60_000);
+    } catch (err) { console.warn('Wake Lock failed:', err); }
+  }
+
+  async _releaseWakeLock() {
+    if (this._wakeLockSentinel) {
+      try { await this._wakeLockSentinel.release(); } catch { /* ignore */ }
+      this._wakeLockSentinel = null;
+    }
+    this._wakeActive = false;
+    if (this._wakeLockTimeout) { clearTimeout(this._wakeLockTimeout); this._wakeLockTimeout = null; }
   }
 
   updated(changedProps) {
@@ -88,6 +151,7 @@ class RmRecipeDetail extends LitElement {
       this._showShoppingPicker = false;
       this._checkedIngredients = null;
       this._photoUrlInput = '';
+      this._metricMode = false;
     }
     if (changedProps.has('shoppingLists') && this.shoppingLists.length && !this._selectedListId) {
       this._selectedListId = this.shoppingLists[0]?.id ?? '';
@@ -475,6 +539,18 @@ class RmRecipeDetail extends LitElement {
             `)}
           </div>
 
+          <!-- Wake lock button (shown when setting enabled) -->
+          ${this.settings?.keepScreenOn ? html`
+            <div class="wakelock-row">
+              <button class="wakelock-btn ${this._wakeActive ? 'active' : ''}"
+                @click=${() => this._wakeActive ? this._releaseWakeLock() : this._requestWakeLock()}
+                title="${this._wakeActive ? 'Release screen lock' : 'Keep screen on'}">
+                <ha-icon icon="${this._wakeActive ? 'mdi:eye' : 'mdi:eye-off-outline'}"></ha-icon>
+                ${this._wakeActive ? 'Screen on' : 'Keep screen on'}
+              </button>
+            </div>
+          ` : ''}
+
           <!-- Tab content -->
           <div class="tab-content">
             ${this._activeTab === 'ingredients' ? this._renderIngredients(r) : ''}
@@ -491,26 +567,53 @@ class RmRecipeDetail extends LitElement {
     `;
   }
 
+  _getDisplayAmount(ing) {
+    if (this._metricMode) {
+      const conv = convertToMetric(this._scaleAmount(ing.amount), ing.unit);
+      if (conv) return conv;
+    }
+    return { amount: this._scaleAmount(ing.amount) || '', unit: ing.unit || '' };
+  }
+
   _renderIngredients(r) {
     const picking = this._showShoppingPicker;
     const checkedSet = this._checkedIngredients;
     const checkedCount = checkedSet?.size ?? 0;
+    const hasImperial = (r.ingredients || []).some(ing =>
+      ing.unit && IMPERIAL_TO_METRIC[ing.unit.toLowerCase().trim()]
+    );
 
     return html`
+      ${this.settings?.showUnitConversion && hasImperial ? html`
+        <div class="metric-toggle-row">
+          <button class="metric-btn ${this._metricMode ? 'active' : ''}"
+            @click=${() => { this._metricMode = !this._metricMode; }}>
+            <ha-icon icon="mdi:swap-horizontal"></ha-icon>
+            ${this._metricMode ? 'Showing metric' : 'Convert to metric'}
+          </button>
+        </div>
+      ` : ''}
+
       ${r.ingredients?.length ? html`
         <ul class="ingredient-list">
-          ${r.ingredients.map((ing, i) => html`
-            <li class="ingredient-item ${picking ? 'selectable' : ''}"
-              @click=${picking ? () => this._toggleIngredient(i) : undefined}>
-              ${picking ? html`
-                <span class="ing-check ${checkedSet?.has(i) ? 'checked' : ''}">
-                  ${checkedSet?.has(i) ? html`<ha-icon icon="mdi:check"></ha-icon>` : ''}
-                </span>
-              ` : ''}
-              <span class="ing-amount">${this._scaleAmount(ing.amount) || ''} ${ing.unit || ''}</span>
-              <span class="ing-name">${ing.name}${ing.notes ? html` <em class="ing-notes">(${ing.notes})</em>` : ''}</span>
-            </li>
-          `)}
+          ${r.ingredients.map((ing, i) => {
+            if (ing.is_heading) {
+              return html`<li class="ing-heading">${ing.name}</li>`;
+            }
+            const { amount, unit } = this._getDisplayAmount(ing);
+            return html`
+              <li class="ingredient-item ${picking ? 'selectable' : ''}"
+                @click=${picking ? () => this._toggleIngredient(i) : undefined}>
+                ${picking ? html`
+                  <span class="ing-check ${checkedSet?.has(i) ? 'checked' : ''}">
+                    ${checkedSet?.has(i) ? html`<ha-icon icon="mdi:check"></ha-icon>` : ''}
+                  </span>
+                ` : ''}
+                <span class="ing-amount">${amount} ${unit}</span>
+                <span class="ing-name">${ing.name}${ing.notes ? html` <em class="ing-notes">(${ing.notes})</em>` : ''}</span>
+              </li>
+            `;
+          })}
         </ul>
       ` : html`<p class="empty-tab">No ingredients listed.</p>`}
 
@@ -962,10 +1065,10 @@ class RmRecipeDetail extends LitElement {
       background: none;
       border: none;
       border-bottom: 2px solid transparent;
-      padding: 8px 10px;
+      padding: 11px 14px;
       cursor: pointer;
-      font-size: 12px;
-      font-weight: 500;
+      font-size: 14px;
+      font-weight: 600;
       color: var(--rm-text-secondary, #8e8e93);
       transition: color 0.15s, border-color 0.15s;
       white-space: nowrap;
@@ -975,25 +1078,74 @@ class RmRecipeDetail extends LitElement {
       border-bottom-color: var(--rm-accent, #ff6b35);
     }
 
+    /* Wake lock button */
+    .wakelock-row {
+      display: flex;
+      justify-content: flex-end;
+      padding: 4px 0 10px;
+    }
+    .wakelock-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: none; border: 1px solid var(--rm-border);
+      border-radius: 20px; padding: 4px 12px;
+      font-size: 12px; cursor: pointer;
+      color: var(--rm-text-secondary);
+      transition: all 0.15s;
+    }
+    .wakelock-btn ha-icon { --mdc-icon-size: 14px; }
+    .wakelock-btn.active {
+      background: var(--rm-accent-soft); color: var(--rm-accent);
+      border-color: var(--rm-accent);
+    }
+
+    /* Metric toggle */
+    .metric-toggle-row {
+      display: flex;
+      justify-content: flex-end;
+      padding: 0 0 8px;
+    }
+    .metric-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: none; border: 1px solid var(--rm-border);
+      border-radius: 20px; padding: 4px 12px;
+      font-size: 12px; cursor: pointer;
+      color: var(--rm-text-secondary);
+      transition: all 0.15s;
+    }
+    .metric-btn ha-icon { --mdc-icon-size: 14px; }
+    .metric-btn.active {
+      background: var(--rm-accent-soft); color: var(--rm-accent);
+      border-color: var(--rm-accent);
+    }
+
+    /* Ingredient section heading */
+    .ing-heading {
+      list-style: none;
+      font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--rm-accent); padding: 10px 0 4px;
+      margin-top: 6px;
+    }
+
     /* Ingredients */
     .ingredient-list { list-style: none; padding: 0; margin: 0 0 16px; }
     .ingredient-item {
       display: flex;
       gap: 10px;
       align-items: baseline;
-      padding: 7px 0;
+      padding: 10px 0;
       border-bottom: 1px solid var(--rm-border, rgba(255,255,255,0.06));
     }
     .ingredient-item:last-child { border-bottom: none; }
     .ing-amount {
-      font-size: 13px;
-      font-weight: 600;
+      font-size: 14px;
+      font-weight: 700;
       color: var(--rm-accent, #ff6b35);
-      min-width: 60px;
+      min-width: 70px;
       flex-shrink: 0;
     }
-    .ing-name { font-size: 14px; color: var(--rm-text, #e5e5ea); }
-    .ing-notes { font-size: 12px; color: var(--rm-text-secondary, #8e8e93); font-style: italic; }
+    .ing-name { font-size: 15px; color: var(--rm-text, #e5e5ea); }
+    .ing-notes { font-size: 13px; color: var(--rm-text-secondary, #8e8e93); font-style: italic; }
 
     /* Ingredient checkbox selection */
     .ingredient-item.selectable { cursor: pointer; border-radius: 6px; padding-left: 4px; }
@@ -1071,24 +1223,24 @@ class RmRecipeDetail extends LitElement {
     .steps-list { list-style: none; padding: 0; margin: 0; }
     .step-item {
       display: flex;
-      gap: 12px;
-      margin-bottom: 14px;
+      gap: 14px;
+      margin-bottom: 20px;
       align-items: flex-start;
     }
     .step-num {
       flex-shrink: 0;
-      width: 26px;
-      height: 26px;
+      width: 30px;
+      height: 30px;
       background: var(--rm-accent, #ff6b35);
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 700;
       color: #fff;
     }
-    .step-text { font-size: 14px; color: var(--rm-text, #e5e5ea); line-height: 1.6; }
+    .step-text { font-size: 15px; color: var(--rm-text, #e5e5ea); line-height: 1.7; }
 
     /* Timer chip in directions */
     .time-chip {
@@ -1345,13 +1497,14 @@ class RmRecipeDetail extends LitElement {
       padding: 4px 0;
     }
     .edit-star {
-      font-size: 26px;
-      color: var(--rm-border, rgba(255,255,255,0.2));
+      font-size: 32px;
+      color: var(--rm-border, rgba(255,255,255,0.3));
       cursor: pointer;
       transition: color 0.12s;
       line-height: 1;
+      -webkit-text-stroke: 1px rgba(200,150,50,0.5);
     }
-    .edit-star.filled { color: #f5a623; }
+    .edit-star.filled { color: #f5a623; -webkit-text-stroke: 1px #d4881b; }
     .edit-star:hover { color: #f5a623; }
     .edit-footer {
       display: flex;

@@ -554,27 +554,28 @@ class RmRecipeGrid extends LitElement {
     .fav-btn ha-icon { --mdc-icon-size: 16px; }
     .fav-btn.active { color: var(--error-color, #cf6679); }
 
-    /* Info icon — bottom-right of thumbnail, larger and more prominent */
+    /* Info icon — bottom-right of thumbnail, large and prominent */
     .info-btn {
       position: absolute;
       bottom: 6px;
       right: 6px;
-      background: rgba(0,0,0,0.55);
-      border: none;
+      background: rgba(0,0,0,0.65);
+      border: 1.5px solid rgba(255,255,255,0.4);
       border-radius: 50%;
-      width: 32px;
-      height: 32px;
+      width: 38px;
+      height: 38px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: rgba(255,255,255,0.9);
+      color: rgba(255,255,255,0.95);
       padding: 0;
-      transition: background 0.15s, transform 0.15s;
+      transition: background 0.15s, transform 0.15s, border-color 0.15s;
       touch-action: manipulation;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
     }
-    .info-btn ha-icon { --mdc-icon-size: 20px; }
-    .info-btn:hover { background: rgba(0,0,0,0.8); transform: scale(1.1); }
+    .info-btn ha-icon { --mdc-icon-size: 24px; }
+    .info-btn:hover { background: rgba(0,0,0,0.85); transform: scale(1.08); border-color: rgba(255,255,255,0.7); }
 
     .recipe-info {
       padding: 8px 10px 10px;
