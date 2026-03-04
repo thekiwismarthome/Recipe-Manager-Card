@@ -176,15 +176,31 @@ class RmSettingsView extends LitElement {
             <option value="ding"  ?selected=${s.timerSound === 'ding'            }>Ding</option>
             <option value="alarm" ?selected=${s.timerSound === 'alarm'           }>Alarm (3 beeps)</option>
             <option value="none"  ?selected=${s.timerSound === 'none'            }>Silent</option>
+            <option value="file"  ?selected=${s.timerSound === 'file'            }>Custom file…</option>
           </select>
         </div>
+
+        ${s.timerSound === 'file' ? html`
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-name">Sound file</span>
+              <span class="setting-hint">${s.timerSoundFileName || 'No file selected'}</span>
+            </div>
+            <label class="file-label">
+              <input type="file" accept="audio/*" class="file-input"
+                @change=${this._handleSoundFileChange} />
+              <ha-icon icon="mdi:folder-music-outline"></ha-icon>
+              ${s.timerSoundFile ? 'Change' : 'Choose file'}
+            </label>
+          </div>
+        ` : ''}
 
         <div class="setting-row">
           <div class="setting-info">
             <span class="setting-name">Test sound</span>
             <span class="setting-hint">Play a preview of the selected alarm</span>
           </div>
-          <button class="seg-btn active" @click=${() => this._testSound(s.timerSound ?? 'beep')}>
+          <button class="seg-btn active" @click=${() => this._testSound(s.timerSound ?? 'beep', s.timerSoundFile)}>
             <ha-icon icon="mdi:volume-high"></ha-icon> Play
           </button>
         </div>
@@ -241,7 +257,24 @@ class RmSettingsView extends LitElement {
     `;
   }
 
-  _testSound(type) {
+  _handleSoundFileChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      this._update({ timerSoundFile: evt.target.result, timerSoundFileName: file.name });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  _testSound(type, fileUrl) {
+    if (type === 'file') {
+      if (fileUrl) {
+        const audio = new Audio(fileUrl);
+        audio.play().catch(err => console.warn('Could not play file:', err));
+      }
+      return;
+    }
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       if (type === 'ding') {
@@ -270,6 +303,7 @@ class RmSettingsView extends LitElement {
       }
     } catch (e) { console.warn('Audio test failed:', e); }
   }
+
 
   _renderPlaceholder(title, icon, message) {
     return html`
@@ -369,6 +403,17 @@ class RmSettingsView extends LitElement {
       transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
     }
     .toggle input:checked ~ .toggle-track .toggle-thumb { transform: translateX(20px); }
+
+    .file-label {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--rm-bg-elevated); border: 1px solid var(--rm-border);
+      border-radius: 8px; padding: 6px 12px; font-size: 13px;
+      color: var(--rm-text); cursor: pointer; transition: background 0.15s;
+      flex-shrink: 0;
+    }
+    .file-label:hover { background: var(--rm-accent-soft); }
+    .file-label ha-icon { --mdc-icon-size: 18px; color: var(--rm-accent); }
+    .file-input { display: none; }
 
     .placeholder-tab {
       display: flex; flex-direction: column; align-items: center;

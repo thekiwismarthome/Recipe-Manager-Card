@@ -56,6 +56,7 @@ class RmShoppingView extends LitElement {
     _selectedListId:   { type: String },
     _loading:          { type: Boolean },
     _clearing:         { type: Boolean },
+    _viewMode:         { type: String },
   };
 
   constructor() {
@@ -69,6 +70,7 @@ class RmShoppingView extends LitElement {
     this._selectedListId = '';
     this._loading = false;
     this._clearing = false;
+    this._viewMode = 'list';
   }
 
   updated(changedProps) {
@@ -228,6 +230,11 @@ class RmShoppingView extends LitElement {
           `}
         </div>
         <div class="sv-actions">
+          <button class="sv-btn ${this._viewMode === 'tile' ? 'active' : ''}"
+            @click=${() => { this._viewMode = this._viewMode === 'tile' ? 'list' : 'tile'; }}
+            title="${this._viewMode === 'tile' ? 'Switch to list view' : 'Switch to tile view'}">
+            <ha-icon icon="${this._viewMode === 'tile' ? 'mdi:view-list' : 'mdi:view-grid-outline'}"></ha-icon>
+          </button>
           <button class="sv-btn" @click=${this._loadSlmData} title="Refresh">
             <ha-icon icon="mdi:refresh"></ha-icon>
           </button>
@@ -250,11 +257,15 @@ class RmShoppingView extends LitElement {
         </div>
       ` : html`
         <div class="sv-items">
-          ${groups.map(({ catId, items }) => this._renderCategoryGroup(catId, items))}
-          ${checked.length ? html`
-            <div class="sv-divider-label">Checked</div>
-            ${checked.map(item => this._renderSlmRow(item, true))}
-          ` : ''}
+          ${this._viewMode === 'tile'
+            ? this._renderTileGrid(groups, checked)
+            : html`
+              ${groups.map(({ catId, items }) => this._renderCategoryGroup(catId, items))}
+              ${checked.length ? html`
+                <div class="sv-divider-label">Checked</div>
+                ${checked.map(item => this._renderSlmRow(item, true))}
+              ` : ''}
+            `}
         </div>
       `}
     `;
@@ -304,6 +315,59 @@ class RmShoppingView extends LitElement {
             style="${isChecked ? `background:${color}; border-color:${color}` : `border-color:${color}`}">
             ${isChecked ? html`<ha-icon icon="mdi:check"></ha-icon>` : ''}
           </div>
+        </div>
+      </div>
+    `;
+  }
+
+  _renderTileGrid(groups, checked) {
+    return html`
+      ${groups.map(({ catId, items }) => {
+        const color = catColor(catId);
+        const emoji = catEmoji(catId);
+        const label = catLabel(catId);
+        return html`
+          <div class="cat-group">
+            <div class="cat-header" style="border-left-color:${color}; background: linear-gradient(to right, ${color}18, transparent)">
+              <span class="cat-emoji">${emoji}</span>
+              <span class="cat-name" style="color:${color}">${label}</span>
+              <span class="cat-count">${items.length}</span>
+            </div>
+            <div class="tile-grid">
+              ${items.map(item => this._renderTile(item, color))}
+            </div>
+          </div>
+        `;
+      })}
+      ${checked.length ? html`
+        <div class="sv-divider-label">Checked</div>
+        <div class="tile-grid">
+          ${checked.map(item => this._renderTile(item, '#78909c', true))}
+        </div>
+      ` : ''}
+    `;
+  }
+
+  _renderTile(item, color, isChecked = false) {
+    const qty = item.quantity && item.quantity !== 1 ? item.quantity : null;
+    const unit = item.unit && item.unit !== 'units' ? item.unit : null;
+    const tileColor = isChecked ? '#78909c' : color;
+    return html`
+      <div class="tile ${isChecked ? 'tile-checked' : ''}"
+        style="border-top: 3px solid ${tileColor}"
+        @click=${() => this._toggleSlmItem(item)}>
+        <div class="tile-emoji">${catEmoji(item.category)}</div>
+        <div class="tile-name">${item.name}</div>
+        ${unit ? html`<div class="tile-unit">${unit}</div>` : ''}
+        ${qty !== null ? html`
+          <div class="tile-qty" style="color:${tileColor}; border-color:${tileColor}55; background:${tileColor}18">${qty}</div>
+        ` : ''}
+        ${!isChecked ? html`
+          <button class="tile-dec" @click=${e => { e.stopPropagation(); this._decreaseSlmItem(item); }} title="Decrease">−</button>
+        ` : ''}
+        <div class="tile-check ${isChecked ? 'checked' : ''}"
+          style="${isChecked ? `background:${tileColor}; border-color:${tileColor}` : `border-color:${tileColor}`}">
+          ${isChecked ? html`<ha-icon icon="mdi:check"></ha-icon>` : ''}
         </div>
       </div>
     `;
@@ -441,6 +505,7 @@ class RmShoppingView extends LitElement {
     }
     .sv-btn ha-icon { --mdc-icon-size: 18px; }
     .sv-btn:hover:not(:disabled) { background: var(--rm-accent-soft); color: var(--rm-text); }
+    .sv-btn.active { background: var(--rm-accent-soft); color: var(--rm-accent); border-color: var(--rm-accent); }
     .sv-btn.danger { color: var(--error-color, #cf6679); border-color: var(--error-color, #cf6679); }
     .sv-btn.danger:hover:not(:disabled) { background: rgba(207,102,121,0.1); }
     .sv-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -652,6 +717,96 @@ class RmShoppingView extends LitElement {
     }
     .sv-checkbox.checked { color: #fff; }
     .sv-checkbox ha-icon { --mdc-icon-size: 14px; }
+
+    /* ── Tile grid ──────────────────── */
+
+    .tile-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 8px;
+      padding: 8px 12px 12px;
+    }
+
+    .tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: var(--rm-bg-elevated);
+      border-radius: 10px;
+      padding: 10px 8px 10px;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.15s;
+      gap: 4px;
+      border: 1px solid var(--rm-border);
+      min-height: 90px;
+      justify-content: center;
+      text-align: center;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tile:hover { background: var(--rm-accent-soft); }
+    .tile-checked { opacity: 0.45; }
+
+    .tile-emoji { font-size: 24px; line-height: 1; margin-bottom: 2px; }
+
+    .tile-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--rm-text);
+      line-height: 1.3;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      word-break: break-word;
+    }
+
+    .tile-unit { font-size: 10px; color: var(--rm-text-muted); }
+
+    .tile-qty {
+      font-size: 11px;
+      font-weight: 700;
+      border: 1px solid;
+      border-radius: 10px;
+      padding: 1px 8px;
+    }
+
+    .tile-dec {
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 1px solid var(--rm-border);
+      background: var(--rm-bg-main);
+      color: var(--rm-text-secondary);
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      transition: background 0.15s;
+    }
+    .tile-dec:hover { background: rgba(207,102,121,0.12); color: var(--error-color, #cf6679); }
+
+    .tile-check {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid var(--rm-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .tile-check.checked { color: #fff; }
+    .tile-check ha-icon { --mdc-icon-size: 12px; }
   `;
 }
 

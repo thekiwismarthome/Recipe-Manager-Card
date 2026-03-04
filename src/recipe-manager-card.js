@@ -254,6 +254,7 @@ class RecipeManagerCard extends LitElement {
     _recentRecipeIds:     { type: Array },
     _timers:              { type: Array },
     _timerAlarm:          { type: Object },
+    _timersPrevView:      { type: String },
     _customTimerInput:    { type: String },
   };
 
@@ -277,7 +278,12 @@ class RecipeManagerCard extends LitElement {
     this._recentRecipeIds = loadRecentRecipes();
     this._timers = loadTimers();
     this._timerAlarm = null;
+    this._timersPrevView = null;
     this._customTimerInput = '';
+    this._alarmLoopActive = false;
+    this._alarmInterval = null;
+    this._alarmTimeout = null;
+    this._alarmAudio = null;
     this._unsubscribe = null;
     this._darkModeQuery = null;
     this._resizeObserver = null;
@@ -450,7 +456,7 @@ class RecipeManagerCard extends LitElement {
     }
     if (alarm && !this._timerAlarm) {
       this._timerAlarm = alarm;
-      playTimerSound(this._settings.timerSound ?? 'beep');
+      this._startAlarmLoop(this._settings.timerSound ?? 'beep', this._settings.timerSoundFile);
     }
   }
 
@@ -480,22 +486,56 @@ class RecipeManagerCard extends LitElement {
     this._timers = this._timers.map(t =>
       t.id === id ? { ...t, remaining: t.remaining + seconds, total: t.total + seconds, running: true } : t
     );
-    if (this._timerAlarm?.id === id) this._timerAlarm = null;
+    if (this._timerAlarm?.id === id) { this._stopAlarmLoop(); this._timerAlarm = null; }
     saveTimers(this._timers);
   }
 
   _dismissAlarm() {
     if (this._timerAlarm) {
+      this._stopAlarmLoop();
       this._stopTimer(this._timerAlarm.id);
       this._timerAlarm = null;
+    }
+  }
+
+  _startAlarmLoop(type, fileUrl) {
+    this._stopAlarmLoop();
+    if (type === 'none') return;
+    if (type === 'file' && fileUrl) {
+      this._alarmLoopActive = true;
+      const playNext = () => {
+        if (!this._alarmLoopActive) return;
+        this._alarmAudio = new Audio(fileUrl);
+        this._alarmAudio.onended = () => {
+          if (this._alarmLoopActive) this._alarmTimeout = setTimeout(playNext, 2000);
+        };
+        this._alarmAudio.onerror = () => {
+          if (this._alarmLoopActive) this._alarmTimeout = setTimeout(() => playTimerSound('beep'), 2000);
+        };
+        this._alarmAudio.play().catch(() => {});
+      };
+      playNext();
+    } else {
+      playTimerSound(type);
+      this._alarmInterval = setInterval(() => playTimerSound(type), 4000);
+    }
+  }
+
+  _stopAlarmLoop() {
+    this._alarmLoopActive = false;
+    if (this._alarmInterval) { clearInterval(this._alarmInterval); this._alarmInterval = null; }
+    if (this._alarmTimeout) { clearTimeout(this._alarmTimeout); this._alarmTimeout = null; }
+    if (this._alarmAudio) {
+      this._alarmAudio.pause();
+      this._alarmAudio.onended = null;
+      this._alarmAudio.onerror = null;
+      this._alarmAudio = null;
     }
   }
 
   _handleStartTimer(e) {
     const { seconds, label } = e.detail;
     this._startTimer(seconds, label);
-    // Navigate to timers view so user can see the running timer
-    if (this._wide) this._view = 'timers';
   }
 
   // -- Event handlers -------------------------------------------------------
@@ -617,14 +657,16 @@ class RecipeManagerCard extends LitElement {
       <nav class="rm-sidebar ${collapsed ? 'collapsed' : ''}">
         <div class="sb-top">
           <div class="sb-logo-row">
-            <div class="sb-logo">
-              <ha-icon icon="mdi:chef-hat"></ha-icon>
-              ${!collapsed ? html`<span>Recipes</span>` : ''}
-            </div>
             <button class="sb-collapse-btn" @click=${() => { this._sidebarCollapsed = !this._sidebarCollapsed; }}
               title="${collapsed ? 'Expand sidebar' : 'Collapse sidebar'}">
-              <ha-icon icon="${collapsed ? 'mdi:menu-open' : 'mdi:menu-close'}"></ha-icon>
+              <ha-icon icon="${collapsed ? 'mdi:menu-close' : 'mdi:menu-open'}"></ha-icon>
             </button>
+            ${!collapsed ? html`
+              <div class="sb-logo">
+                <ha-icon icon="mdi:chef-hat"></ha-icon>
+                <span>Recipes</span>
+              </div>
+            ` : ''}
           </div>
 
           ${!collapsed ? html`
@@ -665,7 +707,7 @@ class RecipeManagerCard extends LitElement {
           <button
             class="sb-item ${v === 'timers' ? 'active' : ''}"
             title="Timers"
-            @click=${() => { this._view = 'timers'; }}
+            @click=${() => { this._timersPrevView = this._view; this._view = 'timers'; }}
           >
             <ha-icon icon="mdi:timer-outline"></ha-icon>
             ${!collapsed ? html`<span>Timers</span>` : ''}
@@ -712,6 +754,12 @@ class RecipeManagerCard extends LitElement {
             <button class="icon-btn" @click=${this._handleBack} title="Back">
               <ha-icon icon="mdi:arrow-left"></ha-icon>
             </button>
+          ` : inTimers && this._timersPrevView === 'detail' ? html`
+            <button class="icon-btn"
+              @click=${() => { this._view = 'detail'; this._timersPrevView = null; }}
+              title="Back to recipe">
+              <ha-icon icon="mdi:arrow-left"></ha-icon>
+            </button>
           ` : !wide ? html`
             ${this._view !== 'grid' && !inSettings && !inTimers ? html`
               <button class="icon-btn" @click=${this._handleShowGrid}>
@@ -727,7 +775,7 @@ class RecipeManagerCard extends LitElement {
         <div class="rm-header-right">
           <!-- Timer pills (compact, shown when timers are running, not in timer view) -->
           ${this._timers.length && this._view !== 'timers' ? html`
-            <div class="timer-pills" @click=${() => { this._view = 'timers'; }}>
+            <div class="timer-pills" @click=${() => { this._timersPrevView = this._view; this._view = 'timers'; }}>
               ${this._timers.slice(0, 3).map(t => html`
                 <div class="timer-pill ${!t.running ? 'paused' : ''}">
                   <ha-icon icon="mdi:timer-outline"></ha-icon>

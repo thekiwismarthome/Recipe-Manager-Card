@@ -39,8 +39,8 @@ function parseTimeToSeconds(text) {
 const IMPERIAL_TO_METRIC = {
   'oz':     { factor: 28.3495, to: 'g',  toFull: 'g'  },
   'lb':     { factor: 453.592, to: 'g',  toFull: 'g', thresholdKg: 500 },
-  'cup':    { factor: 236.588, to: 'ml', toFull: 'ml' },
-  'cups':   { factor: 236.588, to: 'ml', toFull: 'ml' },
+  'cup':    { factor: 250,     to: 'ml', toFull: 'ml' },
+  'cups':   { factor: 250,     to: 'ml', toFull: 'ml' },
   'fl oz':  { factor: 29.5735, to: 'ml', toFull: 'ml' },
   'pt':     { factor: 473.176, to: 'ml', toFull: 'ml' },
   'qt':     { factor: 946.353, to: 'ml', toFull: 'ml' },
@@ -87,6 +87,7 @@ class RmRecipeDetail extends LitElement {
     _addingPhotoUrl:     { type: Boolean },
     _metricMode:         { type: Boolean },
     _wakeActive:         { type: Boolean },
+    _completedSteps:     { type: Object },  // Set of completed step indices
   };
 
   constructor() {
@@ -112,6 +113,7 @@ class RmRecipeDetail extends LitElement {
     this._addingPhotoUrl = false;
     this._metricMode = false;
     this._wakeActive = false;
+    this._completedSteps = new Set();
     this._wakeLockSentinel = null;
     this._wakeLockTimeout = null;
   }
@@ -152,6 +154,7 @@ class RmRecipeDetail extends LitElement {
       this._checkedIngredients = null;
       this._photoUrlInput = '';
       this._metricMode = false;
+      this._completedSteps = new Set();
     }
     if (changedProps.has('shoppingLists') && this.shoppingLists.length && !this._selectedListId) {
       this._selectedListId = this.shoppingLists[0]?.id ?? '';
@@ -661,18 +664,31 @@ class RmRecipeDetail extends LitElement {
     `;
   }
 
+  _toggleStepComplete(i) {
+    const next = new Set(this._completedSteps);
+    if (next.has(i)) next.delete(i);
+    else next.add(i);
+    this._completedSteps = next;
+  }
+
   _renderDirections(r) {
     if (!r.instructions?.length) {
       return html`<p class="empty-tab">No directions listed.</p>`;
     }
     return html`
       <ol class="steps-list">
-        ${r.instructions.map((step, i) => html`
-          <li class="step-item">
-            <span class="step-num">${i + 1}</span>
-            <span class="step-text">${this._renderStepWithTimers(step)}</span>
-          </li>
-        `)}
+        ${r.instructions.map((step, i) => {
+          const done = this._completedSteps.has(i);
+          return html`
+            <li class="step-item ${done ? 'step-done' : ''}">
+              <span class="step-num ${done ? 'done' : ''}"
+                @click=${(e) => { e.stopPropagation(); this._toggleStepComplete(i); }}
+                title="${done ? 'Mark incomplete' : 'Mark complete'}"
+              >${done ? html`<ha-icon icon="mdi:check"></ha-icon>` : i + 1}</span>
+              <span class="step-text">${this._renderStepWithTimers(step)}</span>
+            </li>
+          `;
+        })}
       </ol>
     `;
   }
@@ -1239,8 +1255,23 @@ class RmRecipeDetail extends LitElement {
       font-size: 13px;
       font-weight: 700;
       color: #fff;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      user-select: none;
     }
-    .step-text { font-size: 15px; color: var(--rm-text, #e5e5ea); line-height: 1.7; }
+    .step-num:hover { opacity: 0.8; }
+    .step-num.done {
+      background: transparent;
+      border: 2px solid var(--rm-border, rgba(255,255,255,0.2));
+      color: var(--rm-text-muted);
+    }
+    .step-num.done ha-icon { --mdc-icon-size: 16px; }
+    .step-item.step-done .step-text {
+      opacity: 0.45;
+      text-decoration: line-through;
+      text-decoration-color: var(--rm-border);
+    }
+    .step-text { font-size: 15px; color: var(--rm-text, #e5e5ea); line-height: 1.7; transition: opacity 0.2s; }
 
     /* Timer chip in directions */
     .time-chip {
