@@ -256,6 +256,7 @@ class RecipeManagerCard extends LitElement {
     _timerAlarm:          { type: Object },
     _timersPrevView:      { type: String },
     _customTimerInput:    { type: String },
+    _hdrStarHover:        { type: Number },
   };
 
   constructor() {
@@ -280,6 +281,7 @@ class RecipeManagerCard extends LitElement {
     this._timerAlarm = null;
     this._timersPrevView = null;
     this._customTimerInput = '';
+    this._hdrStarHover = 0;
     this._alarmLoopActive = false;
     this._alarmInterval = null;
     this._alarmTimeout = null;
@@ -630,11 +632,29 @@ class RecipeManagerCard extends LitElement {
 
   _renderStars(rating) {
     const r = rating || 0;
+    const hover = this._hdrStarHover;
+    const display = hover > 0 ? hover : r;
     return html`
-      <div class="header-stars">
-        ${[1,2,3,4,5].map(n => html`<span class="hdr-star ${n <= r ? 'filled' : ''}">★</span>`)}
+      <div class="header-stars"
+        @mouseleave=${() => { this._hdrStarHover = 0; }}
+        title="${hover > 0 ? `Set rating: ${hover}★` : r > 0 ? `Rating: ${r}★ — click to change` : 'Click to rate'}">
+        ${[1,2,3,4,5].map(n => html`
+          <span class="hdr-star ${n <= display ? 'filled' : ''}"
+            @mouseover=${() => { this._hdrStarHover = n; }}
+            @click=${() => this._handleRateRecipe(n)}>★</span>
+        `)}
       </div>
     `;
+  }
+
+  async _handleRateRecipe(n) {
+    if (!this._selectedRecipe) return;
+    // Clicking the current rating clears it
+    const newRating = this._selectedRecipe.rating === n ? null : n;
+    this._hdrStarHover = 0;
+    await this._handleUpdateRecipe({
+      detail: { recipeId: this._selectedRecipe.id, data: { rating: newRating } },
+    });
   }
 
   _renderSidebar() {
@@ -1228,11 +1248,15 @@ class RecipeManagerCard extends LitElement {
       align-items: center;
     }
     .hdr-star {
-      font-size: 16px;
-      color: var(--rm-border, rgba(0,0,0,0.15));
+      font-size: 18px;
+      color: var(--rm-border, rgba(0,0,0,0.2));
       line-height: 1;
+      cursor: pointer;
+      transition: color 0.1s, transform 0.1s;
+      -webkit-text-stroke: 1px rgba(200,150,0,0.3);
     }
-    .hdr-star.filled { color: #f5a623; }
+    .hdr-star:hover { transform: scale(1.2); color: #f5a623; }
+    .hdr-star.filled { color: #f5a623; -webkit-text-stroke: 1px #c47f0a; }
 
     /* Timer pills */
     .timer-pills {

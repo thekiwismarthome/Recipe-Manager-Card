@@ -7,7 +7,8 @@ import JSZip from 'jszip';
 class RmAddRecipeDialog extends LitElement {
   static properties = {
     api:     { type: Object },
-    asPanel: { type: Boolean },  // true = right-side panel (wide), false = bottom sheet
+    asPanel:    { type: Boolean },  // true = right-side panel (wide), false = bottom sheet
+    inlineMode: { type: Boolean },  // true = render as full inline view (no overlay)
     _mode: { type: String },   // 'url' | 'manual' | 'import'
     _url: { type: String },
     _scraping: { type: Boolean },
@@ -28,6 +29,7 @@ class RmAddRecipeDialog extends LitElement {
     super();
     this.api = null;
     this.asPanel = false;
+    this.inlineMode = false;
     this._mode = 'url';
     this._url = '';
     this._scraping = false;
@@ -276,47 +278,54 @@ class RmAddRecipeDialog extends LitElement {
     this._form = { ...this._form, instructions: this._form.instructions.filter((_, i) => i !== idx) };
   }
 
+  _renderPanelContent() {
+    return html`
+      <div class="dialog-header">
+        <div class="mode-toggle">
+          <button class="mode-btn ${this._mode === 'url' ? 'active' : ''}" @click=${() => { this._mode = 'url'; }}>
+            <ha-icon icon="mdi:link-variant"></ha-icon> From URL
+          </button>
+          <button class="mode-btn ${this._mode === 'manual' ? 'active' : ''}" @click=${() => { this._mode = 'manual'; }}>
+            <ha-icon icon="mdi:pencil-outline"></ha-icon> Manual
+          </button>
+          <button class="mode-btn ${this._mode === 'import' ? 'active' : ''}" @click=${() => { this._mode = 'import'; }}>
+            <ha-icon icon="mdi:import"></ha-icon> Import
+          </button>
+        </div>
+        ${!this.inlineMode ? html`<button class="icon-btn" @click=${this._close}><ha-icon icon="mdi:close"></ha-icon></button>` : ''}
+      </div>
+
+      <div class="dialog-body">
+        ${this._mode === 'url'    ? this._renderUrlMode()    : ''}
+        ${this._mode === 'import' ? this._renderImportMode() : ''}
+        ${this._mode === 'manual' ? this._renderManualMode() : ''}
+      </div>
+
+      ${this._mode === 'manual' ? html`
+        <div class="dialog-footer">
+          <button class="action-btn" @click=${this._close}>Cancel</button>
+          <button
+            class="action-btn primary"
+            ?disabled=${!this._form.name.trim() || this._saving}
+            @click=${this._handleSave}
+          >
+            ${this._saving
+              ? html`<ha-circular-progress active size="tiny"></ha-circular-progress>`
+              : html`<ha-icon icon="mdi:content-save-outline"></ha-icon>`}
+            Save Recipe
+          </button>
+        </div>
+      ` : ''}
+    `;
+  }
+
   render() {
+    if (this.inlineMode) {
+      return html`<div class="dialog-panel inline-panel">${this._renderPanelContent()}</div>`;
+    }
     return html`
       <div class="dialog-overlay ${this.asPanel ? 'panel-mode' : ''}" @click=${(e) => { if (e.target === e.currentTarget) this._close(); }}>
-        <div class="dialog-panel">
-          <div class="dialog-header">
-            <div class="mode-toggle">
-              <button class="mode-btn ${this._mode === 'url' ? 'active' : ''}" @click=${() => { this._mode = 'url'; }}>
-                <ha-icon icon="mdi:link-variant"></ha-icon> From URL
-              </button>
-              <button class="mode-btn ${this._mode === 'manual' ? 'active' : ''}" @click=${() => { this._mode = 'manual'; }}>
-                <ha-icon icon="mdi:pencil-outline"></ha-icon> Manual
-              </button>
-              <button class="mode-btn ${this._mode === 'import' ? 'active' : ''}" @click=${() => { this._mode = 'import'; }}>
-                <ha-icon icon="mdi:import"></ha-icon> Import
-              </button>
-            </div>
-            <button class="icon-btn" @click=${this._close}><ha-icon icon="mdi:close"></ha-icon></button>
-          </div>
-
-          <div class="dialog-body">
-            ${this._mode === 'url'    ? this._renderUrlMode()    : ''}
-            ${this._mode === 'import' ? this._renderImportMode() : ''}
-            ${this._mode === 'manual' ? this._renderManualMode() : ''}
-          </div>
-
-          ${this._mode === 'manual' ? html`
-            <div class="dialog-footer">
-              <button class="action-btn" @click=${this._close}>Cancel</button>
-              <button
-                class="action-btn primary"
-                ?disabled=${!this._form.name.trim() || this._saving}
-                @click=${this._handleSave}
-              >
-                ${this._saving
-                  ? html`<ha-circular-progress active size="tiny"></ha-circular-progress>`
-                  : html`<ha-icon icon="mdi:content-save-outline"></ha-icon>`}
-                Save Recipe
-              </button>
-            </div>
-          ` : ''}
-        </div>
+        <div class="dialog-panel">${this._renderPanelContent()}</div>
       </div>
     `;
   }
@@ -651,7 +660,17 @@ class RmAddRecipeDialog extends LitElement {
   }
 
   static styles = css`
-    :host { display: block; }
+    :host { display: block; height: 100%; }
+
+    .inline-panel {
+      border-radius: 0 !important;
+      max-width: 100% !important;
+      max-height: 100% !important;
+      height: 100%;
+      border-left: none !important;
+      box-shadow: none !important;
+      border-top: 1px solid var(--rm-border, rgba(0,0,0,0.08));
+    }
 
     .dialog-overlay {
       position: fixed;

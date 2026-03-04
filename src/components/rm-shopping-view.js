@@ -70,7 +70,7 @@ class RmShoppingView extends LitElement {
     this._selectedListId = '';
     this._loading = false;
     this._clearing = false;
-    this._viewMode = 'list';
+    this._viewMode = 'tile';
   }
 
   updated(changedProps) {

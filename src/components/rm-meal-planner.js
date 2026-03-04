@@ -295,6 +295,7 @@ class RmMealPlanner extends LitElement {
       flex-direction: column;
       height: 100%;
       overflow: hidden;
+      position: relative;
     }
 
     /* Week nav */
@@ -408,17 +409,15 @@ class RmMealPlanner extends LitElement {
       display: flex;
       align-items: center;
       gap: 3px;
-      background: var(--rm-bg, #1c1c1e);
+      background: var(--rm-bg-elevated, #1c1c1e);
       border-radius: 4px;
-      padding: 2px 4px;
+      padding: 2px 2px 2px 4px;
       cursor: pointer;
       font-size: 10px;
       color: var(--rm-text, #e5e5ea);
       position: relative;
-      min-height: 20px;
-      overflow: hidden;
+      min-height: 22px;
     }
-    .meal-entry:hover .entry-remove { opacity: 1; }
     .entry-thumb {
       width: 16px;
       height: 16px;
@@ -442,21 +441,23 @@ class RmMealPlanner extends LitElement {
     }
     .entry-servings { font-size: 9px; color: var(--rm-text-secondary, #8e8e93); flex-shrink: 0; }
     .entry-remove {
-      background: rgba(0,0,0,0.5);
+      background: rgba(0,0,0,0.35);
       border: none;
       border-radius: 50%;
-      width: 14px;
-      height: 14px;
+      width: 16px;
+      height: 16px;
+      min-width: 16px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       color: #fff;
       padding: 0;
-      opacity: 0;
-      transition: opacity 0.15s;
+      opacity: 1;
       flex-shrink: 0;
+      transition: background 0.15s;
     }
+    .entry-remove:hover { background: rgba(207,102,121,0.8); }
     .entry-remove ha-icon { --mdc-icon-size: 10px; }
 
     .add-slot-btn {
@@ -501,18 +502,20 @@ class RmMealPlanner extends LitElement {
     .picker-overlay {
       position: absolute;
       inset: 0;
-      background: rgba(0,0,0,0.65);
-      display: flex;
-      align-items: flex-end;
-      z-index: 10;
-    }
-    .picker-panel {
-      background: var(--rm-bg, #1c1c1e);
-      border-radius: var(--rm-radius, 12px) var(--rm-radius, 12px) 0 0;
-      width: 100%;
-      max-height: 75vh;
+      background: rgba(0,0,0,0.55);
       display: flex;
       flex-direction: column;
+      justify-content: flex-end;
+      z-index: 20;
+    }
+    .picker-panel {
+      background: var(--rm-bg-surface, #1c1c1e);
+      border-radius: var(--rm-radius, 12px) var(--rm-radius, 12px) 0 0;
+      width: 100%;
+      max-height: 80%;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 -4px 24px rgba(0,0,0,0.3);
     }
     .picker-header {
       display: flex;
