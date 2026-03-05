@@ -808,12 +808,20 @@ class RmRecipeDetail extends LitElement {
               Add
             </button>
           </div>
-          <label class="camera-btn">
-            <ha-icon icon="mdi:camera-plus-outline"></ha-icon>
-            Take / Upload Photo
-            <input type="file" accept="image/*" capture="environment" class="camera-input"
-              @change=${this._handleCameraCapture} />
-          </label>
+          <div class="camera-btns">
+            <label class="camera-btn-split">
+              <ha-icon icon="mdi:camera"></ha-icon>
+              <span>Take Photo</span>
+              <input type="file" accept="image/*" capture="environment" class="camera-input"
+                @change=${this._handleCameraCapture} />
+            </label>
+            <label class="camera-btn-split">
+              <ha-icon icon="mdi:image-multiple-outline"></ha-icon>
+              <span>Choose from Library</span>
+              <input type="file" accept="image/*" class="camera-input"
+                @change=${this._handleCameraCapture} />
+            </label>
+          </div>
         </div>
       </div>
     `;
@@ -1415,21 +1423,29 @@ class RmRecipeDetail extends LitElement {
       font-size: 13px;
     }
     .photo-url-input:focus { outline: none; border-color: var(--rm-accent, #ff6b35); }
-    .camera-btn {
-      display: inline-flex;
+    .camera-btns {
+      display: flex;
+      gap: 10px;
+    }
+    .camera-btn-split {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
       align-items: center;
+      justify-content: center;
       gap: 8px;
       background: var(--rm-bg-elevated, #2c2c2e);
-      border: 1px dashed var(--rm-border, rgba(255,255,255,0.2));
-      border-radius: 8px;
-      color: var(--rm-text-secondary, #8e8e93);
-      padding: 10px 14px;
+      border: 2px solid var(--rm-accent, #ff6b35);
+      border-radius: 10px;
+      color: var(--rm-text, #e5e5ea);
+      padding: 16px 8px;
       cursor: pointer;
-      font-size: 13px;
-      transition: border-color 0.15s, color 0.15s;
+      font-size: 12px;
+      text-align: center;
+      transition: background 0.15s, border-color 0.15s;
     }
-    .camera-btn:hover { border-color: var(--rm-accent, #ff6b35); color: var(--rm-text); }
-    .camera-btn ha-icon { --mdc-icon-size: 20px; color: var(--rm-accent, #ff6b35); }
+    .camera-btn-split:hover { background: var(--rm-accent-soft, rgba(255,107,53,0.12)); }
+    .camera-btn-split ha-icon { --mdc-icon-size: 28px; color: var(--rm-accent, #ff6b35); }
     .camera-input { display: none; }
 
     /* Buttons */

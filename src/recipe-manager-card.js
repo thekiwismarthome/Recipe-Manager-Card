@@ -906,6 +906,7 @@ class RecipeManagerCard extends LitElement {
     `;
     if (this._view === 'shopping') return html`
       <rm-shopping-view
+        .hass=${this.hass}
         .slmAvailable=${this._slmAvailable}
         .shoppingLists=${this._shoppingLists}
         .api=${this._api}

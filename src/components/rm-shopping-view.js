@@ -1,149 +1,43 @@
 /**
- * Shopping list view — shows either SLM items or a local fallback list.
- * Visual style matches Shopping List Manager (SLM) card.
+ * Shopping list view — embeds shopping-list-manager-card when SLM is available,
+ * or shows a local fallback list when it is not.
  */
 import { LitElement, html, css } from 'lit';
 
-// ---------------------------------------------------------------------------
-// Category metadata (mirrors SLM categories)
-// ---------------------------------------------------------------------------
-
-const CATEGORY_META = {
-  produce:    { label: 'Produce',    emoji: '🥦', color: '#4caf50' },
-  dairy:      { label: 'Dairy',      emoji: '🥛', color: '#42a5f5' },
-  meat:       { label: 'Meat',       emoji: '🥩', color: '#ef5350' },
-  bakery:     { label: 'Bakery',     emoji: '🍞', color: '#ff8f00' },
-  pantry:     { label: 'Pantry',     emoji: '🫙', color: '#ef6c00' },
-  frozen:     { label: 'Frozen',     emoji: '🧊', color: '#00acc1' },
-  beverages:  { label: 'Beverages',  emoji: '🧃', color: '#7e57c2' },
-  snacks:     { label: 'Snacks',     emoji: '🍿', color: '#cddc39' },
-  household:  { label: 'Household',  emoji: '🧹', color: '#26a69a' },
-  health:     { label: 'Health',     emoji: '💊', color: '#66bb6a' },
-  pet:        { label: 'Pet',        emoji: '🐾', color: '#a1887f' },
-  baby:       { label: 'Baby',       emoji: '🍼', color: '#f06292' },
-  other:      { label: 'Other',      emoji: '📦', color: '#78909c' },
-  recent:     { label: 'Recent',     emoji: '🕐', color: '#90a4ae' },
-};
-
-function catMeta(catId) {
-  return CATEGORY_META[catId?.toLowerCase()] ?? CATEGORY_META.other;
-}
-
-function catColor(catId) {
-  return catMeta(catId).color;
-}
-
-function catEmoji(catId) {
-  return catMeta(catId).emoji;
-}
-
-function catLabel(catId) {
-  return catMeta(catId).label;
-}
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
 class RmShoppingView extends LitElement {
   static properties = {
-    slmAvailable:      { type: Boolean },
-    shoppingLists:     { type: Array },
-    api:               { type: Object },
-    localItems:        { type: Array },
-    _slmItems:         { type: Array },
-    _slmCategories:    { type: Array },
-    _selectedListId:   { type: String },
-    _loading:          { type: Boolean },
-    _clearing:         { type: Boolean },
-    _viewMode:         { type: String },
+    hass:          { type: Object },
+    slmAvailable:  { type: Boolean },
+    shoppingLists: { type: Array },
+    api:           { type: Object },
+    localItems:    { type: Array },
   };
 
   constructor() {
     super();
+    this.hass = null;
     this.slmAvailable = false;
     this.shoppingLists = [];
     this.api = null;
     this.localItems = [];
-    this._slmItems = [];
-    this._slmCategories = [];
-    this._selectedListId = '';
-    this._loading = false;
-    this._clearing = false;
-    this._viewMode = 'tile';
   }
 
   updated(changedProps) {
-    if (changedProps.has('slmAvailable') || changedProps.has('shoppingLists')) {
-      if (this.slmAvailable && this.shoppingLists.length && !this._selectedListId) {
-        this._selectedListId = this.shoppingLists[0]?.id ?? '';
-        this._loadSlmData();
+    // When SLM is available, propagate hass to the embedded card and call setConfig once.
+    if (this.slmAvailable && this.hass &&
+        (changedProps.has('hass') || changedProps.has('slmAvailable'))) {
+      const slmCard = this.shadowRoot?.querySelector('shopping-list-manager-card');
+      if (slmCard) {
+        if (!slmCard._rmConfigSet) {
+          try { slmCard.setConfig({}); } catch (e) { /* ignore */ }
+          slmCard._rmConfigSet = true;
+        }
+        slmCard.hass = this.hass;
       }
     }
-    if (changedProps.has('_selectedListId') && this._selectedListId && this.slmAvailable) {
-      this._loadSlmData();
-    }
   }
 
-  async _loadSlmData() {
-    if (!this._selectedListId || !this.api) return;
-    this._loading = true;
-    try {
-      const [itemsResult, catsResult] = await Promise.allSettled([
-        this.api.getSlmItems(this._selectedListId),
-        this.api.getSlmCategories?.(),
-      ]);
-      this._slmItems = itemsResult.status === 'fulfilled' ? (itemsResult.value?.items ?? []) : [];
-      this._slmCategories = catsResult.status === 'fulfilled' ? (catsResult.value?.categories ?? []) : [];
-    } catch (err) {
-      console.warn('Failed to load SLM data:', err);
-      this._slmItems = [];
-    } finally {
-      this._loading = false;
-    }
-  }
-
-  async _toggleSlmItem(item) {
-    const newChecked = !item.checked;
-    this._slmItems = this._slmItems.map(i =>
-      i.id === item.id ? { ...i, checked: newChecked } : i
-    );
-    try {
-      await this.api.checkSlmItem(item.id, newChecked);
-    } catch (err) {
-      console.warn('Failed to check SLM item:', err);
-      this._slmItems = this._slmItems.map(i =>
-        i.id === item.id ? { ...i, checked: !newChecked } : i
-      );
-    }
-  }
-
-  async _decreaseSlmItem(item) {
-    const qty = (item.quantity ?? 1);
-    if (qty <= 1) {
-      // Remove item
-      this._slmItems = this._slmItems.filter(i => i.id !== item.id);
-      try { await this.api.deleteSlmItem?.(item.id); } catch { /* ignore */ }
-    } else {
-      const newQty = qty - 1;
-      this._slmItems = this._slmItems.map(i =>
-        i.id === item.id ? { ...i, quantity: newQty } : i
-      );
-      try { await this.api.updateSlmItem?.(item.id, { quantity: newQty }); } catch { /* ignore */ }
-    }
-  }
-
-  async _clearSlmChecked() {
-    this._clearing = true;
-    try {
-      await this.api.clearSlmChecked(this._selectedListId);
-      this._slmItems = this._slmItems.filter(i => !i.checked);
-    } catch (err) {
-      console.warn('Failed to clear SLM checked:', err);
-    } finally {
-      this._clearing = false;
-    }
-  }
+  // -- Local mode helpers --------------------------------------------------
 
   _toggleLocalItem(id) {
     const updated = this.localItems.map(item =>
@@ -168,40 +62,7 @@ class RmShoppingView extends LitElement {
     }));
   }
 
-  // Group unchecked SLM items by category, preserving SLM category order
-  _groupByCategory(items) {
-    const unchecked = items.filter(i => !i.checked);
-    const checked = items.filter(i => i.checked);
-
-    // Determine ordered category IDs from SLM categories or from item data
-    const orderedCatIds = this._slmCategories.length
-      ? this._slmCategories.map(c => c.id ?? c.name?.toLowerCase())
-      : [...new Set(unchecked.map(i => i.category?.toLowerCase() ?? 'other'))];
-
-    // Build groups
-    const groups = [];
-    const seen = new Set();
-
-    for (const catId of orderedCatIds) {
-      const catItems = unchecked.filter(i => (i.category?.toLowerCase() ?? 'other') === catId);
-      if (catItems.length) {
-        groups.push({ catId, items: catItems });
-        seen.add(catId);
-      }
-    }
-
-    // Add any categories not in the ordered list
-    for (const item of unchecked) {
-      const catId = item.category?.toLowerCase() ?? 'other';
-      if (!seen.has(catId)) {
-        const existing = groups.find(g => g.catId === catId);
-        if (existing) existing.items.push(item);
-        else { groups.push({ catId, items: [item] }); seen.add(catId); }
-      }
-    }
-
-    return { groups, checked };
-  }
+  // -- Render --------------------------------------------------------------
 
   render() {
     return html`
@@ -212,165 +73,7 @@ class RmShoppingView extends LitElement {
   }
 
   _renderSlmMode() {
-    const hasChecked = this._slmItems.some(i => i.checked);
-    const { groups, checked } = this._groupByCategory(this._slmItems);
-
-    return html`
-      <div class="sv-header">
-        <div class="sv-header-left">
-          ${this.shoppingLists.length > 1 ? html`
-            <select class="list-select" .value=${this._selectedListId}
-              @change=${e => { this._selectedListId = e.target.value; }}>
-              ${this.shoppingLists.map(l => html`
-                <option value="${l.id}" ?selected=${l.id === this._selectedListId}>${l.name}</option>
-              `)}
-            </select>
-          ` : html`
-            <span class="sv-list-name">${this.shoppingLists[0]?.name ?? 'Shopping List'}</span>
-          `}
-        </div>
-        <div class="sv-actions">
-          <button class="sv-btn ${this._viewMode === 'tile' ? 'active' : ''}"
-            @click=${() => { this._viewMode = this._viewMode === 'tile' ? 'list' : 'tile'; }}
-            title="${this._viewMode === 'tile' ? 'Switch to list view' : 'Switch to tile view'}">
-            <ha-icon icon="${this._viewMode === 'tile' ? 'mdi:view-list' : 'mdi:view-grid-outline'}"></ha-icon>
-          </button>
-          <button class="sv-btn" @click=${this._loadSlmData} title="Refresh">
-            <ha-icon icon="mdi:refresh"></ha-icon>
-          </button>
-          ${hasChecked ? html`
-            <button class="sv-btn danger" @click=${this._clearSlmChecked} ?disabled=${this._clearing}>
-              <ha-icon icon="mdi:delete-sweep-outline"></ha-icon>
-              <span>Clear checked</span>
-            </button>
-          ` : ''}
-        </div>
-      </div>
-
-      ${this._loading ? html`
-        <div class="sv-loading"><ha-circular-progress active size="small"></ha-circular-progress></div>
-      ` : this._slmItems.length === 0 ? html`
-        <div class="sv-empty">
-          <ha-icon icon="mdi:cart-outline"></ha-icon>
-          <p>Your shopping list is empty.</p>
-          <p class="sv-hint">Add ingredients from any recipe to get started.</p>
-        </div>
-      ` : html`
-        <div class="sv-items">
-          ${this._viewMode === 'tile'
-            ? this._renderTileGrid(groups, checked)
-            : html`
-              ${groups.map(({ catId, items }) => this._renderCategoryGroup(catId, items))}
-              ${checked.length ? html`
-                <div class="sv-divider-label">Checked</div>
-                ${checked.map(item => this._renderSlmRow(item, true))}
-              ` : ''}
-            `}
-        </div>
-      `}
-    `;
-  }
-
-  _renderCategoryGroup(catId, items) {
-    const color = catColor(catId);
-    const emoji = catEmoji(catId);
-    const label = catLabel(catId);
-
-    return html`
-      <div class="cat-group">
-        <div class="cat-header" style="border-left-color:${color}; background: linear-gradient(to right, ${color}18, transparent)">
-          <span class="cat-emoji">${emoji}</span>
-          <span class="cat-name" style="color:${color}">${label}</span>
-          <span class="cat-count">${items.length}</span>
-        </div>
-        ${items.map(item => this._renderSlmRow(item, false, color))}
-      </div>
-    `;
-  }
-
-  _renderSlmRow(item, isChecked, catColor = '#78909c') {
-    const qty = item.quantity && item.quantity !== 1 ? item.quantity : null;
-    const unit = item.unit && item.unit !== 'units' ? item.unit : null;
-    const color = isChecked ? '#78909c' : (catColor || catColor(item.category));
-
-    return html`
-      <div class="sv-row ${isChecked ? 'sv-row-checked' : ''}"
-        @click=${() => this._toggleSlmItem(item)}>
-        <div class="sv-row-left">
-          <div class="cat-dot" style="background:${color}"></div>
-          <span class="row-emoji">${catEmoji(item.category)}</span>
-        </div>
-        <div class="sv-row-mid">
-          <span class="sv-item-name">${item.name}</span>
-          ${unit ? html`<span class="sv-item-unit">${unit}</span>` : ''}
-        </div>
-        <div class="sv-row-right" @click=${e => e.stopPropagation()}>
-          ${!isChecked ? html`
-            <button class="dec-btn" @click=${() => this._decreaseSlmItem(item)} title="Decrease">−</button>
-          ` : ''}
-          ${qty !== null ? html`
-            <span class="qty-badge" style="background:${color}22; color:${color}; border-color:${color}44">${qty}</span>
-          ` : ''}
-          <div class="sv-checkbox ${isChecked ? 'checked' : ''}"
-            style="${isChecked ? `background:${color}; border-color:${color}` : `border-color:${color}`}">
-            ${isChecked ? html`<ha-icon icon="mdi:check"></ha-icon>` : ''}
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  _renderTileGrid(groups, checked) {
-    return html`
-      ${groups.map(({ catId, items }) => {
-        const color = catColor(catId);
-        const emoji = catEmoji(catId);
-        const label = catLabel(catId);
-        return html`
-          <div class="cat-group">
-            <div class="cat-header" style="border-left-color:${color}; background: linear-gradient(to right, ${color}18, transparent)">
-              <span class="cat-emoji">${emoji}</span>
-              <span class="cat-name" style="color:${color}">${label}</span>
-              <span class="cat-count">${items.length}</span>
-            </div>
-            <div class="tile-grid">
-              ${items.map(item => this._renderTile(item, color))}
-            </div>
-          </div>
-        `;
-      })}
-      ${checked.length ? html`
-        <div class="sv-divider-label">Checked</div>
-        <div class="tile-grid">
-          ${checked.map(item => this._renderTile(item, '#78909c', true))}
-        </div>
-      ` : ''}
-    `;
-  }
-
-  _renderTile(item, color, isChecked = false) {
-    const qty = item.quantity && item.quantity !== 1 ? item.quantity : null;
-    const unit = item.unit && item.unit !== 'units' ? item.unit : null;
-    const tileColor = isChecked ? '#78909c' : color;
-    return html`
-      <div class="tile ${isChecked ? 'tile-checked' : ''}"
-        style="border-top: 3px solid ${tileColor}"
-        @click=${() => this._toggleSlmItem(item)}>
-        <div class="tile-emoji">${catEmoji(item.category)}</div>
-        <div class="tile-name">${item.name}</div>
-        ${unit ? html`<div class="tile-unit">${unit}</div>` : ''}
-        ${qty !== null ? html`
-          <div class="tile-qty" style="color:${tileColor}; border-color:${tileColor}55; background:${tileColor}18">${qty}</div>
-        ` : ''}
-        ${!isChecked ? html`
-          <button class="tile-dec" @click=${e => { e.stopPropagation(); this._decreaseSlmItem(item); }} title="Decrease">−</button>
-        ` : ''}
-        <div class="tile-check ${isChecked ? 'checked' : ''}"
-          style="${isChecked ? `background:${tileColor}; border-color:${tileColor}` : `border-color:${tileColor}`}">
-          ${isChecked ? html`<ha-icon icon="mdi:check"></ha-icon>` : ''}
-        </div>
-      </div>
-    `;
+    return html`<shopping-list-manager-card></shopping-list-manager-card>`;
   }
 
   _renderLocalMode() {
@@ -428,7 +131,7 @@ class RmShoppingView extends LitElement {
       <div class="sv-row ${item.checked ? 'sv-row-checked' : ''}"
         @click=${() => this._toggleLocalItem(item.id)}>
         <div class="sv-row-left">
-          <div class="cat-dot" style="background:#78909c"></div>
+          <div class="cat-dot"></div>
           <span class="row-emoji">📦</span>
         </div>
         <div class="sv-row-mid">
@@ -454,7 +157,14 @@ class RmShoppingView extends LitElement {
       overflow: hidden;
     }
 
-    /* ── Header ─────────────────────── */
+    /* Embedded SLM card fills remaining space */
+    shopping-list-manager-card {
+      display: block;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ── Header (local mode) ────────── */
 
     .sv-header {
       display: flex;
@@ -466,29 +176,13 @@ class RmShoppingView extends LitElement {
       gap: 8px;
     }
 
-    .sv-header-left { display: flex; align-items: center; }
-
     .sv-list-name {
       font-weight: 600;
       font-size: 15px;
       color: var(--rm-text);
     }
 
-    .list-select {
-      background: var(--rm-bg-surface);
-      border: 1px solid var(--rm-border);
-      border-radius: 8px;
-      color: var(--rm-text);
-      padding: 6px 10px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-
-    .sv-actions {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-    }
+    .sv-actions { display: flex; gap: 6px; align-items: center; }
 
     .sv-btn {
       display: flex;
@@ -505,10 +199,8 @@ class RmShoppingView extends LitElement {
     }
     .sv-btn ha-icon { --mdc-icon-size: 18px; }
     .sv-btn:hover:not(:disabled) { background: var(--rm-accent-soft); color: var(--rm-text); }
-    .sv-btn.active { background: var(--rm-accent-soft); color: var(--rm-accent); border-color: var(--rm-accent); }
     .sv-btn.danger { color: var(--error-color, #cf6679); border-color: var(--error-color, #cf6679); }
     .sv-btn.danger:hover:not(:disabled) { background: rgba(207,102,121,0.1); }
-    .sv-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
     /* ── Install banner ─────────────── */
 
@@ -524,22 +216,10 @@ class RmShoppingView extends LitElement {
       flex-shrink: 0;
     }
     .sv-install-banner ha-icon { --mdc-icon-size: 20px; color: var(--rm-accent); flex-shrink: 0; margin-top: 1px; }
-    .sv-install-text {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      font-size: 12px;
-      color: var(--rm-text-secondary);
-    }
+    .sv-install-text { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--rm-text-secondary); }
     .sv-install-text strong { color: var(--rm-text); font-size: 13px; }
 
-    /* ── Loading / empty ────────────── */
-
-    .sv-loading {
-      display: flex;
-      justify-content: center;
-      padding: 40px;
-    }
+    /* ── Empty state ────────────────── */
 
     .sv-empty {
       display: flex;
@@ -555,7 +235,7 @@ class RmShoppingView extends LitElement {
     .sv-empty p { margin: 0; font-size: 15px; }
     .sv-hint { font-size: 13px !important; color: var(--rm-text-muted) !important; }
 
-    /* ── Items scroll container ─────── */
+    /* ── Items list (local mode) ─────── */
 
     .sv-items {
       flex: 1;
@@ -564,43 +244,6 @@ class RmShoppingView extends LitElement {
       scrollbar-width: thin;
       scrollbar-color: var(--rm-border) transparent;
     }
-
-    /* ── Category group ─────────────── */
-
-    .cat-group { margin-bottom: 4px; }
-
-    .cat-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 7px 16px 7px 12px;
-      border-left: 3px solid;
-      margin: 4px 0 0;
-    }
-
-    .cat-emoji { font-size: 15px; line-height: 1; }
-
-    .cat-name {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      flex: 1;
-    }
-
-    .cat-count {
-      font-size: 10px;
-      font-weight: 600;
-      color: var(--rm-text-muted);
-      background: var(--rm-bg-elevated);
-      border: 1px solid var(--rm-border);
-      border-radius: 10px;
-      padding: 1px 7px;
-      min-width: 20px;
-      text-align: center;
-    }
-
-    /* ── Item rows ──────────────────── */
 
     .sv-divider-label {
       padding: 12px 16px 4px;
@@ -619,34 +262,16 @@ class RmShoppingView extends LitElement {
       cursor: pointer;
       transition: background 0.12s;
       border-bottom: 1px solid var(--rm-border);
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
       min-height: 46px;
     }
-    .sv-row:last-child { border-bottom: none; }
     .sv-row:hover { background: var(--rm-accent-soft); }
     .sv-row-checked { opacity: 0.5; }
 
-    .sv-row-left {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      flex-shrink: 0;
-    }
+    .sv-row-left { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
 
-    .cat-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
+    .cat-dot { width: 8px; height: 8px; border-radius: 50%; background: #78909c; flex-shrink: 0; }
 
-    .row-emoji {
-      font-size: 17px;
-      line-height: 1;
-      width: 22px;
-      text-align: center;
-    }
+    .row-emoji { font-size: 17px; line-height: 1; width: 22px; text-align: center; }
 
     .sv-row-mid {
       flex: 1;
@@ -657,52 +282,11 @@ class RmShoppingView extends LitElement {
       flex-wrap: wrap;
     }
 
-    .sv-item-name {
-      font-size: 14px;
-      color: var(--rm-text);
-      font-weight: 500;
-    }
+    .sv-item-name { font-size: 14px; color: var(--rm-text); font-weight: 500; }
     .sv-row-checked .sv-item-name { text-decoration: line-through; }
+    .sv-item-unit { font-size: 12px; color: var(--rm-text-muted); }
 
-    .sv-item-unit {
-      font-size: 12px;
-      color: var(--rm-text-muted);
-    }
-
-    .sv-row-right {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-shrink: 0;
-    }
-
-    .dec-btn {
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      border: 1.5px solid var(--rm-border);
-      background: var(--rm-bg-elevated);
-      color: var(--rm-text-secondary);
-      font-size: 16px;
-      line-height: 1;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.15s, border-color 0.15s;
-      padding: 0;
-    }
-    .dec-btn:hover { background: rgba(207,102,121,0.12); border-color: var(--error-color, #cf6679); color: var(--error-color, #cf6679); }
-
-    .qty-badge {
-      font-size: 12px;
-      font-weight: 700;
-      border: 1.5px solid;
-      border-radius: 12px;
-      padding: 2px 9px;
-      min-width: 28px;
-      text-align: center;
-    }
+    .sv-row-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 
     .sv-checkbox {
       width: 22px;
@@ -713,100 +297,9 @@ class RmShoppingView extends LitElement {
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      transition: background 0.15s, border-color 0.15s;
     }
-    .sv-checkbox.checked { color: #fff; }
+    .sv-checkbox.checked { color: #fff; background: #78909c; border-color: #78909c; }
     .sv-checkbox ha-icon { --mdc-icon-size: 14px; }
-
-    /* ── Tile grid ──────────────────── */
-
-    .tile-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-      gap: 8px;
-      padding: 8px 12px 12px;
-    }
-
-    .tile {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      background: var(--rm-bg-elevated);
-      border-radius: 10px;
-      padding: 10px 8px 10px;
-      cursor: pointer;
-      position: relative;
-      transition: background 0.15s;
-      gap: 4px;
-      border: 1px solid var(--rm-border);
-      min-height: 90px;
-      justify-content: center;
-      text-align: center;
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .tile:hover { background: var(--rm-accent-soft); }
-    .tile-checked { opacity: 0.45; }
-
-    .tile-emoji { font-size: 24px; line-height: 1; margin-bottom: 2px; }
-
-    .tile-name {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--rm-text);
-      line-height: 1.3;
-      overflow: hidden;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      word-break: break-word;
-    }
-
-    .tile-unit { font-size: 10px; color: var(--rm-text-muted); }
-
-    .tile-qty {
-      font-size: 11px;
-      font-weight: 700;
-      border: 1px solid;
-      border-radius: 10px;
-      padding: 1px 8px;
-    }
-
-    .tile-dec {
-      position: absolute;
-      top: 5px;
-      left: 5px;
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      border: 1px solid var(--rm-border);
-      background: var(--rm-bg-main);
-      color: var(--rm-text-secondary);
-      font-size: 14px;
-      line-height: 1;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
-      transition: background 0.15s;
-    }
-    .tile-dec:hover { background: rgba(207,102,121,0.12); color: var(--error-color, #cf6679); }
-
-    .tile-check {
-      position: absolute;
-      top: 5px;
-      right: 5px;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      border: 2px solid var(--rm-border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .tile-check.checked { color: #fff; }
-    .tile-check ha-icon { --mdc-icon-size: 12px; }
   `;
 }
 

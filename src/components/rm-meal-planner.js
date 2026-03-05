@@ -417,6 +417,8 @@ class RmMealPlanner extends LitElement {
       color: var(--rm-text, #e5e5ea);
       position: relative;
       min-height: 22px;
+      max-height: 22px;
+      overflow: hidden;
     }
     .entry-thumb {
       width: 16px;
