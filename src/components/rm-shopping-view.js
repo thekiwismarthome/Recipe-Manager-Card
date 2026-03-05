@@ -312,7 +312,40 @@ class RmShoppingView extends LitElement {
   }
 
   static styles = css`
-    :host { display: block; height: 100%; }
+    :host {
+      display: block;
+      height: 100%;
+
+      /* ── Bridge SLM CSS variables so slm-item-grid/slm-item-tile render correctly ── */
+      /* Text */
+      --slm-text-primary:    var(--rm-text,           #e5e5ea);
+      --slm-text-secondary:  var(--rm-text-secondary, #8e8e93);
+      --slm-text-muted:      var(--rm-text-muted,     #636366);
+      /* Accents — keep SLM's blue-purple palette, not RM's orange */
+      --slm-accent-primary:   #9fa8da;
+      --slm-accent-secondary: #81c784;
+      --slm-accent-warning:   #ffb74d;
+      --slm-accent-danger:    #ef9a9a;
+      /* Tiles */
+      --slm-tile-checked-opacity: 0.35;
+      --slm-font-size-base:   14px;
+      --slm-font-weight-base: 400;
+      /* Category colours (dark theme) */
+      --slm-cat-produce:    #4caf50;
+      --slm-cat-dairy:      #29b6f6;
+      --slm-cat-meat:       #ef5350;
+      --slm-cat-bakery:     #ffa726;
+      --slm-cat-pantry:     #ff7043;
+      --slm-cat-frozen:     #26c6da;
+      --slm-cat-beverages:  #7c4dff;
+      --slm-cat-snacks:     #d4e157;
+      --slm-cat-household:  #26a69a;
+      --slm-cat-health:     #66bb6a;
+      --slm-cat-pet:        #8d6e63;
+      --slm-cat-baby:       #ec407a;
+      --slm-cat-other:      #78909c;
+      --slm-cat-recent:     #9e9e9e;
+    }
 
     .shopping-view {
       display: flex;
