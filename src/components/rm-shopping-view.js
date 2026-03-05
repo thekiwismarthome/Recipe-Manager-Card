@@ -1,16 +1,21 @@
 /**
- * Shopping list view — embeds shopping-list-manager-card when SLM is available,
- * or shows a local fallback list when it is not.
+ * Shopping list view — uses slm-item-grid directly for identical SLM tile look,
+ * or shows a local fallback list when SLM is not available.
  */
 import { LitElement, html, css } from 'lit';
 
 class RmShoppingView extends LitElement {
   static properties = {
-    hass:          { type: Object },
-    slmAvailable:  { type: Boolean },
-    shoppingLists: { type: Array },
-    api:           { type: Object },
-    localItems:    { type: Array },
+    hass:             { type: Object },
+    slmAvailable:     { type: Boolean },
+    shoppingLists:    { type: Array },
+    api:              { type: Object },
+    localItems:       { type: Array },
+    _slmItems:        { type: Array, state: true },
+    _slmCategories:   { type: Array, state: true },
+    _selectedListId:  { type: String, state: true },
+    _loading:         { type: Boolean, state: true },
+    _clearing:        { type: Boolean, state: true },
   };
 
   constructor() {
@@ -20,24 +25,116 @@ class RmShoppingView extends LitElement {
     this.shoppingLists = [];
     this.api = null;
     this.localItems = [];
+    this._slmItems = [];
+    this._slmCategories = [];
+    this._selectedListId = '';
+    this._loading = false;
+    this._clearing = false;
   }
 
   updated(changedProps) {
-    // When SLM is available, propagate hass to the embedded card and call setConfig once.
-    if (this.slmAvailable && this.hass &&
-        (changedProps.has('hass') || changedProps.has('slmAvailable'))) {
-      const slmCard = this.shadowRoot?.querySelector('shopping-list-manager-card');
-      if (slmCard) {
-        if (!slmCard._rmConfigSet) {
-          try { slmCard.setConfig({}); } catch (e) { /* ignore */ }
-          slmCard._rmConfigSet = true;
-        }
-        slmCard.hass = this.hass;
+    if (changedProps.has('slmAvailable') || changedProps.has('shoppingLists')) {
+      if (this.slmAvailable && this.shoppingLists.length && !this._selectedListId) {
+        this._selectedListId = this.shoppingLists[0]?.id ?? '';
+        this._loadSlmData();
       }
+    }
+    if (changedProps.has('_selectedListId') && this._selectedListId && this.slmAvailable) {
+      this._loadSlmData();
     }
   }
 
-  // -- Local mode helpers --------------------------------------------------
+  async _loadSlmData() {
+    if (!this._selectedListId || !this.api) return;
+    this._loading = true;
+    try {
+      const [itemsRes, catsRes] = await Promise.allSettled([
+        this.api.getSlmItems(this._selectedListId),
+        this.api.getSlmCategories(),
+      ]);
+      this._slmItems = itemsRes.status === 'fulfilled' ? (itemsRes.value?.items ?? []) : [];
+      this._slmCategories = catsRes.status === 'fulfilled' ? (catsRes.value?.categories ?? []) : [];
+    } finally {
+      this._loading = false;
+    }
+  }
+
+  // -- SLM grid API adapter -------------------------------------------------
+  // slm-item-grid calls these methods on its .api prop.
+
+  get _slmGridApi() {
+    if (!this.api) return null;
+    const api = this.api;
+    return {
+      getProductsByIds: (ids) => api.getSlmProductsByIds(ids).catch(() => ({ products: [] })),
+      getProductSuggestions: (limit) => api.getSlmProductSuggestions(limit).catch(() => ({ products: [] })),
+    };
+  }
+
+  // -- Event handlers -------------------------------------------------------
+
+  async _handleItemCheck(e) {
+    const { itemId, checked } = e.detail;
+    // Optimistic update
+    this._slmItems = this._slmItems.map(i => i.id === itemId ? { ...i, checked } : i);
+    try {
+      await this.api.checkSlmItem(itemId, checked);
+    } catch {
+      this._slmItems = this._slmItems.map(i => i.id === itemId ? { ...i, checked: !checked } : i);
+    }
+  }
+
+  async _handleItemDecrease(e) {
+    const { itemId } = e.detail;
+    const item = this._slmItems.find(i => i.id === itemId);
+    if (!item) return;
+    if ((item.quantity ?? 1) <= 1) {
+      this._slmItems = this._slmItems.filter(i => i.id !== itemId);
+      try { await this.api.deleteSlmItem(itemId); } catch { /* ignore */ }
+    } else {
+      const newQty = item.quantity - 1;
+      this._slmItems = this._slmItems.map(i => i.id === itemId ? { ...i, quantity: newQty } : i);
+      try { await this.api.updateSlmItem(itemId, { quantity: newQty }); } catch { /* ignore */ }
+    }
+  }
+
+  async _handleItemClick(e) {
+    // Quantity badge click = increment
+    const { itemId } = e.detail;
+    const item = this._slmItems.find(i => i.id === itemId);
+    if (!item) return;
+    const newQty = (item.quantity ?? 1) + 1;
+    this._slmItems = this._slmItems.map(i => i.id === itemId ? { ...i, quantity: newQty } : i);
+    try { await this.api.updateSlmItem(itemId, { quantity: newQty }); } catch { /* ignore */ }
+  }
+
+  async _handleAddItem(e) {
+    const { name, category_id, product_id, quantity, unit, price, image_url } = e.detail;
+    try {
+      const result = await this.api.addSlmItem(this._selectedListId, {
+        name, category_id, product_id,
+        quantity: quantity || 1,
+        unit: unit || 'units',
+        ...(price ? { price } : {}),
+        ...(image_url ? { image_url } : {}),
+      });
+      if (result?.item) this._slmItems = [...this._slmItems, result.item];
+    } catch (err) {
+      console.warn('Failed to add item:', err);
+    }
+  }
+
+  async _clearChecked() {
+    this._clearing = true;
+    try {
+      await this.api.clearSlmChecked(this._selectedListId);
+      this._slmItems = this._slmItems.filter(i => !i.checked);
+    } finally {
+      this._clearing = false;
+    }
+  }
+
+  // -- Local mode helpers ---------------------------------------------------
 
   _toggleLocalItem(id) {
     const updated = this.localItems.map(item =>
@@ -62,7 +159,7 @@ class RmShoppingView extends LitElement {
     }));
   }
 
-  // -- Render --------------------------------------------------------------
+  // -- Render ---------------------------------------------------------------
 
   render() {
     return html`
@@ -73,7 +170,74 @@ class RmShoppingView extends LitElement {
   }
 
   _renderSlmMode() {
-    return html`<shopping-list-manager-card></shopping-list-manager-card>`;
+    const hasChecked = this._slmItems.some(i => i.checked);
+    const checkedItems = this._slmItems.filter(i => i.checked);
+
+    // Build SLM-compatible settings object
+    const slmSettings = {
+      showRecentlyUsed: true,
+      showPriceOnTile: true,
+      tilesPerRow: 3,
+      sortMode: 'category',
+    };
+
+    return html`
+      <div class="sv-header">
+        <div class="sv-header-left">
+          ${this.shoppingLists.length > 1 ? html`
+            <select class="list-select" .value=${this._selectedListId}
+              @change=${e => { this._selectedListId = e.target.value; }}>
+              ${this.shoppingLists.map(l => html`
+                <option value="${l.id}" ?selected=${l.id === this._selectedListId}>${l.name}</option>
+              `)}
+            </select>
+          ` : html`
+            <span class="sv-list-name">${this.shoppingLists[0]?.name ?? 'Shopping List'}</span>
+          `}
+        </div>
+        <div class="sv-actions">
+          <button class="sv-btn" @click=${this._loadSlmData} title="Refresh">
+            <ha-icon icon="mdi:refresh"></ha-icon>
+          </button>
+          ${hasChecked ? html`
+            <button class="sv-btn danger" @click=${this._clearChecked} ?disabled=${this._clearing}>
+              <ha-icon icon="mdi:delete-sweep-outline"></ha-icon>
+              <span>Clear checked</span>
+            </button>
+          ` : ''}
+        </div>
+      </div>
+
+      ${this._loading ? html`
+        <div class="sv-loading"><ha-circular-progress active size="small"></ha-circular-progress></div>
+      ` : html`
+        <div class="sv-scroll">
+          <slm-item-grid
+            .items=${this._slmItems}
+            .categories=${this._slmCategories}
+            .settings=${slmSettings}
+            .api=${this._slmGridApi}
+            @item-check=${this._handleItemCheck}
+            @item-decrease=${this._handleItemDecrease}
+            @item-click=${this._handleItemClick}
+            @add-item=${this._handleAddItem}
+          ></slm-item-grid>
+
+          ${checkedItems.length ? html`
+            <div class="checked-section">
+              <div class="checked-label">Checked (${checkedItems.length})</div>
+              ${checkedItems.map(item => html`
+                <div class="checked-row"
+                  @click=${() => this._handleItemCheck({ detail: { itemId: item.id, checked: false } })}>
+                  <span class="checked-name">${item.name}</span>
+                  <ha-icon icon="mdi:check-circle" class="checked-icon"></ha-icon>
+                </div>
+              `)}
+            </div>
+          ` : ''}
+        </div>
+      `}
+    `;
   }
 
   _renderLocalMode() {
@@ -157,29 +321,34 @@ class RmShoppingView extends LitElement {
       overflow: hidden;
     }
 
-    /* Embedded SLM card fills remaining space */
-    shopping-list-manager-card {
-      display: block;
-      flex: 1;
-      min-height: 0;
-    }
-
-    /* ── Header (local mode) ────────── */
+    /* ── Header ─────────────────────── */
 
     .sv-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 16px;
+      padding: 10px 14px;
       border-bottom: 1px solid var(--rm-border);
       flex-shrink: 0;
       gap: 8px;
     }
 
+    .sv-header-left { display: flex; align-items: center; }
+
     .sv-list-name {
       font-weight: 600;
       font-size: 15px;
       color: var(--rm-text);
+    }
+
+    .list-select {
+      background: var(--rm-bg-surface);
+      border: 1px solid var(--rm-border);
+      border-radius: 8px;
+      color: var(--rm-text);
+      padding: 5px 10px;
+      font-size: 14px;
+      cursor: pointer;
     }
 
     .sv-actions { display: flex; gap: 6px; align-items: center; }
@@ -192,7 +361,7 @@ class RmShoppingView extends LitElement {
       border: 1px solid var(--rm-border);
       border-radius: 8px;
       color: var(--rm-text-secondary);
-      padding: 6px 10px;
+      padding: 5px 10px;
       font-size: 12px;
       cursor: pointer;
       transition: background 0.15s;
@@ -201,8 +370,65 @@ class RmShoppingView extends LitElement {
     .sv-btn:hover:not(:disabled) { background: var(--rm-accent-soft); color: var(--rm-text); }
     .sv-btn.danger { color: var(--error-color, #cf6679); border-color: var(--error-color, #cf6679); }
     .sv-btn.danger:hover:not(:disabled) { background: rgba(207,102,121,0.1); }
+    .sv-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* ── Install banner ─────────────── */
+    /* ── Loading ────────────────────── */
+
+    .sv-loading {
+      display: flex;
+      justify-content: center;
+      padding: 40px;
+    }
+
+    /* ── SLM scroll area ────────────── */
+
+    .sv-scroll {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--rm-border) transparent;
+    }
+
+    slm-item-grid {
+      display: block;
+    }
+
+    /* ── Checked section ────────────── */
+
+    .checked-section {
+      padding: 0 4px 16px;
+    }
+
+    .checked-label {
+      padding: 10px 12px 6px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--rm-text-muted);
+    }
+
+    .checked-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--rm-border);
+      cursor: pointer;
+      opacity: 0.5;
+      transition: background 0.12s;
+    }
+    .checked-row:hover { background: var(--rm-accent-soft); opacity: 0.7; }
+
+    .checked-name {
+      font-size: 14px;
+      color: var(--rm-text);
+      text-decoration: line-through;
+    }
+
+    .checked-icon { --mdc-icon-size: 18px; color: var(--rm-text-muted); }
+
+    /* ── Install banner (local mode) ── */
 
     .sv-install-banner {
       display: flex;
@@ -235,7 +461,7 @@ class RmShoppingView extends LitElement {
     .sv-empty p { margin: 0; font-size: 15px; }
     .sv-hint { font-size: 13px !important; color: var(--rm-text-muted) !important; }
 
-    /* ── Items list (local mode) ─────── */
+    /* ── Local items list ───────────── */
 
     .sv-items {
       flex: 1;
@@ -268,9 +494,7 @@ class RmShoppingView extends LitElement {
     .sv-row-checked { opacity: 0.5; }
 
     .sv-row-left { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
-
     .cat-dot { width: 8px; height: 8px; border-radius: 50%; background: #78909c; flex-shrink: 0; }
-
     .row-emoji { font-size: 17px; line-height: 1; width: 22px; text-align: center; }
 
     .sv-row-mid {
@@ -289,13 +513,10 @@ class RmShoppingView extends LitElement {
     .sv-row-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 
     .sv-checkbox {
-      width: 22px;
-      height: 22px;
+      width: 22px; height: 22px;
       border-radius: 50%;
       border: 2px solid var(--rm-border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
     }
     .sv-checkbox.checked { color: #fff; background: #78909c; border-color: #78909c; }

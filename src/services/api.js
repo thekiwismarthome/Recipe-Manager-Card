@@ -226,6 +226,26 @@ export class RecipeManagerAPI {
     return this.hass.callWS({ type: 'shopping_list_manager/items/clear_checked', list_id: listId });
   }
 
+  async deleteSlmItem(itemId) {
+    return this.hass.callWS({ type: 'shopping_list_manager/items/delete', item_id: itemId });
+  }
+
+  async addSlmItem(listId, data) {
+    return this.hass.callWS({ type: 'shopping_list_manager/items/add', list_id: listId, ...data });
+  }
+
+  async getSlmCategories() {
+    return this.hass.callWS({ type: 'shopping_list_manager/categories/get_all' });
+  }
+
+  async getSlmProductsByIds(ids) {
+    return this.hass.callWS({ type: 'shopping_list_manager/products/get_by_ids', product_ids: ids });
+  }
+
+  async getSlmProductSuggestions(limit = 20) {
+    return this.hass.callWS({ type: 'shopping_list_manager/products/suggestions', limit });
+  }
+
   // -- Import ---------------------------------------------------------------
 
   /**
