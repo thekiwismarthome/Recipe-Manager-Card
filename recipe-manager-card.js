@@ -330,20 +330,20 @@ const w=globalThis,k=e=>e,$=w.trustedTypes,S=$?$.createPolicy("lit-html",{create
 
     /* Sub-filter chips */
     .sub-filter-row {
-      display: flex; gap: 6px; padding: 6px 14px 10px;
-      overflow-x: auto; flex-shrink: 0;
+      display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 14px;
+      flex-shrink: 0; max-height: 88px;
+      overflow-y: auto;
       scrollbar-width: thin;
       scrollbar-color: var(--rm-border) transparent;
-      touch-action: pan-x;
-      -webkit-overflow-scrolling: touch;
     }
-    .sub-filter-row::-webkit-scrollbar { height: 3px; }
+    .sub-filter-row::-webkit-scrollbar { width: 4px; }
     .sub-filter-row::-webkit-scrollbar-track { background: transparent; }
-    .sub-filter-row::-webkit-scrollbar-thumb { background: var(--rm-border); border-radius: 3px; }
+    .sub-filter-row::-webkit-scrollbar-thumb { background: var(--rm-border); border-radius: 4px; }
     .sub-chip {
+      display: inline-flex; align-items: center; gap: 5px;
       background: var(--rm-bg-elevated); border: 1px solid var(--rm-border);
       border-radius: 20px; color: var(--rm-text-secondary);
-      font-size: 12px; padding: 4px 12px; cursor: pointer;
+      font-size: 12px; padding: 4px 8px 4px 12px; cursor: pointer;
       white-space: nowrap; transition: all 0.15s;
     }
     .sub-chip.active {
@@ -353,11 +353,7 @@ const w=globalThis,k=e=>e,$=w.trustedTypes,S=$?$.createPolicy("lit-html",{create
       display: inline-flex; align-items: center; justify-content: center;
       background: var(--rm-accent); color: #fff;
       border-radius: 10px; font-size: 10px; font-weight: 700;
-      padding: 1px 5px; min-width: 16px; margin-left: 5px;
-      line-height: 1.4;
-    }
-    .sub-chip.active .sub-chip-count {
-      background: var(--rm-accent);
+      padding: 1px 5px; min-width: 16px; line-height: 1.4;
     }
 
     /* Tags (narrow view) */
