@@ -1976,4 +1976,4 @@ class RmRecipeDetail extends LitElement {
   `;
 }
 
-customElements.define('rm-recipe-detail', RmRecipeDetail);
+if (!customElements.get('rm-recipe-detail')) customElements.define('rm-recipe-detail', RmRecipeDetail);
