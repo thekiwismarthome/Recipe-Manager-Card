@@ -192,8 +192,7 @@ export class RecipeManagerAPI {
             list_id: listId,
             name: cleanName,
             quantity: _slmParseQty(ing.amount),
-            unit: ing.unit || 'units',
-            category_id: 'other',
+            unit: ing.unit || null,
           };
           if (note) payload.note = note;
           await this.hass.callWS(payload);

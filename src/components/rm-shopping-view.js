@@ -25,8 +25,15 @@ class RmShoppingView extends LitElement {
     this._slmCard = null;
   }
 
+  // True when the SLM frontend element is registered OR when the backend API
+  // confirmed SLM is installed. Using the element registration as the primary
+  // check means we try to embed even if the backend WS call failed transiently.
+  get _useSLM() {
+    return this.slmAvailable || !!customElements.get('shopping-list-manager-card');
+  }
+
   updated(changedProps) {
-    if (this.slmAvailable) {
+    if (this._useSLM) {
       if (!this._slmCard) {
         this._mountSlmCard();
       } else if (changedProps.has('hass') && this.hass) {
@@ -93,7 +100,7 @@ class RmShoppingView extends LitElement {
   render() {
     return html`
       <div class="shopping-view">
-        ${this.slmAvailable ? this._renderSlmMode() : this._renderLocalMode()}
+        ${this._useSLM ? this._renderSlmMode() : this._renderLocalMode()}
       </div>
     `;
   }
