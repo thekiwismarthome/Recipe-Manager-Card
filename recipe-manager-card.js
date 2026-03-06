@@ -2921,11 +2921,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     .placeholder-tab ha-icon { --mdc-icon-size: 48px; opacity: 0.3; }
     .placeholder-title { font-size: 18px; font-weight: 600; color: var(--rm-text); }
     .placeholder-msg { font-size: 14px; max-width: 280px; line-height: 1.5; }
-  `}customElements.define("rm-settings-view",Ce);class Ee extends se{static properties={hass:{type:Object},slmAvailable:{type:Boolean},shoppingLists:{type:Array},api:{type:Object},localItems:{type:Array}};constructor(){super(),this.hass=null,this.slmAvailable=!1,this.shoppingLists=[],this.api=null,this.localItems=[],this._slmCard=null}get _useSLM(){return this.slmAvailable||!!customElements.get("shopping-list-manager-card")}updated(e){this._useSLM&&(this._slmCard?e.has("hass")&&this.hass&&(this._slmCard.hass=this.hass):this._mountSlmCard())}_mountSlmCard(){const e=this.shadowRoot?.querySelector(".slm-host");if(!e)return;const t=customElements.get("shopping-list-manager-card");if(!t)return void setTimeout(()=>this._mountSlmCard(),500);const i=new t;try{i.setConfig({})}catch(e){}i.style.cssText="display:block;height:100%;max-height:100%;overflow:hidden;",e.appendChild(i),this.hass&&(i.hass=this.hass),this._slmCard=i}_toggleLocalItem(e){const t=this.localItems.map(t=>t.id===e?{...t,checked:!t.checked}:t);this._dispatchLocalUpdate(t)}_clearLocalChecked(){this._dispatchLocalUpdate(this.localItems.filter(e=>!e.checked))}_clearAllLocal(){this._dispatchLocalUpdate([])}_dispatchLocalUpdate(e){this.dispatchEvent(new CustomEvent("rm-shopping-local-update",{detail:{items:e},bubbles:!0,composed:!0}))}render(){return U`
+  `}customElements.define("rm-settings-view",Ce);class Ee extends se{static properties={hass:{type:Object},slmAvailable:{type:Boolean},shoppingLists:{type:Array},api:{type:Object},localItems:{type:Array}};constructor(){super(),this.hass=null,this.slmAvailable=!1,this.shoppingLists=[],this.api=null,this.localItems=[],this._slmCard=null}get _useSLM(){return this.slmAvailable||!!customElements.get("shopping-list-manager-card")}updated(e){this._useSLM&&(this._slmCard?e.has("hass")&&this.hass&&(this._slmCard.hass=this.hass):this._mountSlmCard())}_mountSlmCard(){const e=this.shadowRoot?.querySelector(".slm-host");if(!e)return;const t=customElements.get("shopping-list-manager-card");if(!t)return void setTimeout(()=>this._mountSlmCard(),500);const i=new t;try{i.setConfig({})}catch(e){}i.style.cssText="display:block;width:100%;height:100%;max-height:100%;min-height:0;",e.appendChild(i),this.hass&&(i.hass=this.hass),this._slmCard=i}_toggleLocalItem(e){const t=this.localItems.map(t=>t.id===e?{...t,checked:!t.checked}:t);this._dispatchLocalUpdate(t)}_clearLocalChecked(){this._dispatchLocalUpdate(this.localItems.filter(e=>!e.checked))}_clearAllLocal(){this._dispatchLocalUpdate([])}_dispatchLocalUpdate(e){this.dispatchEvent(new CustomEvent("rm-shopping-local-update",{detail:{items:e},bubbles:!0,composed:!0}))}render(){return U`
       <div class="shopping-view">
         ${this._useSLM?this._renderSlmMode():this._renderLocalMode()}
       </div>
-    `}_renderSlmMode(){return U`<div class="slm-host"></div>`}_renderLocalMode(){const e=this.localItems.some(e=>e.checked),t=this.localItems.filter(e=>!e.checked),i=this.localItems.filter(e=>e.checked);return U`
+    `}_renderSlmMode(){return U`
+      <div class="slm-card-wrap">
+        <div class="slm-host"></div>
+      </div>
+    `}_renderLocalMode(){const e=this.localItems.some(e=>e.checked),t=this.localItems.filter(e=>!e.checked),i=this.localItems.filter(e=>e.checked);return U`
       <div class="sv-header">
         <span class="sv-list-name">My Shopping List</span>
         <div class="sv-actions">
@@ -2995,16 +2999,20 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
     /* ── Embedded SLM card ──────────────────────────────────────────────── */
 
-    .slm-host {
+    .slm-card-wrap {
       flex: 1;
       min-height: 0;
-      display: block;
+      padding: 10px 12px 12px;
+      box-sizing: border-box;
+      background: var(--rm-bg-main);
       overflow: hidden;
-      /* Flatten the nested ha-card that shopping-list-manager-card renders */
-      --ha-card-border-radius: 0;
-      --ha-card-box-shadow: none;
-      --ha-card-border-width: 0;
-      --ha-card-background: transparent;
+    }
+
+    .slm-host {
+      display: block;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
     }
 
     /* ── Header (local mode only) ───────────────────────────────────────── */

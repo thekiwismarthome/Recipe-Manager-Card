@@ -58,8 +58,8 @@ class RmShoppingView extends LitElement {
     const card = new ElementClass();
     try { card.setConfig({}); } catch (e) { /* ignore */ }
 
-    // Inline style overrides the SLM card's internal :host { height:100vh }
-    card.style.cssText = 'display:block;height:100%;max-height:100%;overflow:hidden;';
+    // Keep SLM's own ha-card visuals, but constrain host sizing to RM's body.
+    card.style.cssText = 'display:block;width:100%;height:100%;max-height:100%;min-height:0;';
 
     // Append to DOM → connectedCallback fires (with _baseCardId already set from setConfig)
     container.appendChild(card);
@@ -108,7 +108,11 @@ class RmShoppingView extends LitElement {
   _renderSlmMode() {
     // Render a plain container; _mountSlmCard() imperatively creates the SLM
     // element inside it so setConfig() runs before connectedCallback().
-    return html`<div class="slm-host"></div>`;
+    return html`
+      <div class="slm-card-wrap">
+        <div class="slm-host"></div>
+      </div>
+    `;
   }
 
   _renderLocalMode() {
@@ -194,16 +198,20 @@ class RmShoppingView extends LitElement {
 
     /* ── Embedded SLM card ──────────────────────────────────────────────── */
 
-    .slm-host {
+    .slm-card-wrap {
       flex: 1;
       min-height: 0;
-      display: block;
+      padding: 10px 12px 12px;
+      box-sizing: border-box;
+      background: var(--rm-bg-main);
       overflow: hidden;
-      /* Flatten the nested ha-card that shopping-list-manager-card renders */
-      --ha-card-border-radius: 0;
-      --ha-card-box-shadow: none;
-      --ha-card-border-width: 0;
-      --ha-card-background: transparent;
+    }
+
+    .slm-host {
+      display: block;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
     }
 
     /* ── Header (local mode only) ───────────────────────────────────────── */
