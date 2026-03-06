@@ -129,10 +129,22 @@ class RmRecipeGrid extends LitElement {
     return [...set].sort();
   }
 
+  get _coursecounts() {
+    const map = {};
+    this.allRecipes.forEach(r => (r.courses || []).forEach(c => { map[c] = (map[c] || 0) + 1; }));
+    return map;
+  }
+
   get _allCategories() {
     const set = new Set();
     this.allRecipes.forEach(r => (r.categories || []).forEach(c => set.add(c)));
     return [...set].sort();
+  }
+
+  get _categorycounts() {
+    const map = {};
+    this.allRecipes.forEach(r => (r.categories || []).forEach(c => { map[c] = (map[c] || 0) + 1; }));
+    return map;
   }
 
   _renderStars(rating) {
@@ -281,7 +293,7 @@ class RmRecipeGrid extends LitElement {
               <button
                 class="sub-chip ${this.activeTag === c ? 'active' : ''}"
                 @click=${() => this._handleTagClick(c)}
-              >${c}</button>
+              >${c}<span class="sub-chip-count">${this._coursecounts[c] || 0}</span></button>
             `)}
           </div>
         ` : ''}
@@ -291,7 +303,7 @@ class RmRecipeGrid extends LitElement {
               <button
                 class="sub-chip ${this.activeTag === c ? 'active' : ''}"
                 @click=${() => this._handleTagClick(c)}
-              >${c}</button>
+              >${c}<span class="sub-chip-count">${this._categorycounts[c] || 0}</span></button>
             `)}
           </div>
         ` : ''}
@@ -486,9 +498,8 @@ class RmRecipeGrid extends LitElement {
     /* Sub-filter chips */
     .sub-filter-row {
       display: flex; gap: 6px; padding: 6px 14px;
-      overflow-x: auto; flex-shrink: 0; scrollbar-width: none;
+      flex-wrap: wrap; flex-shrink: 0;
     }
-    .sub-filter-row::-webkit-scrollbar { display: none; }
     .sub-chip {
       background: var(--rm-bg-elevated); border: 1px solid var(--rm-border);
       border-radius: 20px; color: var(--rm-text-secondary);
@@ -497,6 +508,16 @@ class RmRecipeGrid extends LitElement {
     }
     .sub-chip.active {
       background: var(--rm-accent-soft); border-color: var(--rm-accent); color: var(--rm-accent);
+    }
+    .sub-chip-count {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--rm-accent); color: #fff;
+      border-radius: 10px; font-size: 10px; font-weight: 700;
+      padding: 1px 5px; min-width: 16px; margin-left: 5px;
+      line-height: 1.4;
+    }
+    .sub-chip.active .sub-chip-count {
+      background: var(--rm-accent);
     }
 
     /* Tags (narrow view) */

@@ -410,7 +410,10 @@ class RecipeManagerCard extends LitElement {
 
   get _filteredRecipes() {
     let list = this._recipes;
-    if (this._activeTag) list = list.filter(r => r.tags?.includes(this._activeTag));
+    if (this._activeTag) list = list.filter(r =>
+      r.tags?.includes(this._activeTag) ||
+      r.courses?.includes(this._activeTag) ||
+      r.categories?.includes(this._activeTag));
     if (this._searchQuery.trim()) {
       const q = this._searchQuery.trim().toLowerCase();
       list = list.filter(r =>
