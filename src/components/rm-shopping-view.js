@@ -22,31 +22,45 @@ class RmShoppingView extends LitElement {
     this.shoppingLists = [];
     this.api = null;
     this.localItems = [];
+    this._slmCard = null;
   }
 
   updated(changedProps) {
-    if (this.slmAvailable && this.hass &&
-        (changedProps.has('hass') || changedProps.has('slmAvailable'))) {
-      this._configureSLMCard();
+    if (this.slmAvailable) {
+      if (!this._slmCard) {
+        this._mountSlmCard();
+      } else if (changedProps.has('hass') && this.hass) {
+        this._slmCard.hass = this.hass;
+      }
     }
   }
 
-  _configureSLMCard() {
-    const card = this.shadowRoot?.querySelector('shopping-list-manager-card');
-    if (!card) return;
+  _mountSlmCard() {
+    const container = this.shadowRoot?.querySelector('.slm-host');
+    if (!container) return;
 
-    // Call setConfig once to initialise the card
-    if (!card._rmConfigSet) {
-      try { card.setConfig({}); } catch (e) { /* ignore */ }
-      card._rmConfigSet = true;
+    const ElementClass = customElements.get('shopping-list-manager-card');
+    if (!ElementClass) {
+      // SLM frontend not loaded yet — retry after a short delay
+      setTimeout(() => this._mountSlmCard(), 500);
+      return;
     }
 
-    // Propagate hass (triggers SLM card's data loading and subscriptions)
-    card.hass = this.hass;
+    // Create element BEFORE connecting so setConfig() fires before connectedCallback().
+    // This matches HA's own card-loading order (setConfig → appendChild → hass).
+    const card = new ElementClass();
+    try { card.setConfig({}); } catch (e) { /* ignore */ }
 
-    // Override the internal `height: 100vh` on :host with an inline style
-    // (inline styles beat :host rules in the shadow DOM cascade)
-    card.style.cssText = 'display:block; flex:1; min-height:0; height:100%; overflow:hidden;';
+    // Inline style overrides the SLM card's internal :host { height:100vh }
+    card.style.cssText = 'display:block;height:100%;max-height:100%;overflow:hidden;';
+
+    // Append to DOM → connectedCallback fires (with _baseCardId already set from setConfig)
+    container.appendChild(card);
+
+    // Set hass after connecting so subscribeToUpdates() has a live connection
+    if (this.hass) card.hass = this.hass;
+
+    this._slmCard = card;
   }
 
   // -- Local mode helpers ---------------------------------------------------
@@ -85,7 +99,9 @@ class RmShoppingView extends LitElement {
   }
 
   _renderSlmMode() {
-    return html`<shopping-list-manager-card></shopping-list-manager-card>`;
+    // Render a plain container; _mountSlmCard() imperatively creates the SLM
+    // element inside it so setConfig() runs before connectedCallback().
+    return html`<div class="slm-host"></div>`;
   }
 
   _renderLocalMode() {
@@ -171,11 +187,12 @@ class RmShoppingView extends LitElement {
 
     /* ── Embedded SLM card ──────────────────────────────────────────────── */
 
-    shopping-list-manager-card {
-      display: block;
+    .slm-host {
       flex: 1;
       min-height: 0;
-      /* Flatten the nested ha-card appearance */
+      display: block;
+      overflow: hidden;
+      /* Flatten the nested ha-card that shopping-list-manager-card renders */
       --ha-card-border-radius: 0;
       --ha-card-box-shadow: none;
       --ha-card-border-width: 0;
