@@ -557,78 +557,94 @@ class RmRecipeDetail extends LitElement {
 
     return html`
       <div class="detail-container">
-        <!-- Hero image -->
-        <div class="hero ${r.image_url ? '' : 'no-image'}">
-          ${r.image_url ? html`
-            <img src="${r.image_url}" alt="${r.name}" />
-            <div class="hero-overlay"></div>
-          ` : html`
-            <div class="hero-placeholder">
-              <ha-icon icon="mdi:food"></ha-icon>
-            </div>
-          `}
-          <div class="hero-actions">
-            <button class="hero-btn ${r.is_favourite ? 'fav-active' : ''}" @click=${this._handleToggleFav}
-              title="${r.is_favourite ? 'Remove from favourites' : 'Add to favourites'}">
-              <ha-icon icon="${r.is_favourite ? 'mdi:heart' : 'mdi:heart-outline'}"></ha-icon>
-            </button>
-            ${r.source_url ? html`
-              <a class="hero-btn" href="${r.source_url}" target="_blank" rel="noopener" title="Open source">
-                <ha-icon icon="mdi:open-in-new"></ha-icon>
-              </a>
-            ` : ''}
-            <button class="hero-btn" @click=${this._startEdit} title="Edit">
-              <ha-icon icon="mdi:pencil-outline"></ha-icon>
-            </button>
-            <button class="hero-btn delete-btn ${this._confirmDelete ? 'confirm' : ''}" @click=${this._handleDeleteRecipe}
-              title="${this._confirmDelete ? 'Confirm delete' : 'Delete recipe'}">
-              <ha-icon icon="${this._confirmDelete ? 'mdi:check' : 'mdi:trash-can-outline'}"></ha-icon>
-            </button>
-          </div>
-        </div>
-
         <div class="detail-scroll">
-          <!-- Recipe meta (description, times, tags — name is shown in parent header) -->
-          <div class="detail-head">
-            ${r.description ? html`<p class="detail-desc">${r.description}</p>` : ''}
-
-            <div class="meta-row">
-              ${r.prep_time ? html`
-                <div class="meta-item">
-                  <span class="meta-label">Prep</span>
-                  <span class="meta-val">${this._formatTime(r.prep_time)}</span>
+          <section class="top-layout">
+            <div class="hero ${r.image_url ? '' : 'no-image'}">
+              ${r.image_url ? html`
+                <img src="${r.image_url}" alt="${r.name}" />
+                <div class="hero-overlay"></div>
+              ` : html`
+                <div class="hero-placeholder">
+                  <ha-icon icon="mdi:food"></ha-icon>
                 </div>
-              ` : ''}
-              ${r.cook_time ? html`
-                <div class="meta-item">
-                  <span class="meta-label">Cook</span>
-                  <span class="meta-val">${this._formatTime(r.cook_time)}</span>
-                </div>
-              ` : ''}
-              ${totalTime ? html`
-                <div class="meta-item">
-                  <span class="meta-label">Total</span>
-                  <span class="meta-val">${this._formatTime(totalTime)}</span>
-                </div>
-              ` : ''}
-              ${r.servings ? html`
-                <div class="meta-item">
-                  <span class="meta-label">Serves</span>
-                  <span class="meta-val">${r.servings_text || r.servings}</span>
-                </div>
-              ` : ''}
+              `}
+              <div class="hero-actions">
+                <button class="hero-btn ${r.is_favourite ? 'fav-active' : ''}" @click=${this._handleToggleFav}
+                  title="${r.is_favourite ? 'Remove from favourites' : 'Add to favourites'}">
+                  <ha-icon icon="${r.is_favourite ? 'mdi:heart' : 'mdi:heart-outline'}"></ha-icon>
+                </button>
+                ${r.source_url ? html`
+                  <a class="hero-btn" href="${r.source_url}" target="_blank" rel="noopener" title="Open source">
+                    <ha-icon icon="mdi:open-in-new"></ha-icon>
+                  </a>
+                ` : ''}
+                <button class="hero-btn" @click=${this._startEdit} title="Edit">
+                  <ha-icon icon="mdi:pencil-outline"></ha-icon>
+                </button>
+                <button class="hero-btn delete-btn ${this._confirmDelete ? 'confirm' : ''}" @click=${this._handleDeleteRecipe}
+                  title="${this._confirmDelete ? 'Confirm delete' : 'Delete recipe'}">
+                  <ha-icon icon="${this._confirmDelete ? 'mdi:check' : 'mdi:trash-can-outline'}"></ha-icon>
+                </button>
+              </div>
             </div>
 
-            ${r.tags?.length ? html`
-              <div class="tags-row">
-                ${r.tags.map(t => html`<span class="tag-chip">${t}</span>`)}
-              </div>
-            ` : ''}
+            <div class="summary-card">
+              <h2 class="summary-title">${r.name}</h2>
+              ${r.description ? html`<p class="detail-desc">${r.description}</p>` : ''}
 
-            ${this._renderChipGroup('Courses', r.courses, 'chip-course')}
-            ${this._renderChipGroup('Categories', r.categories, 'chip-category')}
-            ${this._renderChipGroup('Collections', r.collections, 'chip-collection')}
-          </div>
+              <div class="summary-actions">
+                <button class="summary-action" @click=${() => this._scrollToPanel('.directions-panel')} title="Jump to directions">
+                  <ha-icon icon="mdi:chef-hat"></ha-icon><span>Cook</span>
+                </button>
+                <button class="summary-action" @click=${() => { this._openShoppingPicker(); this._scrollToPanel('.ingredients-panel'); }} title="Add ingredients to shopping list">
+                  <ha-icon icon="mdi:cart-plus"></ha-icon><span>Shop</span>
+                </button>
+                <button class="summary-action" @click=${() => window.print()} title="Print recipe">
+                  <ha-icon icon="mdi:printer-outline"></ha-icon><span>Print</span>
+                </button>
+                <button class="summary-action" @click=${this._startEdit} title="Edit recipe">
+                  <ha-icon icon="mdi:pencil-outline"></ha-icon><span>Edit</span>
+                </button>
+              </div>
+
+              <div class="meta-row">
+                ${r.prep_time ? html`
+                  <div class="meta-item">
+                    <span class="meta-label">Prep</span>
+                    <span class="meta-val">${this._formatTime(r.prep_time)}</span>
+                  </div>
+                ` : ''}
+                ${r.cook_time ? html`
+                  <div class="meta-item">
+                    <span class="meta-label">Cook</span>
+                    <span class="meta-val">${this._formatTime(r.cook_time)}</span>
+                  </div>
+                ` : ''}
+                ${totalTime ? html`
+                  <div class="meta-item">
+                    <span class="meta-label">Total</span>
+                    <span class="meta-val">${this._formatTime(totalTime)}</span>
+                  </div>
+                ` : ''}
+                ${r.servings ? html`
+                  <div class="meta-item">
+                    <span class="meta-label">Serves</span>
+                    <span class="meta-val">${r.servings_text || r.servings}</span>
+                  </div>
+                ` : ''}
+              </div>
+
+              ${r.tags?.length ? html`
+                <div class="tags-row">
+                  ${r.tags.map(t => html`<span class="tag-chip">${t}</span>`)}
+                </div>
+              ` : ''}
+
+              ${this._renderChipGroup('Courses', r.courses, 'chip-course')}
+              ${this._renderChipGroup('Categories', r.categories, 'chip-category')}
+              ${this._renderChipGroup('Collections', r.collections, 'chip-collection')}
+            </div>
+          </section>
 
           <!-- Serving scaler -->
           ${r.servings ? html`
@@ -646,36 +662,42 @@ class RmRecipeDetail extends LitElement {
             </div>
           ` : ''}
 
-          <!-- Tabs -->
-          <div class="tabs-row">
-            ${[['ingredients','Ingredients'],['directions','Directions'],['notes','Notes'],['nutrition','Nutrition'],['photos','Photos']].map(([val, lbl]) => html`
-              <button
-                class="tab-btn ${this._activeTab === val ? 'active' : ''}"
-                @click=${() => { this._activeTab = val; }}
-              >${lbl}</button>
-            `)}
+          <div class="detail-grid">
+            <section class="panel-card ingredients-panel">
+              <div class="panel-heading">
+                <h3>Ingredients</h3>
+              </div>
+              ${this._renderIngredients(r)}
+              ${this._renderNutrition(r)}
+            </section>
+
+            <section class="panel-card directions-panel">
+              <div class="panel-heading">
+                <h3>Directions</h3>
+                ${this.settings?.keepScreenOn ? html`
+                  <button class="wakelock-btn ${this._wakeActive ? 'active' : ''}"
+                    @click=${() => this._wakeActive ? this._releaseWakeLock() : this._requestWakeLock()}
+                    title="${this._wakeActive ? 'Release screen lock' : 'Keep screen on'}">
+                    <ha-icon icon="${this._wakeActive ? 'mdi:eye' : 'mdi:eye-off-outline'}"></ha-icon>
+                    ${this._wakeActive ? 'Screen on' : 'Keep screen on'}
+                  </button>
+                ` : ''}
+              </div>
+              ${this._renderDirections(r)}
+            </section>
           </div>
 
-          <!-- Wake lock button (shown when setting enabled) -->
-          ${this.settings?.keepScreenOn ? html`
-            <div class="wakelock-row">
-              <button class="wakelock-btn ${this._wakeActive ? 'active' : ''}"
-                @click=${() => this._wakeActive ? this._releaseWakeLock() : this._requestWakeLock()}
-                title="${this._wakeActive ? 'Release screen lock' : 'Keep screen on'}">
-                <ha-icon icon="${this._wakeActive ? 'mdi:eye' : 'mdi:eye-off-outline'}"></ha-icon>
-                ${this._wakeActive ? 'Screen on' : 'Keep screen on'}
-              </button>
-            </div>
+          ${r.notes ? html`
+            <section class="panel-card notes-panel">
+              <div class="panel-heading"><h3>Notes</h3></div>
+              ${this._renderNotes(r)}
+            </section>
           ` : ''}
 
-          <!-- Tab content -->
-          <div class="tab-content">
-            ${this._activeTab === 'ingredients' ? this._renderIngredients(r) : ''}
-            ${this._activeTab === 'directions'  ? this._renderDirections(r)  : ''}
-            ${this._activeTab === 'notes'       ? this._renderNotes(r)       : ''}
-            ${this._activeTab === 'nutrition'   ? this._renderNutrition(r)   : ''}
-            ${this._activeTab === 'photos'      ? this._renderPhotos(r)      : ''}
-          </div>
+          <section class="panel-card photos-panel">
+            <div class="panel-heading"><h3>Photos</h3></div>
+            ${this._renderPhotos(r)}
+          </section>
         </div>
 
         <!-- Edit panel (inline overlay) -->
@@ -696,6 +718,7 @@ class RmRecipeDetail extends LitElement {
     const picking = this._showShoppingPicker;
     const checkedSet = this._checkedIngredients;
     const checkedCount = checkedSet?.size ?? 0;
+    const groups = this._groupIngredients(r.ingredients || []);
     const hasImperial = (r.ingredients || []).some(ing =>
       ing.unit && IMPERIAL_TO_METRIC[ing.unit.toLowerCase().trim()]
     );
@@ -711,27 +734,31 @@ class RmRecipeDetail extends LitElement {
         </div>
       ` : ''}
 
-      ${r.ingredients?.length ? html`
-        <ul class="ingredient-list">
-          ${r.ingredients.map((ing, i) => {
-            if (ing.is_heading) {
-              return html`<li class="ing-heading">${ing.name}</li>`;
-            }
-            const { amount, unit } = this._getDisplayAmount(ing);
-            return html`
-              <li class="ingredient-item ${picking ? 'selectable' : ''}"
-                @click=${picking ? () => this._toggleIngredient(i) : undefined}>
-                ${picking ? html`
-                  <span class="ing-check ${checkedSet?.has(i) ? 'checked' : ''}">
-                    ${checkedSet?.has(i) ? html`<ha-icon icon="mdi:check"></ha-icon>` : ''}
-                  </span>
-                ` : ''}
-                <span class="ing-amount">${amount} ${unit}</span>
-                <span class="ing-name">${ing.name}${ing.notes ? html` <em class="ing-notes">(${ing.notes})</em>` : ''}</span>
-              </li>
-            `;
-          })}
-        </ul>
+      ${groups.length ? html`
+        <div class="ingredient-groups">
+          ${groups.map(group => html`
+            <section class="ingredient-group-card">
+              <h4 class="ingredient-group-title">${group.title}</h4>
+              <ul class="ingredient-list">
+                ${group.items.map(ing => {
+                  const { amount, unit } = this._getDisplayAmount(ing);
+                  return html`
+                    <li class="ingredient-item ${picking ? 'selectable' : ''}"
+                      @click=${picking ? () => this._toggleIngredient(ing._idx) : undefined}>
+                      ${picking ? html`
+                        <span class="ing-check ${checkedSet?.has(ing._idx) ? 'checked' : ''}">
+                          ${checkedSet?.has(ing._idx) ? html`<ha-icon icon="mdi:check"></ha-icon>` : ''}
+                        </span>
+                      ` : ''}
+                      <span class="ing-amount">${[amount, unit].filter(Boolean).join(' ') || ' '}</span>
+                      <span class="ing-name">${ing.name}${ing.notes ? html` <em class="ing-notes">(${ing.notes})</em>` : ''}</span>
+                    </li>
+                  `;
+                })}
+              </ul>
+            </section>
+          `)}
+        </div>
       ` : html`<p class="empty-tab">No ingredients listed.</p>`}
 
       <!-- Shopping section (always shown) -->
@@ -845,30 +872,74 @@ class RmRecipeDetail extends LitElement {
   _renderNutrition(r) {
     const n = r.nutrition || {};
     const hasAny = NUTRITION_FIELDS.some(f => n[f.key] != null && n[f.key] !== '');
-    if (!hasAny) {
-      return html`
-        <div class="empty-tab">
-          <p>No nutrition info. Add it via the edit panel.</p>
-        </div>
-      `;
-    }
-    const perServing = r.servings ? `Per serving (${r.servings_text || r.servings})` : 'Per serving';
+    if (!hasAny) return '';
+
+    const summary = this._getNutritionSummary(r);
+    const rows = this._getNutritionRows(r);
+    const servingsLabel = r.servings_text || r.servings || 1;
+    const carbEnd = Math.min(summary.ringStops.carbEnd, 100);
+    const fatEnd = Math.min(summary.ringStops.fatEnd, 100);
+    const ringStyle = `background: conic-gradient(
+      var(--rm-nutr-carb, #3ea0ff) 0 ${carbEnd}%,
+      var(--rm-nutr-fat, #f4c04b) ${carbEnd}% ${fatEnd}%,
+      var(--rm-nutr-protein, #8b5cf6) ${fatEnd}% 100%
+    );`;
+
     return html`
-      <div class="nutrition-panel">
-        <div class="nutr-header">Nutrition Facts</div>
-        <div class="nutr-sub">${perServing}</div>
-        <div class="nutr-divider thick"></div>
-        ${NUTRITION_FIELDS.map(f => {
-          const val = n[f.key];
-          if (val == null || val === '') return '';
-          return html`
-            <div class="nutr-row ${f.bold ? 'nutr-bold' : ''} ${f.indent ? 'nutr-indent' : ''}">
-              <span class="nutr-label">${f.label}</span>
-              <span class="nutr-val">${val}${f.unit !== 'kcal' ? html`<em> ${f.unit}</em>` : ''}</span>
+      <div class="nutrition-card">
+        <div class="nutrition-summary">
+          <div class="macro-ring" style="${ringStyle}">
+            <div class="macro-ring-center">
+              <strong>${this._formatNutritionNumber(summary.calories) || '0'}</strong>
+              <span>cals</span>
             </div>
-            <div class="nutr-divider"></div>
-          `;
-        })}
+          </div>
+          <div class="macro-stat-list">
+            <div class="macro-stat">
+              <strong>${this._formatNutritionNumber(summary.carbs) || '0'} g</strong>
+              <span>Carbs</span>
+              <em>${summary.carbsPct != null ? `${summary.carbsPct}% cals` : ''}</em>
+            </div>
+            <div class="macro-stat">
+              <strong>${this._formatNutritionNumber(summary.fat) || '0'} g</strong>
+              <span>Total fat</span>
+              <em>${summary.fatPct != null ? `${summary.fatPct}% cals` : ''}</em>
+            </div>
+            <div class="macro-stat">
+              <strong>${this._formatNutritionNumber(summary.protein) || '0'} g</strong>
+              <span>Protein</span>
+              <em>${summary.proteinPct != null ? `${summary.proteinPct}% cals` : ''}</em>
+            </div>
+          </div>
+        </div>
+
+        <button class="nutrition-toggle" @click=${() => { this._nutritionExpanded = !this._nutritionExpanded; }}>
+          <span>Daily RDA Nutrition</span>
+          <span class="nutrition-serving">${servingsLabel}</span>
+          <ha-icon icon="${this._nutritionExpanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}"></ha-icon>
+        </button>
+
+        ${this._nutritionExpanded ? html`
+          <div class="nutrition-details">
+            <div class="nutrition-row servings-row">
+              <span>Servings</span>
+              <strong>${servingsLabel}</strong>
+            </div>
+            ${rows.map(row => html`
+              <div class="nutrition-row">
+                <div class="nutrition-row-top">
+                  <span>${row.label}</span>
+                  <strong>${row.value} ${row.unit}${row.pct != null ? html` <em>(${row.pct}%)</em>` : ''}</strong>
+                </div>
+                ${row.pct != null ? html`
+                  <div class="nutrition-bar">
+                    <span style="width: ${Math.min(row.pct, 100)}%"></span>
+                  </div>
+                ` : ''}
+              </div>
+            `)}
+          </div>
+        ` : ''}
       </div>
     `;
   }
@@ -1045,13 +1116,29 @@ class RmRecipeDetail extends LitElement {
       overflow: hidden;
     }
 
+    .detail-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 16px 24px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--rm-border, rgba(255,255,255,0.08)) transparent;
+    }
+
+    .top-layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
     /* Hero */
     .hero {
-      flex-shrink: 0;
-      height: 180px;
+      height: 240px;
       position: relative;
-      background: var(--rm-surface, #2c2c2e);
+      background: var(--rm-bg-elevated, #2c2c2e);
       overflow: hidden;
+      border-radius: var(--rm-radius, 12px);
+      border: 1px solid var(--rm-border, rgba(255,255,255,0.08));
     }
     .hero.no-image { height: 80px; }
     .hero img { width: 100%; height: 100%; object-fit: cover; }
@@ -1096,21 +1183,82 @@ class RmRecipeDetail extends LitElement {
     .hero-btn.fav-active { color: var(--error-color, #cf6679); }
     .hero-btn.delete-btn.confirm { background: var(--error-color, #cf6679); color: #fff; }
 
-    /* Scroll area */
-    .detail-scroll {
-      flex: 1;
-      overflow-y: auto;
-      padding: 14px 16px 24px;
-      scrollbar-width: thin;
-      scrollbar-color: var(--rm-border, rgba(255,255,255,0.08)) transparent;
+    .summary-card {
+      background: linear-gradient(160deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      border: 1px solid var(--rm-border, rgba(255,255,255,0.08));
+      border-radius: var(--rm-radius, 12px);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
 
-    .detail-head { margin-bottom: 12px; }
+    .summary-title {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.1;
+      color: var(--rm-text, #e5e5ea);
+      font-family: "Georgia", "Times New Roman", serif;
+      letter-spacing: 0.01em;
+      text-wrap: balance;
+    }
+
+    .summary-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .summary-action {
+      border: 1px solid var(--rm-border, rgba(255,255,255,0.12));
+      background: var(--rm-bg-elevated, #2c2c2e);
+      color: var(--rm-text, #e5e5ea);
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 13px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .summary-action:hover { background: var(--rm-accent-soft); border-color: var(--rm-accent); }
+    .summary-action ha-icon { --mdc-icon-size: 15px; }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .panel-card {
+      background: linear-gradient(165deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      border: 1px solid var(--rm-border, rgba(255,255,255,0.08));
+      border-radius: var(--rm-radius, 12px);
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .panel-heading {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .panel-heading h3 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1;
+      color: var(--rm-text, #e5e5ea);
+      font-family: "Georgia", "Times New Roman", serif;
+    }
+
     .detail-desc {
       margin: 0 0 8px;
-      font-size: 14px;
+      font-size: 16px;
       color: var(--rm-text-secondary, #8e8e93);
-      line-height: 1.5;
+      line-height: 1.6;
     }
 
     .meta-row {
@@ -1256,13 +1404,23 @@ class RmRecipeDetail extends LitElement {
       border-color: var(--rm-accent);
     }
 
-    /* Ingredient section heading */
-    .ing-heading {
-      list-style: none;
-      font-size: 11px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.08em;
-      color: var(--rm-accent); padding: 10px 0 4px;
-      margin-top: 6px;
+    .ingredient-groups {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .ingredient-group-card {
+      border: 1px solid var(--rm-border, rgba(255,255,255,0.08));
+      border-radius: 12px;
+      background: rgba(255,255,255,0.02);
+      padding: 12px 12px 4px;
+    }
+    .ingredient-group-title {
+      margin: 0 0 8px;
+      font-size: 18px;
+      color: var(--rm-text, #e5e5ea);
+      font-family: "Georgia", "Times New Roman", serif;
+      letter-spacing: 0.01em;
     }
 
     /* Ingredients */
@@ -1271,15 +1429,15 @@ class RmRecipeDetail extends LitElement {
       display: flex;
       gap: 10px;
       align-items: baseline;
-      padding: 10px 0;
+      padding: 11px 0;
       border-bottom: 1px solid var(--rm-border, rgba(255,255,255,0.06));
     }
     .ingredient-item:last-child { border-bottom: none; }
     .ing-amount {
       font-size: 14px;
       font-weight: 700;
-      color: var(--rm-accent, #ff6b35);
-      min-width: 70px;
+      color: var(--rm-text, #e5e5ea);
+      min-width: 92px;
       flex-shrink: 0;
     }
     .ing-name { font-size: 15px; color: var(--rm-text, #e5e5ea); }
@@ -1362,19 +1520,23 @@ class RmRecipeDetail extends LitElement {
     .step-item {
       display: flex;
       gap: 14px;
-      margin-bottom: 20px;
-      align-items: flex-start;
+      margin-bottom: 10px;
+      align-items: center;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--rm-border, rgba(255,255,255,0.08));
+      border-radius: 10px;
+      padding: 12px 10px;
     }
     .step-num {
       flex-shrink: 0;
-      width: 30px;
-      height: 30px;
-      background: var(--rm-accent, #ff6b35);
+      width: 28px;
+      height: 28px;
+      background: #2f9cff;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 700;
       color: #fff;
       cursor: pointer;
@@ -1431,39 +1593,175 @@ class RmRecipeDetail extends LitElement {
     .empty-tab p { margin: 0; }
 
     /* Nutrition */
-    .nutrition-panel {
-      max-width: 340px;
-      border: 2px solid var(--rm-text, #e5e5ea);
-      border-radius: 4px;
-      padding: 8px 12px;
-      margin: 0 auto;
+    .nutrition-card {
+      margin-top: 12px;
+      border: 1px solid var(--rm-border, rgba(255,255,255,0.08));
+      border-radius: 12px;
+      background: rgba(255,255,255,0.02);
+      padding: 12px;
     }
-    .nutr-header {
-      font-size: 28px;
-      font-weight: 900;
-      color: var(--rm-text, #e5e5ea);
+    .nutrition-summary {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .macro-ring {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .macro-ring-center {
+      position: absolute;
+      inset: 7px;
+      border-radius: 50%;
+      background: var(--rm-bg-surface, #1c1c1e);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
       line-height: 1;
-      margin-bottom: 2px;
     }
-    .nutr-sub {
+    .macro-ring-center strong {
+      font-size: 22px;
+      color: var(--rm-text, #e5e5ea);
+      font-weight: 800;
+    }
+    .macro-ring-center span {
       font-size: 11px;
       color: var(--rm-text-secondary, #8e8e93);
-      margin-bottom: 6px;
+      margin-top: 4px;
     }
-    .nutr-divider { border-top: 1px solid var(--rm-border, rgba(255,255,255,0.15)); margin: 2px 0; }
-    .nutr-divider.thick { border-top: 6px solid var(--rm-text, #e5e5ea); margin: 4px 0; }
-    .nutr-row {
+
+    .macro-stat-list {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(78px, 1fr));
+      gap: 10px;
+      flex: 1;
+      min-width: 220px;
+    }
+    .macro-stat strong {
+      display: block;
+      font-size: 20px;
+      color: var(--rm-text, #e5e5ea);
+      line-height: 1.2;
+    }
+    .macro-stat span {
+      display: block;
+      font-size: 13px;
+      color: var(--rm-text-secondary, #8e8e93);
+    }
+    .macro-stat em {
+      display: block;
+      margin-top: 4px;
+      font-style: normal;
+      font-size: 12px;
+      color: var(--rm-accent, #58a6ff);
+    }
+
+    .nutrition-toggle {
+      margin-top: 12px;
+      width: 100%;
+      border: none;
+      background: transparent;
+      color: var(--rm-text, #e5e5ea);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      padding: 8px 0 2px;
+      font-size: 16px;
+      text-align: left;
+    }
+    .nutrition-toggle ha-icon {
+      margin-left: auto;
+      --mdc-icon-size: 20px;
+      color: var(--rm-text-secondary, #8e8e93);
+    }
+    .nutrition-serving {
+      margin-left: auto;
+      color: var(--rm-text-secondary, #8e8e93);
+    }
+
+    .nutrition-details {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .nutrition-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .nutrition-row-top {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      padding: 2px 0;
-      font-size: 13px;
+      gap: 8px;
+      font-size: 14px;
       color: var(--rm-text, #e5e5ea);
     }
-    .nutr-bold { font-weight: 700; font-size: 15px; }
-    .nutr-indent { padding-left: 14px; font-size: 12px; }
-    .nutr-val { font-weight: 600; white-space: nowrap; }
-    .nutr-val em { font-style: normal; font-size: 11px; color: var(--rm-text-secondary, #8e8e93); }
+    .nutrition-row-top strong {
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .nutrition-row-top em {
+      font-style: normal;
+      color: var(--rm-text-secondary, #8e8e93);
+      font-weight: 500;
+    }
+    .nutrition-bar {
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+    .nutrition-bar span {
+      display: block;
+      height: 100%;
+      background: #4aa7ff;
+    }
+    .servings-row {
+      border-bottom: 1px solid var(--rm-border, rgba(255,255,255,0.08));
+      padding-bottom: 8px;
+      margin-bottom: 2px;
+    }
+
+    @media (min-width: 960px) {
+      .top-layout {
+        grid-template-columns: minmax(300px, 420px) minmax(0, 1fr);
+      }
+      .hero { height: 330px; }
+      .detail-grid {
+        grid-template-columns: minmax(300px, 420px) minmax(0, 1fr);
+      }
+      .notes-panel,
+      .photos-panel {
+        margin-top: 14px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .detail-scroll {
+        padding: 10px 10px 18px;
+      }
+      .summary-title { font-size: 24px; }
+      .panel-heading h3 { font-size: 21px; }
+      .summary-action span { display: none; }
+      .summary-action { padding: 8px; }
+      .macro-stat-list {
+        grid-template-columns: repeat(3, minmax(66px, 1fr));
+        min-width: 0;
+      }
+      .macro-stat strong { font-size: 18px; }
+      .macro-stat span { font-size: 12px; }
+      .macro-stat em { font-size: 11px; }
+      .nutrition-toggle { font-size: 15px; }
+      .ing-amount { min-width: 75px; }
+    }
 
     /* Photos tab */
     .photos-tab { display: flex; flex-direction: column; gap: 16px; }
