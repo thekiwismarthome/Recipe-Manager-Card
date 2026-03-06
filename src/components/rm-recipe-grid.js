@@ -90,6 +90,21 @@ class RmRecipeGrid extends LitElement {
     }));
   }
 
+  _recipeMatchesTag(recipe, tag) {
+    if (!tag) return true;
+    return recipe.tags?.includes(tag)
+      || recipe.courses?.includes(tag)
+      || recipe.categories?.includes(tag);
+  }
+
+  _recipeMatchesSearch(recipe, q) {
+    const query = (q || '').trim().toLowerCase();
+    if (!query) return true;
+    return recipe.name?.toLowerCase().includes(query)
+      || recipe.description?.toLowerCase().includes(query)
+      || recipe.tags?.some(t => t.toLowerCase().includes(query));
+  }
+
   _formatTime(minutes) {
     if (!minutes) return null;
     if (minutes < 60) return `${minutes}m`;
@@ -102,6 +117,18 @@ class RmRecipeGrid extends LitElement {
 
   _getFilteredList() {
     let base = this.recipes;
+
+    // Wide Courses/Categories chips should still filter correctly even if
+    // an older parent bundle only filters against `tags`.
+    const wideTagMode = this.hideSidebar
+      && this.activeTag
+      && (this._filterMode === 'courses' || this._filterMode === 'categories');
+    if (wideTagMode) {
+      base = this.allRecipes.filter(r =>
+        this._recipeMatchesTag(r, this.activeTag) && this._recipeMatchesSearch(r, this.searchQuery)
+      );
+    }
+
     switch (this._filterMode) {
       case 'favourites':
         base = this.allRecipes.filter(r => r.is_favourite)
