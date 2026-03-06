@@ -86,6 +86,7 @@ class RmRecipeDetail extends LitElement {
     _photoUrlInput:      { type: String },
     _addingPhotoUrl:     { type: Boolean },
     _metricMode:         { type: Boolean },
+    _nutritionExpanded:  { type: Boolean },
     _wakeActive:         { type: Boolean },
     _completedSteps:     { type: Object },  // Set of completed step indices
   };
@@ -112,6 +113,7 @@ class RmRecipeDetail extends LitElement {
     this._photoUrlInput = '';
     this._addingPhotoUrl = false;
     this._metricMode = false;
+    this._nutritionExpanded = false;
     this._wakeActive = false;
     this._completedSteps = new Set();
     this._wakeLockSentinel = null;
@@ -154,6 +156,7 @@ class RmRecipeDetail extends LitElement {
       this._checkedIngredients = null;
       this._photoUrlInput = '';
       this._metricMode = false;
+      this._nutritionExpanded = false;
       this._completedSteps = new Set();
     }
     if (changedProps.has('shoppingLists') && this.shoppingLists.length && !this._selectedListId) {
@@ -434,6 +437,117 @@ class RmRecipeDetail extends LitElement {
         ${items.map(t => html`<span class="chip ${cssClass}">${t}</span>`)}
       </div>
     `;
+  }
+
+  _scrollToPanel(selector) {
+    const panel = this.renderRoot?.querySelector(selector);
+    if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  _normalizeSectionLabel(label) {
+    const clean = String(label || '').trim().replace(/:$/, '');
+    return clean || 'Ingredients';
+  }
+
+  _groupIngredients(ingredients = []) {
+    const groups = [];
+    let current = { title: 'Ingredients', items: [] };
+
+    ingredients.forEach((ing, idx) => {
+      const name = String(ing?.name || '').trim();
+      const headingLine = !ing?.amount && !ing?.unit && /:$/.test(name);
+      if (ing?.is_heading || headingLine) {
+        if (current.items.length) groups.push(current);
+        current = { title: this._normalizeSectionLabel(name), items: [] };
+        return;
+      }
+      current.items.push({ ...ing, _idx: idx });
+    });
+
+    if (current.items.length) groups.push(current);
+    return groups;
+  }
+
+  _parseNutritionValue(value) {
+    if (value == null || value === '') return null;
+    const parsed = parseFloat(String(value).replace(/[^0-9.\-]/g, ''));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  _formatNutritionNumber(value) {
+    if (!Number.isFinite(value)) return null;
+    return value >= 10
+      ? String(Math.round(value * 10) / 10).replace(/\.0$/, '')
+      : String(Math.round(value * 100) / 100).replace(/\.00$/, '').replace(/0$/, '');
+  }
+
+  _getNutritionSummary(r) {
+    const n = r.nutrition || {};
+    const calories = this._parseNutritionValue(n.calories) || 0;
+    const carbs = this._parseNutritionValue(n.carbohydrates) || 0;
+    const fat = this._parseNutritionValue(n.fat) || 0;
+    const protein = this._parseNutritionValue(n.protein) || 0;
+
+    const carbsKcal = carbs * 4;
+    const fatKcal = fat * 9;
+    const proteinKcal = protein * 4;
+    const macroKcal = carbsKcal + fatKcal + proteinKcal;
+    const denom = macroKcal || calories || 0;
+    const pct = v => (denom > 0 ? Math.round((v / denom) * 100) : null);
+
+    return {
+      calories,
+      carbs,
+      fat,
+      protein,
+      carbsPct: pct(carbsKcal),
+      fatPct: pct(fatKcal),
+      proteinPct: pct(proteinKcal),
+      ringStops: {
+        carbEnd: pct(carbsKcal) || 0,
+        fatEnd: (pct(carbsKcal) || 0) + (pct(fatKcal) || 0),
+      },
+    };
+  }
+
+  _getNutritionRows(r) {
+    const n = r.nutrition || {};
+    const refs = {
+      calories: { max: 2000, unit: 'kcal' },
+      carbohydrates: { max: 275, unit: 'g' },
+      protein: { max: 50, unit: 'g' },
+      fat: { max: 78, unit: 'g' },
+      saturated_fat: { max: 20, unit: 'g' },
+      sugar: { max: 50, unit: 'g' },
+      fiber: { max: 28, unit: 'g' },
+      cholesterol: { max: 300, unit: 'mg' },
+      sodium: { max: 2300, unit: 'mg' },
+    };
+    const order = [
+      ['calories', 'Calories'],
+      ['carbohydrates', 'Carbs'],
+      ['protein', 'Protein'],
+      ['fat', 'Total fat'],
+      ['saturated_fat', 'Saturated fat'],
+      ['sugar', 'Sugars'],
+      ['fiber', 'Fiber'],
+      ['cholesterol', 'Cholesterol'],
+      ['sodium', 'Sodium'],
+    ];
+
+    return order.map(([key, label]) => {
+      const num = this._parseNutritionValue(n[key]);
+      if (num == null) return null;
+      const ref = refs[key];
+      const pct = ref?.max ? Math.max(0, Math.round((num / ref.max) * 100)) : null;
+      return {
+        key,
+        label,
+        value: this._formatNutritionNumber(num),
+        unit: ref?.unit || '',
+        pct,
+      };
+    }).filter(Boolean);
   }
 
   render() {
