@@ -17,7 +17,7 @@ class RmRecipeGrid extends LitElement {
     scrollPos:      { type: Number },
     recentRecipes:  { type: Array },
     recentCount:    { type: Number },
-    _filterMode:    { type: String },   // 'all'|'courses'|'categories'|'favourites'|'recent'
+    _filterMode:    { type: String },   // 'all'|'courses'|'categories'|'collections'|'favourites'|'recent'
     _starFilter:    { type: Number },   // 0 = no filter; 1-5 = minimum rating
     _sortByRating:  { type: Boolean },  // sort recipes by rating desc
     _showRatingMenu:{ type: Boolean },  // star filter dropdown open
@@ -94,7 +94,8 @@ class RmRecipeGrid extends LitElement {
     if (!tag) return true;
     return recipe.tags?.includes(tag)
       || recipe.courses?.includes(tag)
-      || recipe.categories?.includes(tag);
+      || recipe.categories?.includes(tag)
+      || recipe.collections?.includes(tag);
   }
 
   _recipeMatchesSearch(recipe, q) {
@@ -122,7 +123,7 @@ class RmRecipeGrid extends LitElement {
     // an older parent bundle only filters against `tags`.
     const wideTagMode = this.hideSidebar
       && this.activeTag
-      && (this._filterMode === 'courses' || this._filterMode === 'categories');
+      && (this._filterMode === 'courses' || this._filterMode === 'categories' || this._filterMode === 'collections');
     if (wideTagMode) {
       base = this.allRecipes.filter(r =>
         this._recipeMatchesTag(r, this.activeTag) && this._recipeMatchesSearch(r, this.searchQuery)
@@ -171,6 +172,18 @@ class RmRecipeGrid extends LitElement {
   get _categorycounts() {
     const map = {};
     this.allRecipes.forEach(r => (r.categories || []).forEach(c => { map[c] = (map[c] || 0) + 1; }));
+    return map;
+  }
+
+  get _allCollections() {
+    const set = new Set();
+    this.allRecipes.forEach(r => (r.collections || []).forEach(c => set.add(c)));
+    return [...set].sort();
+  }
+
+  get _collectioncounts() {
+    const map = {};
+    this.allRecipes.forEach(r => (r.collections || []).forEach(c => { map[c] = (map[c] || 0) + 1; }));
     return map;
   }
 
@@ -286,6 +299,7 @@ class RmRecipeGrid extends LitElement {
                 ['all',         'mdi:view-grid',           'All'],
                 ['courses',     'mdi:silverware-fork-knife','Courses'],
                 ['categories',  'mdi:tag-multiple-outline', 'Categories'],
+                ['collections', 'mdi:folder-multiple-outline', 'Collections'],
                 ['favourites',  'mdi:heart-outline',        'Favourites'],
                 ['recent',      'mdi:history',              'Recent'],
               ].map(([mode, icon, label]) => html`
@@ -331,6 +345,16 @@ class RmRecipeGrid extends LitElement {
                 class="sub-chip ${this.activeTag === c ? 'active' : ''}"
                 @click=${() => this._handleTagClick(c)}
               >${c}<span class="sub-chip-count">${this._categorycounts[c] || 0}</span></button>
+            `)}
+          </div>
+        ` : ''}
+        ${this.hideSidebar && this._filterMode === 'collections' && this._allCollections.length ? html`
+          <div class="sub-filter-row">
+            ${this._allCollections.map(c => html`
+              <button
+                class="sub-chip ${this.activeTag === c ? 'active' : ''}"
+                @click=${() => this._handleTagClick(c)}
+              >${c}<span class="sub-chip-count">${this._collectioncounts[c] || 0}</span></button>
             `)}
           </div>
         ` : ''}
