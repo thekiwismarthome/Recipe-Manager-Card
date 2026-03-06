@@ -330,9 +330,16 @@ const w=globalThis,k=e=>e,$=w.trustedTypes,S=$?$.createPolicy("lit-html",{create
 
     /* Sub-filter chips */
     .sub-filter-row {
-      display: flex; gap: 6px; padding: 6px 14px;
-      flex-wrap: wrap; flex-shrink: 0;
+      display: flex; gap: 6px; padding: 6px 14px 10px;
+      overflow-x: auto; flex-shrink: 0;
+      scrollbar-width: thin;
+      scrollbar-color: var(--rm-border) transparent;
+      touch-action: pan-x;
+      -webkit-overflow-scrolling: touch;
     }
+    .sub-filter-row::-webkit-scrollbar { height: 3px; }
+    .sub-filter-row::-webkit-scrollbar-track { background: transparent; }
+    .sub-filter-row::-webkit-scrollbar-thumb { background: var(--rm-border); border-radius: 3px; }
     .sub-chip {
       background: var(--rm-bg-elevated); border: 1px solid var(--rm-border);
       border-radius: 20px; color: var(--rm-text-secondary);
