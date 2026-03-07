@@ -258,6 +258,7 @@ class RecipeManagerCard extends LitElement {
     _customTimerInput:    { type: String },
     _hdrStarHover:        { type: Number },
     _mobileMenuOpen:      { type: Boolean },
+    _navDirection:        { type: String },
   };
 
   constructor() {
@@ -284,6 +285,7 @@ class RecipeManagerCard extends LitElement {
     this._customTimerInput = '';
     this._hdrStarHover = 0;
     this._mobileMenuOpen = false;
+    this._navDirection = 'forward';
     this._alarmLoopActive = false;
     this._alarmInterval = null;
     this._alarmTimeout = null;
@@ -552,12 +554,13 @@ class RecipeManagerCard extends LitElement {
   _handleTagFilter(e)  { const t = e.detail?.tag; this._activeTag = this._activeTag === t ? null : t; }
 
   _handleBack() {
+    this._navDirection = 'back';
     this._view = 'grid';
     this._selectedRecipe = null;
   }
 
-  _handleShowGrid()    { this._view = 'grid'; this._selectedRecipe = null; }
-  _handleShowPlanner() { this._view = 'planner'; }
+  _handleShowGrid()    { this._navDirection = 'back'; this._view = 'grid'; this._selectedRecipe = null; }
+  _handleShowPlanner() { this._navDirection = 'forward'; this._view = 'planner'; }
 
   _handleOpenRecipe(e) {
     const grid = this.shadowRoot?.querySelector('rm-recipe-grid');
@@ -566,6 +569,7 @@ class RecipeManagerCard extends LitElement {
       this._gridScrollPos = scrollEl?.scrollTop ?? 0;
     }
     const recipe = e.detail?.recipe;
+    this._navDirection = 'forward';
     this._selectedRecipe = recipe;
     this._view = 'detail';
 
@@ -587,7 +591,7 @@ class RecipeManagerCard extends LitElement {
   async _handleDeleteRecipe(e) {
     await this._api.deleteRecipe(e.detail.recipeId);
     await this._loadRecipes(); await this._loadTags();
-    this._view = 'grid'; this._selectedRecipe = null;
+    this._navDirection = 'back'; this._view = 'grid'; this._selectedRecipe = null;
   }
 
   async _handleUpdateRecipe(e) {
@@ -600,11 +604,13 @@ class RecipeManagerCard extends LitElement {
 
   async _handleAddRecipe(e) {
     await this._api.addRecipe(e.detail.data);
+    this._navDirection = 'back';
     this._view = 'grid';
     await this._loadRecipes(); await this._loadTags();
   }
 
   async _handleImportDone() {
+    this._navDirection = 'back';
     this._view = 'grid';
     await this._loadRecipes(); await this._loadTags();
   }
@@ -671,7 +677,7 @@ class RecipeManagerCard extends LitElement {
       <button
         class="sb-item ${v === view ? 'active' : ''} ${placeholder ? 'placeholder' : ''}"
         title="${placeholder ? label + ' — coming soon' : label}"
-        @click=${placeholder ? undefined : () => { this._view = view; this._selectedRecipe = null; }}
+        @click=${placeholder ? undefined : () => { this._navDirection = 'forward'; this._view = view; this._selectedRecipe = null; }}
         ?disabled=${placeholder}
       >
         <ha-icon icon="${icon}"></ha-icon>
@@ -703,7 +709,7 @@ class RecipeManagerCard extends LitElement {
                 type="text"
                 placeholder="Search…"
                 .value=${this._searchQuery}
-                @input=${e => { this._searchQuery = e.target.value; this._view = 'grid'; }}
+                @input=${e => { this._searchQuery = e.target.value; this._navDirection = 'back'; this._view = 'grid'; }}
               />
               ${this._searchQuery ? html`
                 <button class="sb-search-clear" @click=${() => { this._searchQuery = ''; }}>
@@ -782,7 +788,7 @@ class RecipeManagerCard extends LitElement {
             </button>
           ` : inTimers && this._timersPrevView === 'detail' ? html`
             <button class="icon-btn"
-              @click=${() => { this._view = 'detail'; this._timersPrevView = null; }}
+              @click=${() => { this._navDirection = 'back'; this._view = 'detail'; this._timersPrevView = null; }}
               title="Back to recipe">
               <ha-icon icon="mdi:arrow-left"></ha-icon>
             </button>
@@ -801,7 +807,7 @@ class RecipeManagerCard extends LitElement {
         <div class="rm-header-right">
           <!-- Timer pills (compact, shown when timers are running, not in timer view) -->
           ${this._timers.length && this._view !== 'timers' ? html`
-            <div class="timer-pills" @click=${() => { this._timersPrevView = this._view; this._view = 'timers'; }}>
+            <div class="timer-pills" @click=${() => { this._navDirection = 'forward'; this._timersPrevView = this._view; this._view = 'timers'; }}>
               ${this._timers.slice(0, 3).map(t => html`
                 <div class="timer-pill ${!t.running ? 'paused' : ''}">
                   <ha-icon icon="mdi:timer-outline"></ha-icon>
@@ -845,7 +851,7 @@ class RecipeManagerCard extends LitElement {
         .inlineMode=${true}
         @rm-add-recipe=${this._handleAddRecipe}
         @rm-import-done=${this._handleImportDone}
-        @rm-close=${() => { this._view = 'grid'; }}
+        @rm-close=${() => { this._navDirection = 'back'; this._view = 'grid'; }}
       ></rm-add-recipe-dialog>
     `;
     if (this._view === 'timers') return this._renderTimersView();
@@ -1006,9 +1012,18 @@ class RecipeManagerCard extends LitElement {
 
   _renderBottomNav() {
     const v = this._view;
+    // Home is always "back" (return to grid); everything else is "forward"
+    const homeBtn = html`
+      <button class="rm-bn-btn ${v === 'grid' ? 'active' : ''}"
+        @click=${() => { this._navDirection = 'back'; this._view = 'grid'; this._selectedRecipe = null; this._mobileMenuOpen = false; }}
+        title="Home">
+        <ha-icon icon="mdi:home"></ha-icon>
+        <span>Home</span>
+      </button>
+    `;
     const btn = (icon, label, view) => html`
       <button class="rm-bn-btn ${v === view ? 'active' : ''}"
-        @click=${() => { this._view = view; this._selectedRecipe = null; this._mobileMenuOpen = false; }}
+        @click=${() => { this._navDirection = 'forward'; this._view = view; this._selectedRecipe = null; this._mobileMenuOpen = false; }}
         title="${label}">
         <ha-icon icon="${icon}"></ha-icon>
         <span>${label}</span>
@@ -1016,15 +1031,15 @@ class RecipeManagerCard extends LitElement {
     `;
     return html`
       <div class="rm-bottom-nav">
-        ${btn('mdi:home', 'Home', 'grid')}
+        ${homeBtn}
         ${this._settings.showPlanner ? btn('mdi:calendar-week', 'Planner', 'planner') : ''}
         <button class="rm-bn-btn rm-bn-add"
-          @click=${() => { this._view = 'add'; this._mobileMenuOpen = false; }}
+          @click=${() => { this._navDirection = 'forward'; this._view = 'add'; this._mobileMenuOpen = false; }}
           title="New Recipe">
           <ha-icon icon="mdi:plus"></ha-icon>
         </button>
         <button class="rm-bn-btn ${v === 'timers' ? 'active' : ''}"
-          @click=${() => { this._timersPrevView = this._view; this._view = 'timers'; this._mobileMenuOpen = false; }}
+          @click=${() => { this._navDirection = 'forward'; this._timersPrevView = this._view; this._view = 'timers'; this._mobileMenuOpen = false; }}
           title="Timers">
           <ha-icon icon="mdi:timer-outline"></ha-icon>
           <span>Timers</span>
@@ -1069,7 +1084,7 @@ class RecipeManagerCard extends LitElement {
         ${wide ? this._renderSidebar() : ''}
         <div class="rm-main">
           ${this._renderHeader()}
-          <div class="rm-body">${this._renderBody()}</div>
+          <div class="rm-body" data-nav="${this._navDirection}">${this._renderBody()}</div>
           ${!wide ? this._renderBottomNav() : ''}
         </div>
 
@@ -1595,13 +1610,18 @@ class RecipeManagerCard extends LitElement {
     }
     .alarm-btn.stop:hover { opacity: 0.85; }
 
-    /* ── View transition ─────────────────── */
+    /* ── View transitions (directional slide) ──────────────── */
 
-    @keyframes rm-view-in {
-      from { opacity: 0; transform: translateX(10px); }
+    @keyframes rm-slide-forward {
+      from { opacity: 0; transform: translateX(48px); }
       to   { opacity: 1; transform: translateX(0); }
     }
-    .rm-body > * { animation: rm-view-in 0.22s ease; }
+    @keyframes rm-slide-back {
+      from { opacity: 0; transform: translateX(-48px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    .rm-body[data-nav="forward"] > * { animation: rm-slide-forward 0.25s cubic-bezier(0.25,0.46,0.45,0.94); }
+    .rm-body[data-nav="back"]    > * { animation: rm-slide-back    0.25s cubic-bezier(0.25,0.46,0.45,0.94); }
 
     /* ── Mobile bottom nav ───────────────── */
 
