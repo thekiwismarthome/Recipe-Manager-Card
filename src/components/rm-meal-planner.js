@@ -618,4 +618,4 @@ class RmMealPlanner extends LitElement {
   `;
 }
 
-if (!customElements.get('rm-meal-planner')) customElements.define('rm-meal-planner', RmMealPlanner);
+try { customElements.define('rm-meal-planner', RmMealPlanner); } catch {}

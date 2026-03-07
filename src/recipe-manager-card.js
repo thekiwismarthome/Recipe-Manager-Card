@@ -1755,7 +1755,7 @@ class RecipeManagerCard extends LitElement {
   `;
 }
 
-if (!customElements.get('recipe-manager-card')) customElements.define('recipe-manager-card', RecipeManagerCard);
+try { customElements.define('recipe-manager-card', RecipeManagerCard); } catch {}
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'recipe-manager-card',

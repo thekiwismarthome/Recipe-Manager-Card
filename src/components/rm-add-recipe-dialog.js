@@ -981,4 +981,4 @@ class RmAddRecipeDialog extends LitElement {
   `;
 }
 
-if (!customElements.get('rm-add-recipe-dialog')) customElements.define('rm-add-recipe-dialog', RmAddRecipeDialog);
+try { customElements.define('rm-add-recipe-dialog', RmAddRecipeDialog); } catch {}

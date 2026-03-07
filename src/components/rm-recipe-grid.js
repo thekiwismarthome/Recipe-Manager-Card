@@ -686,4 +686,4 @@ class RmRecipeGrid extends LitElement {
   `;
 }
 
-if (!customElements.get('rm-recipe-grid')) customElements.define('rm-recipe-grid', RmRecipeGrid);
+try { customElements.define('rm-recipe-grid', RmRecipeGrid); } catch {}

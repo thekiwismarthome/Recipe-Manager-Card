@@ -426,4 +426,4 @@ class RmSettingsView extends LitElement {
   `;
 }
 
-if (!customElements.get('rm-settings-view')) customElements.define('rm-settings-view', RmSettingsView);
+try { customElements.define('rm-settings-view', RmSettingsView); } catch {}

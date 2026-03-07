@@ -368,4 +368,4 @@ class RmShoppingView extends LitElement {
   `;
 }
 
-if (!customElements.get('rm-shopping-view')) customElements.define('rm-shopping-view', RmShoppingView);
+try { customElements.define('rm-shopping-view', RmShoppingView); } catch {}
