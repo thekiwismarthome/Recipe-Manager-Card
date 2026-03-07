@@ -259,6 +259,7 @@ class RecipeManagerCard extends LitElement {
     _hdrStarHover:        { type: Number },
     _mobileMenuOpen:      { type: Boolean },
     _navDirection:        { type: String },
+    _closingDetail:       { type: Boolean },
   };
 
   constructor() {
@@ -286,6 +287,7 @@ class RecipeManagerCard extends LitElement {
     this._hdrStarHover = 0;
     this._mobileMenuOpen = false;
     this._navDirection = 'forward';
+    this._closingDetail = false;
     this._alarmLoopActive = false;
     this._alarmInterval = null;
     this._alarmTimeout = null;
@@ -554,9 +556,23 @@ class RecipeManagerCard extends LitElement {
   _handleTagFilter(e)  { const t = e.detail?.tag; this._activeTag = this._activeTag === t ? null : t; }
 
   _handleBack() {
-    this._navDirection = 'back';
-    this._view = 'grid';
-    this._selectedRecipe = null;
+    if (this._view === 'detail' && this._selectedRecipe && !this._closingDetail) {
+      // Trigger the slide-out animation; view changes on animationend
+      this._closingDetail = true;
+    } else {
+      this._navDirection = 'back';
+      this._view = 'grid';
+      this._selectedRecipe = null;
+    }
+  }
+
+  _onDetailAnimEnd(e) {
+    if (e.target !== e.currentTarget) return; // ignore bubbled child events
+    if (this._closingDetail) {
+      this._closingDetail = false;
+      this._view = 'grid';
+      this._selectedRecipe = null;
+    }
   }
 
   _handleShowGrid()    { this._navDirection = 'back'; this._view = 'grid'; this._selectedRecipe = null; }
@@ -838,6 +854,8 @@ class RecipeManagerCard extends LitElement {
 
   _renderBody() {
     const s = this._settings;
+
+    // ── Full-screen views (replace everything, use directional slide) ──────
     if (this._view === 'settings') return html`
       <rm-settings-view
         .settings=${s}
@@ -855,50 +873,6 @@ class RecipeManagerCard extends LitElement {
       ></rm-add-recipe-dialog>
     `;
     if (this._view === 'timers') return this._renderTimersView();
-    if (this._loading) return html`
-      <div class="rm-loading"><ha-circular-progress active size="large"></ha-circular-progress></div>
-    `;
-    if (this._error) return html`
-      <div class="rm-error">
-        <ha-icon icon="mdi:alert-circle-outline"></ha-icon>
-        <p>${this._error}</p>
-        <button class="text-btn" @click=${this._init.bind(this)}>Retry</button>
-      </div>
-    `;
-    if (this._view === 'grid') return html`
-      <rm-recipe-grid
-        .recipes=${this._filteredRecipes}
-        .allRecipes=${this._recipes}
-        .tags=${this._tags}
-        .searchQuery=${this._searchQuery}
-        .activeTag=${this._activeTag}
-        .columns=${s.columns}
-        .showFavourites=${s.showFavourites}
-        .hideSidebar=${this._wide}
-        .scrollPos=${this._gridScrollPos}
-        .recentRecipes=${this._recentRecipes}
-        .recentCount=${s.recentCount ?? 12}
-        @rm-search=${this._handleSearch}
-        @rm-tag-filter=${this._handleTagFilter}
-        @rm-open-recipe=${this._handleOpenRecipe}
-        @rm-toggle-favourite=${this._handleToggleFavourite}
-      ></rm-recipe-grid>
-    `;
-    if (this._view === 'detail') return html`
-      <rm-recipe-detail
-        .recipe=${this._selectedRecipe}
-        .api=${this._api}
-        .settings=${s}
-        .shoppingLists=${this._shoppingLists}
-        .slmAvailable=${this._slmAvailable}
-        @rm-back=${this._handleBack}
-        @rm-toggle-favourite=${this._handleToggleFavourite}
-        @rm-delete-recipe=${this._handleDeleteRecipe}
-        @rm-update-recipe=${this._handleUpdateRecipe}
-        @rm-add-to-shopping=${this._handleAddToShopping}
-        @rm-start-timer=${this._handleStartTimer}
-      ></rm-recipe-detail>
-    `;
     if (this._view === 'planner') return html`
       <rm-meal-planner
         .api=${this._api}
@@ -917,7 +891,58 @@ class RecipeManagerCard extends LitElement {
         @rm-shopping-local-update=${this._handleShoppingLocalUpdate}
       ></rm-shopping-view>
     `;
-    return html``;
+
+    // ── Loading / error ────────────────────────────────────────────────────
+    if (this._loading) return html`
+      <div class="rm-loading"><ha-circular-progress active size="large"></ha-circular-progress></div>
+    `;
+    if (this._error) return html`
+      <div class="rm-error">
+        <ha-icon icon="mdi:alert-circle-outline"></ha-icon>
+        <p>${this._error}</p>
+        <button class="text-btn" @click=${this._init.bind(this)}>Retry</button>
+      </div>
+    `;
+
+    // ── Grid + detail overlay (grid stays mounted; detail slides on top) ───
+    const showDetail = (this._view === 'detail' || this._closingDetail) && this._selectedRecipe;
+    return html`
+      <rm-recipe-grid
+        .recipes=${this._filteredRecipes}
+        .allRecipes=${this._recipes}
+        .tags=${this._tags}
+        .searchQuery=${this._searchQuery}
+        .activeTag=${this._activeTag}
+        .columns=${s.columns}
+        .showFavourites=${s.showFavourites}
+        .hideSidebar=${this._wide}
+        .scrollPos=${this._gridScrollPos}
+        .recentRecipes=${this._recentRecipes}
+        .recentCount=${s.recentCount ?? 12}
+        @rm-search=${this._handleSearch}
+        @rm-tag-filter=${this._handleTagFilter}
+        @rm-open-recipe=${this._handleOpenRecipe}
+        @rm-toggle-favourite=${this._handleToggleFavourite}
+      ></rm-recipe-grid>
+      ${showDetail ? html`
+        <div class="rm-detail-overlay ${this._closingDetail ? 'rm-detail-closing' : ''}"
+          @animationend=${this._onDetailAnimEnd}>
+          <rm-recipe-detail
+            .recipe=${this._selectedRecipe}
+            .api=${this._api}
+            .settings=${s}
+            .shoppingLists=${this._shoppingLists}
+            .slmAvailable=${this._slmAvailable}
+            @rm-back=${this._handleBack}
+            @rm-toggle-favourite=${this._handleToggleFavourite}
+            @rm-delete-recipe=${this._handleDeleteRecipe}
+            @rm-update-recipe=${this._handleUpdateRecipe}
+            @rm-add-to-shopping=${this._handleAddToShopping}
+            @rm-start-timer=${this._handleStartTimer}
+          ></rm-recipe-detail>
+        </div>
+      ` : ''}
+    `;
   }
 
   _renderTimersView() {
@@ -1368,6 +1393,7 @@ class RecipeManagerCard extends LitElement {
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      position: relative;
     }
 
     .icon-btn {
@@ -1611,18 +1637,43 @@ class RecipeManagerCard extends LitElement {
     }
     .alarm-btn.stop:hover { opacity: 0.85; }
 
-    /* ── View transitions (directional slide) ──────────────── */
+    /* ── View transitions ───────────────────────────────────── */
 
+    /* Generic directional slide for full-screen views (settings, add, planner, etc.) */
     @keyframes rm-slide-forward {
-      from { opacity: 0; transform: translateX(100%); }
+      from { opacity: 0; transform: translateX(48px); }
       to   { opacity: 1; transform: translateX(0); }
     }
     @keyframes rm-slide-back {
-      from { opacity: 0; transform: translateX(-100%); }
+      from { opacity: 0; transform: translateX(-48px); }
       to   { opacity: 1; transform: translateX(0); }
     }
-    .rm-body[data-nav="forward"] > * { animation: rm-slide-forward 0.3s cubic-bezier(0.25,0.46,0.45,0.94); }
-    .rm-body[data-nav="back"]    > * { animation: rm-slide-back    0.3s cubic-bezier(0.25,0.46,0.45,0.94); }
+    .rm-body[data-nav="forward"] > *:not(.rm-detail-overlay) { animation: rm-slide-forward 0.25s cubic-bezier(0.25,0.46,0.45,0.94); }
+    .rm-body[data-nav="back"]    > *:not(.rm-detail-overlay) { animation: rm-slide-back    0.25s cubic-bezier(0.25,0.46,0.45,0.94); }
+
+    /* Recipe detail — full-width slide over the grid */
+    @keyframes rm-detail-in {
+      from { transform: translateX(100%); }
+      to   { transform: translateX(0); }
+    }
+    @keyframes rm-detail-out {
+      from { transform: translateX(0); }
+      to   { transform: translateX(100%); }
+    }
+    .rm-detail-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      background: var(--rm-bg-main);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: rm-detail-in 0.75s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+    }
+    .rm-detail-overlay.rm-detail-closing {
+      animation: rm-detail-out 0.75s cubic-bezier(0.55, 0, 1, 0.45) both;
+    }
+    .rm-detail-overlay > * { flex: 1; min-height: 0; }
 
     /* ── Mobile bottom nav ───────────────── */
 
