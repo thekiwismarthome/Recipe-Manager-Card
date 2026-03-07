@@ -13,6 +13,7 @@ class RmShoppingView extends LitElement {
     shoppingLists: { type: Array },
     api:           { type: Object },
     localItems:    { type: Array },
+    settings:      { type: Object },
   };
 
   constructor() {
@@ -22,6 +23,7 @@ class RmShoppingView extends LitElement {
     this.shoppingLists = [];
     this.api = null;
     this.localItems = [];
+    this.settings = null;
     this._slmCard = null;
   }
 
@@ -36,10 +38,22 @@ class RmShoppingView extends LitElement {
     if (this._useSLM) {
       if (!this._slmCard) {
         this._mountSlmCard();
-      } else if (changedProps.has('hass') && this.hass) {
-        this._slmCard.hass = this.hass;
+      } else {
+        if (changedProps.has('hass') && this.hass) {
+          this._slmCard.hass = this.hass;
+        }
+        if (changedProps.has('settings') && this.settings && this._slmCard) {
+          this._syncSlmTheme();
+        }
       }
     }
+  }
+
+  _syncSlmTheme() {
+    if (!this._slmCard || !this.settings) return;
+    const { theme, darkMode } = this.settings;
+    this._slmCard.settings = { ...this._slmCard.settings, theme, darkMode };
+    this._slmCard.applyColorScheme?.();
   }
 
   _mountSlmCard() {
@@ -61,6 +75,9 @@ class RmShoppingView extends LitElement {
     // Keep SLM's own ha-card visuals, but constrain host sizing to RM's body.
     card.style.cssText = 'display:block;width:100%;height:100%;max-height:100%;min-height:0;';
 
+    // Mark as embedded so SLM can expose extra options
+    card.isEmbedded = true;
+
     // Append to DOM → connectedCallback fires (with _baseCardId already set from setConfig)
     container.appendChild(card);
 
@@ -68,6 +85,9 @@ class RmShoppingView extends LitElement {
     if (this.hass) card.hass = this.hass;
 
     this._slmCard = card;
+
+    // Sync RMC theme to SLM after settings have loaded (hass setter triggers loadSettings)
+    setTimeout(() => this._syncSlmTheme(), 0);
   }
 
   // -- Local mode helpers ---------------------------------------------------

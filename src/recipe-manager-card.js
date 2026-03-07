@@ -257,6 +257,7 @@ class RecipeManagerCard extends LitElement {
     _timersPrevView:      { type: String },
     _customTimerInput:    { type: String },
     _hdrStarHover:        { type: Number },
+    _mobileMenuOpen:      { type: Boolean },
   };
 
   constructor() {
@@ -282,6 +283,7 @@ class RecipeManagerCard extends LitElement {
     this._timersPrevView = null;
     this._customTimerInput = '';
     this._hdrStarHover = 0;
+    this._mobileMenuOpen = false;
     this._alarmLoopActive = false;
     this._alarmInterval = null;
     this._alarmTimeout = null;
@@ -816,21 +818,11 @@ class RecipeManagerCard extends LitElement {
             <button class="icon-btn" @click=${this._handleShowGrid}>
               <ha-icon icon="mdi:close"></ha-icon>
             </button>
-          ` : !wide && this._view === 'grid' ? html`
-            <button class="icon-btn" @click=${() => { this._view = 'add'; }}>
-              <ha-icon icon="mdi:plus"></ha-icon>
-            </button>
-            ${this._settings.showPlanner ? html`
-              <button class="icon-btn" @click=${this._handleShowPlanner}>
-                <ha-icon icon="mdi:calendar-week"></ha-icon>
-              </button>
-            ` : ''}
-            <button class="icon-btn" @click=${() => { this._view = 'settings'; }}>
-              <ha-icon icon="mdi:cog-outline"></ha-icon>
-            </button>
-          ` : !wide && this._view === 'planner' ? html`
-            <button class="icon-btn" @click=${this._handleShowGrid}>
-              <ha-icon icon="mdi:view-grid"></ha-icon>
+          ` : !wide ? html`
+            <button class="icon-btn"
+              @click=${() => { this._mobileMenuOpen = !this._mobileMenuOpen; }}
+              title="${this._mobileMenuOpen ? 'Close menu' : 'Menu'}">
+              <ha-icon icon="${this._mobileMenuOpen ? 'mdi:close' : 'mdi:menu'}"></ha-icon>
             </button>
           ` : ''}
         </div>
@@ -915,6 +907,7 @@ class RecipeManagerCard extends LitElement {
         .shoppingLists=${this._shoppingLists}
         .api=${this._api}
         .localItems=${this._localShoppingItems}
+        .settings=${this._settings}
         @rm-shopping-local-update=${this._handleShoppingLocalUpdate}
       ></rm-shopping-view>
     `;
@@ -1011,6 +1004,64 @@ class RecipeManagerCard extends LitElement {
     `;
   }
 
+  _renderBottomNav() {
+    const v = this._view;
+    const btn = (icon, label, view) => html`
+      <button class="rm-bn-btn ${v === view ? 'active' : ''}"
+        @click=${() => { this._view = view; this._selectedRecipe = null; this._mobileMenuOpen = false; }}
+        title="${label}">
+        <ha-icon icon="${icon}"></ha-icon>
+        <span>${label}</span>
+      </button>
+    `;
+    return html`
+      <div class="rm-bottom-nav">
+        ${btn('mdi:home', 'Home', 'grid')}
+        ${this._settings.showPlanner ? btn('mdi:calendar-week', 'Planner', 'planner') : ''}
+        <button class="rm-bn-btn rm-bn-add"
+          @click=${() => { this._view = 'add'; this._mobileMenuOpen = false; }}
+          title="New Recipe">
+          <ha-icon icon="mdi:plus"></ha-icon>
+        </button>
+        <button class="rm-bn-btn ${v === 'timers' ? 'active' : ''}"
+          @click=${() => { this._timersPrevView = this._view; this._view = 'timers'; this._mobileMenuOpen = false; }}
+          title="Timers">
+          <ha-icon icon="mdi:timer-outline"></ha-icon>
+          <span>Timers</span>
+          ${this._timers.length ? html`<span class="rm-bn-badge">${this._timers.length}</span>` : ''}
+        </button>
+        ${btn('mdi:cart-outline', 'Shopping', 'shopping')}
+      </div>
+    `;
+  }
+
+  _renderMobileMenu() {
+    return html`
+      <div class="rm-mobile-overlay" @click=${() => { this._mobileMenuOpen = false; }}>
+        <nav class="rm-mobile-menu" @click=${e => e.stopPropagation()}>
+          <div class="rm-mm-header">
+            <ha-icon icon="mdi:chef-hat" class="rm-mm-logo"></ha-icon>
+            <span class="rm-mm-title">Recipes</span>
+            <button class="icon-btn" @click=${() => { this._mobileMenuOpen = false; }}>
+              <ha-icon icon="mdi:close"></ha-icon>
+            </button>
+          </div>
+          <div class="rm-mm-items">
+            <button class="rm-mm-item" @click=${() => { this._view = 'settings'; this._mobileMenuOpen = false; }}>
+              <ha-icon icon="mdi:cog-outline"></ha-icon>
+              <span>Settings</span>
+            </button>
+            <button class="rm-mm-item" disabled>
+              <ha-icon icon="mdi:help-circle-outline"></ha-icon>
+              <span>Help</span>
+              <span class="rm-mm-soon">Soon</span>
+            </button>
+          </div>
+        </nav>
+      </div>
+    `;
+  }
+
   render() {
     const wide = this._wide;
     return html`
@@ -1019,7 +1070,10 @@ class RecipeManagerCard extends LitElement {
         <div class="rm-main">
           ${this._renderHeader()}
           <div class="rm-body">${this._renderBody()}</div>
+          ${!wide ? this._renderBottomNav() : ''}
         </div>
+
+        ${!wide && this._mobileMenuOpen ? this._renderMobileMenu() : ''}
 
         <!-- Timer alarm modal -->
         ${this._timerAlarm ? this._renderTimerAlarm() : ''}
@@ -1053,8 +1107,9 @@ class RecipeManagerCard extends LitElement {
       overflow: hidden;
       display: flex;
       flex-direction: row;
+      height: 100%;
+      max-height: none;
       min-height: 500px;
-      max-height: 85vh;
       color: var(--rm-text);
       position: relative;
     }
@@ -1539,6 +1594,144 @@ class RecipeManagerCard extends LitElement {
       grid-column: 1 / -1;
     }
     .alarm-btn.stop:hover { opacity: 0.85; }
+
+    /* ── View transition ─────────────────── */
+
+    @keyframes rm-view-in {
+      from { opacity: 0; transform: translateX(10px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    .rm-body > * { animation: rm-view-in 0.22s ease; }
+
+    /* ── Mobile bottom nav ───────────────── */
+
+    .rm-bottom-nav {
+      display: flex;
+      align-items: stretch;
+      border-top: 1px solid var(--rm-border);
+      background: var(--rm-bg-surface);
+      flex-shrink: 0;
+      height: 56px;
+    }
+
+    .rm-bn-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--rm-text-muted);
+      font-size: 9px;
+      font-weight: 600;
+      padding: 6px 2px;
+      position: relative;
+      transition: color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .rm-bn-btn ha-icon { --mdc-icon-size: 22px; }
+    .rm-bn-btn.active { color: var(--rm-accent); }
+    .rm-bn-btn:not(.rm-bn-add):hover { color: var(--rm-text); }
+
+    .rm-bn-add {
+      background: var(--rm-accent);
+      color: white !important;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      flex: none;
+      align-self: center;
+      margin: 0 8px;
+      padding: 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .rm-bn-add ha-icon { --mdc-icon-size: 26px; }
+
+    .rm-bn-badge {
+      position: absolute;
+      top: 3px;
+      right: calc(50% - 18px);
+      background: var(--rm-accent);
+      color: #fff;
+      border-radius: 8px;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 4px;
+      min-width: 14px;
+      text-align: center;
+    }
+
+    /* ── Mobile slide-in menu ────────────── */
+
+    .rm-mobile-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 100;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .rm-mobile-menu {
+      width: min(280px, 80%);
+      height: 100%;
+      background: var(--rm-bg-surface);
+      border-left: 1px solid var(--rm-border);
+      display: flex;
+      flex-direction: column;
+      animation: rm-menu-slide-in 0.22s ease;
+      overflow: hidden;
+    }
+
+    @keyframes rm-menu-slide-in {
+      from { transform: translateX(100%); }
+      to   { transform: translateX(0); }
+    }
+
+    .rm-mm-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 12px 14px 16px;
+      border-bottom: 1px solid var(--rm-border);
+      flex-shrink: 0;
+    }
+    .rm-mm-logo { color: var(--rm-accent); --mdc-icon-size: 22px; }
+    .rm-mm-title { flex: 1; font-weight: 700; font-size: 15px; color: var(--rm-text); }
+
+    .rm-mm-items { padding: 8px 0; flex: 1; overflow-y: auto; }
+
+    .rm-mm-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 12px 16px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--rm-text-secondary);
+      font-size: 14px;
+      text-align: left;
+      transition: background 0.12s, color 0.12s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .rm-mm-item ha-icon { --mdc-icon-size: 20px; flex-shrink: 0; }
+    .rm-mm-item:hover:not(:disabled) { background: var(--rm-accent-soft); color: var(--rm-text); }
+    .rm-mm-item:disabled { opacity: 0.4; cursor: default; }
+
+    .rm-mm-soon {
+      margin-left: auto;
+      font-size: 10px;
+      font-weight: 700;
+      background: var(--rm-accent-soft);
+      color: var(--rm-accent);
+      border-radius: 6px;
+      padding: 2px 6px;
+    }
   `;
 }
 
