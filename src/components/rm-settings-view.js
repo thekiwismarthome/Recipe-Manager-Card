@@ -117,7 +117,7 @@ class RmSettingsView extends LitElement {
         <div class="setting-row">
           <span class="setting-name">Recipe columns</span>
           <div class="btn-group">
-            ${[2, 3, 4].map(n => html`
+            ${[2, 3, 4, 5, 8, 10].map(n => html`
               <button class="seg-btn ${s.columns === n ? 'active' : ''}"
                 @click=${() => this._update({ columns: n })}>${n}</button>
             `)}
