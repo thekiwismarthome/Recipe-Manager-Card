@@ -557,20 +557,24 @@ class RecipeManagerCard extends LitElement {
 
   _handleBack() {
     if (this._view === 'detail' && this._selectedRecipe && !this._closingDetail) {
-      // Trigger the slide-out animation; view changes on animationend
+      // Set _view to grid immediately so the track CSS class is removed and
+      // the transition plays in reverse. Keep _closingDetail=true so the
+      // detail pane stays mounted and the header stays correct during the slide.
       this._closingDetail = true;
+      this._view = 'grid';
     } else {
       this._navDirection = 'back';
       this._view = 'grid';
       this._selectedRecipe = null;
+      this._closingDetail = false;
     }
   }
 
-  _onDetailAnimEnd(e) {
-    if (e.target !== e.currentTarget) return; // ignore bubbled child events
+  _onDetailTransitionEnd(e) {
+    if (e.target !== e.currentTarget) return;
+    if (e.propertyName !== 'transform') return;
     if (this._closingDetail) {
       this._closingDetail = false;
-      this._view = 'grid';
       this._selectedRecipe = null;
     }
   }
@@ -585,6 +589,7 @@ class RecipeManagerCard extends LitElement {
       this._gridScrollPos = scrollEl?.scrollTop ?? 0;
     }
     const recipe = e.detail?.recipe;
+    this._closingDetail = false;
     this._navDirection = 'forward';
     this._selectedRecipe = recipe;
     this._view = 'detail';
@@ -780,7 +785,7 @@ class RecipeManagerCard extends LitElement {
   }
 
   _renderHeader() {
-    const inDetail = this._view === 'detail' && this._selectedRecipe;
+    const inDetail = (this._view === 'detail' || this._closingDetail) && this._selectedRecipe;
     const inSettings = this._view === 'settings';
     const inAdd = this._view === 'add';
     const inTimers = this._view === 'timers';
@@ -904,44 +909,49 @@ class RecipeManagerCard extends LitElement {
       </div>
     `;
 
-    // ── Grid + detail overlay (grid stays mounted; detail slides on top) ───
-    const showDetail = (this._view === 'detail' || this._closingDetail) && this._selectedRecipe;
+    // ── Grid + detail (sliding track — grid and detail sit side by side,
+    //    the track translates left to reveal the detail pane) ───────────────
+    const keepDetail = (this._view === 'detail' || this._closingDetail) && this._selectedRecipe;
     return html`
-      <rm-recipe-grid
-        .recipes=${this._filteredRecipes}
-        .allRecipes=${this._recipes}
-        .tags=${this._tags}
-        .searchQuery=${this._searchQuery}
-        .activeTag=${this._activeTag}
-        .columns=${s.columns}
-        .showFavourites=${s.showFavourites}
-        .hideSidebar=${this._wide}
-        .scrollPos=${this._gridScrollPos}
-        .recentRecipes=${this._recentRecipes}
-        .recentCount=${s.recentCount ?? 12}
-        @rm-search=${this._handleSearch}
-        @rm-tag-filter=${this._handleTagFilter}
-        @rm-open-recipe=${this._handleOpenRecipe}
-        @rm-toggle-favourite=${this._handleToggleFavourite}
-      ></rm-recipe-grid>
-      ${showDetail ? html`
-        <div class="rm-detail-overlay ${this._closingDetail ? 'rm-detail-closing' : ''}"
-          @animationend=${this._onDetailAnimEnd}>
-          <rm-recipe-detail
-            .recipe=${this._selectedRecipe}
-            .api=${this._api}
-            .settings=${s}
-            .shoppingLists=${this._shoppingLists}
-            .slmAvailable=${this._slmAvailable}
-            @rm-back=${this._handleBack}
+      <div class="rm-slide-track ${this._view === 'detail' ? 'show-detail' : ''}"
+        @transitionend=${this._onDetailTransitionEnd}>
+        <div class="rm-slide-pane">
+          <rm-recipe-grid
+            .recipes=${this._filteredRecipes}
+            .allRecipes=${this._recipes}
+            .tags=${this._tags}
+            .searchQuery=${this._searchQuery}
+            .activeTag=${this._activeTag}
+            .columns=${s.columns}
+            .showFavourites=${s.showFavourites}
+            .hideSidebar=${this._wide}
+            .scrollPos=${this._gridScrollPos}
+            .recentRecipes=${this._recentRecipes}
+            .recentCount=${s.recentCount ?? 12}
+            @rm-search=${this._handleSearch}
+            @rm-tag-filter=${this._handleTagFilter}
+            @rm-open-recipe=${this._handleOpenRecipe}
             @rm-toggle-favourite=${this._handleToggleFavourite}
-            @rm-delete-recipe=${this._handleDeleteRecipe}
-            @rm-update-recipe=${this._handleUpdateRecipe}
-            @rm-add-to-shopping=${this._handleAddToShopping}
-            @rm-start-timer=${this._handleStartTimer}
-          ></rm-recipe-detail>
+          ></rm-recipe-grid>
         </div>
-      ` : ''}
+        <div class="rm-slide-pane">
+          ${keepDetail ? html`
+            <rm-recipe-detail
+              .recipe=${this._selectedRecipe}
+              .api=${this._api}
+              .settings=${s}
+              .shoppingLists=${this._shoppingLists}
+              .slmAvailable=${this._slmAvailable}
+              @rm-back=${this._handleBack}
+              @rm-toggle-favourite=${this._handleToggleFavourite}
+              @rm-delete-recipe=${this._handleDeleteRecipe}
+              @rm-update-recipe=${this._handleUpdateRecipe}
+              @rm-add-to-shopping=${this._handleAddToShopping}
+              @rm-start-timer=${this._handleStartTimer}
+            ></rm-recipe-detail>
+          ` : ''}
+        </div>
+      </div>
     `;
   }
 
@@ -1651,29 +1661,30 @@ class RecipeManagerCard extends LitElement {
     .rm-body[data-nav="forward"] > *:not(.rm-detail-overlay) { animation: rm-slide-forward 0.25s cubic-bezier(0.25,0.46,0.45,0.94); }
     .rm-body[data-nav="back"]    > *:not(.rm-detail-overlay) { animation: rm-slide-back    0.25s cubic-bezier(0.25,0.46,0.45,0.94); }
 
-    /* Recipe detail — full-width slide over the grid */
-    @keyframes rm-detail-in {
-      from { transform: translateX(100%); }
-      to   { transform: translateX(0); }
+    /* Recipe detail — sliding track (grid left pane, detail right pane) */
+    .rm-slide-track {
+      display: flex;
+      flex-direction: row;
+      width: 200%;
+      height: 100%;
+      transform: translateX(0);
+      transition: transform 0.75s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      will-change: transform;
     }
-    @keyframes rm-detail-out {
-      from { transform: translateX(0); }
-      to   { transform: translateX(100%); }
+    .rm-slide-track.show-detail {
+      transform: translateX(-50%);
     }
-    .rm-detail-overlay {
-      position: absolute;
-      inset: 0;
-      z-index: 10;
-      background: var(--rm-bg-main);
+    .rm-slide-pane {
+      flex: 0 0 50%;
+      height: 100%;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
-      animation: rm-detail-in 0.75s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
     }
-    .rm-detail-overlay.rm-detail-closing {
-      animation: rm-detail-out 0.75s cubic-bezier(0.55, 0, 1, 0.45) both;
+    .rm-slide-pane > * {
+      flex: 1;
+      min-height: 0;
     }
-    .rm-detail-overlay > * { flex: 1; min-height: 0; }
 
     /* ── Mobile bottom nav ───────────────── */
 
