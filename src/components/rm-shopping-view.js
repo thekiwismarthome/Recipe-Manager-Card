@@ -25,6 +25,12 @@ class RmShoppingView extends LitElement {
     this.localItems = [];
     this.settings = null;
     this._slmCard = null;
+    this._slmRetryTimeout = null;
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    if (this._slmRetryTimeout) { clearTimeout(this._slmRetryTimeout); this._slmRetryTimeout = null; }
   }
 
   // True when the SLM frontend element is registered OR when the backend API
@@ -63,7 +69,12 @@ class RmShoppingView extends LitElement {
     const ElementClass = customElements.get('shopping-list-manager-card');
     if (!ElementClass) {
       // SLM frontend not loaded yet — retry after a short delay
-      setTimeout(() => this._mountSlmCard(), 500);
+      if (!this._slmRetryTimeout) {
+        this._slmRetryTimeout = setTimeout(() => {
+          this._slmRetryTimeout = null;
+          if (this.isConnected) this._mountSlmCard();
+        }, 500);
+      }
       return;
     }
 

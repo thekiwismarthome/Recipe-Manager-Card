@@ -39,27 +39,31 @@ class RmMealPlanner extends LitElement {
   }
 
   _getMondayISO(date) {
-    const d = new Date(date);
-    const day = d.getDay(); // 0=Sun
+    const day = date.getDay(); // local day of week, 0=Sun
     const diff = (day === 0 ? -6 : 1 - day);
+    const d = new Date(date);
     d.setDate(d.getDate() + diff);
-    return d.toISOString().split('T')[0];
+    // Build ISO string from local date parts to avoid UTC offset shifting the day
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
   }
 
   _addDays(isoDate, days) {
-    const d = new Date(isoDate + 'T00:00:00');
-    d.setDate(d.getDate() + days);
+    const d = new Date(isoDate + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + days);
     return d.toISOString().split('T')[0];
   }
 
   _formatDisplayDate(isoDate) {
-    const d = new Date(isoDate + 'T00:00:00');
-    return d.getDate().toString();
+    const d = new Date(isoDate + 'T00:00:00Z');
+    return d.getUTCDate().toString();
   }
 
   _formatMonthYear(isoDate) {
-    const d = new Date(isoDate + 'T00:00:00');
-    return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    const d = new Date(isoDate + 'T00:00:00Z');
+    return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
   }
 
   _prevWeek() {

@@ -44,7 +44,7 @@ class RmRecipeGrid extends LitElement {
   }
 
   updated(changedProps) {
-    if (changedProps.has('scrollPos') && this.scrollPos > 0) {
+    if (changedProps.has('scrollPos') && this.scrollPos != null) {
       this.updateComplete.then(() => {
         requestAnimationFrame(() => {
           const el = this.shadowRoot?.querySelector('.grid-scroll');

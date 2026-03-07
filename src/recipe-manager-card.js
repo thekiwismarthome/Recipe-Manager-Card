@@ -322,6 +322,7 @@ class RecipeManagerCard extends LitElement {
     this._darkModeQuery?.removeEventListener('change', this._onSystemDark);
     this._resizeObserver?.disconnect();
     if (this._timerTick) { clearInterval(this._timerTick); this._timerTick = null; }
+    if (this._timerAlarm) { this._stopAlarmLoop(); this._timerAlarm = null; }
     saveTimers(this._timers);
   }
 
