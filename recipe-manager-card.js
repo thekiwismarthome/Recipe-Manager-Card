@@ -2696,7 +2696,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         <div class="setting-row">
           <span class="setting-name">Recipe columns</span>
           <div class="btn-group">
-            ${[2,3,4].map(t=>U`
+            ${[2,3,4,5,8,10].map(t=>U`
               <button class="seg-btn ${e.columns===t?"active":""}"
                 @click=${()=>this._update({columns:t})}>${t}</button>
             `)}
@@ -3547,9 +3547,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       overflow: hidden;
       display: flex;
       flex-direction: row;
-      height: 100%;
-      max-height: none;
-      min-height: 500px;
+      height: 100vh;
+      max-height: 100vh;
+      min-height: 100vh;
+      margin: 0;
       color: var(--rm-text);
       position: relative;
     }
@@ -4038,15 +4039,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     /* ── View transitions (directional slide) ──────────────── */
 
     @keyframes rm-slide-forward {
-      from { opacity: 0; transform: translateX(48px); }
+      from { opacity: 0; transform: translateX(100%); }
       to   { opacity: 1; transform: translateX(0); }
     }
     @keyframes rm-slide-back {
-      from { opacity: 0; transform: translateX(-48px); }
+      from { opacity: 0; transform: translateX(-100%); }
       to   { opacity: 1; transform: translateX(0); }
     }
-    .rm-body[data-nav="forward"] > * { animation: rm-slide-forward 0.25s cubic-bezier(0.25,0.46,0.45,0.94); }
-    .rm-body[data-nav="back"]    > * { animation: rm-slide-back    0.25s cubic-bezier(0.25,0.46,0.45,0.94); }
+    .rm-body[data-nav="forward"] > * { animation: rm-slide-forward 0.3s cubic-bezier(0.25,0.46,0.45,0.94); }
+    .rm-body[data-nav="back"]    > * { animation: rm-slide-back    0.3s cubic-bezier(0.25,0.46,0.45,0.94); }
 
     /* ── Mobile bottom nav ───────────────── */
 
