@@ -1135,6 +1135,9 @@ class RecipeManagerCard extends LitElement {
   static styles = css`
     :host {
       display: block;
+      height: 100vh;
+      height: calc(var(--vh, 1vh) * 100);
+      max-height: -webkit-fill-available;
       --rm-bg-main:        #fafbfc;
       --rm-bg-surface:     #ffffff;
       --rm-bg-elevated:    #ffffff;
@@ -1158,12 +1161,7 @@ class RecipeManagerCard extends LitElement {
       overflow: hidden;
       display: flex;
       flex-direction: row;
-      height: 100vh;
-      height: 100dvh;
-      max-height: 100vh;
-      max-height: 100dvh;
-      min-height: 100vh;
-      min-height: 100dvh;
+      height: 100%;
       margin: 0;
       color: var(--rm-text);
       position: relative;
