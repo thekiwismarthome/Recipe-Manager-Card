@@ -1048,41 +1048,32 @@ class RecipeManagerCard extends LitElement {
 
   _renderBottomNav() {
     const v = this._view;
-    // Home is always "back" (return to grid); everything else is "forward"
-    const homeBtn = html`
-      <button class="rm-bn-btn ${v === 'grid' ? 'active' : ''}"
-        @click=${() => { this._navDirection = 'back'; this._view = 'grid'; this._selectedRecipe = null; this._mobileMenuOpen = false; }}
-        title="Home">
-        <ha-icon icon="mdi:home"></ha-icon>
-        <span>Home</span>
-      </button>
-    `;
-    const btn = (icon, label, view) => html`
+    const btn = (icon, label, view, clickFn) => html`
       <button class="rm-bn-btn ${v === view ? 'active' : ''}"
-        @click=${() => { this._navDirection = 'forward'; this._view = view; this._selectedRecipe = null; this._mobileMenuOpen = false; }}
+        @click=${clickFn || (() => { this._navDirection = 'forward'; this._view = view; this._selectedRecipe = null; })}
         title="${label}">
         <ha-icon icon="${icon}"></ha-icon>
         <span>${label}</span>
       </button>
     `;
     return html`
-      <div class="rm-bottom-nav">
-        ${homeBtn}
-        ${this._settings.showPlanner ? btn('mdi:calendar-week', 'Planner', 'planner') : ''}
+      <nav class="rm-bottom-nav">
+        ${btn('mdi:home', 'Home', 'grid', () => { this._navDirection = 'back'; this._view = 'grid'; this._selectedRecipe = null; })}
+        ${btn('mdi:cart-outline', 'Shopping', 'shopping')}
         <button class="rm-bn-btn rm-bn-add"
-          @click=${() => { this._navDirection = 'forward'; this._view = 'add'; this._mobileMenuOpen = false; }}
+          @click=${() => { this._navDirection = 'forward'; this._view = 'add'; }}
           title="New Recipe">
           <ha-icon icon="mdi:plus"></ha-icon>
         </button>
+        ${btn('mdi:calendar-week', 'Planner', 'planner')}
         <button class="rm-bn-btn ${v === 'timers' ? 'active' : ''}"
-          @click=${() => { this._navDirection = 'forward'; this._timersPrevView = this._view; this._view = 'timers'; this._mobileMenuOpen = false; }}
+          @click=${() => { this._navDirection = 'forward'; this._timersPrevView = this._view; this._view = 'timers'; }}
           title="Timers">
           <ha-icon icon="mdi:timer-outline"></ha-icon>
           <span>Timers</span>
           ${this._timers.length ? html`<span class="rm-bn-badge">${this._timers.length}</span>` : ''}
         </button>
-        ${btn('mdi:cart-outline', 'Shopping', 'shopping')}
-      </div>
+      </nav>
     `;
   }
 
@@ -1135,9 +1126,7 @@ class RecipeManagerCard extends LitElement {
   static styles = css`
     :host {
       display: block;
-      height: 100vh;
-      height: calc(var(--vh, 1vh) * 100);
-      max-height: -webkit-fill-available;
+      height: 100%;
       --rm-bg-main:        #fafbfc;
       --rm-bg-surface:     #ffffff;
       --rm-bg-elevated:    #ffffff;
@@ -1157,7 +1146,7 @@ class RecipeManagerCard extends LitElement {
 
     ha-card.rm-card {
       background: var(--rm-bg-main);
-      border-radius: var(--rm-radius);
+      border-radius: 0;
       overflow: hidden;
       display: flex;
       flex-direction: row;
@@ -1165,10 +1154,6 @@ class RecipeManagerCard extends LitElement {
       margin: 0;
       color: var(--rm-text);
       position: relative;
-    }
-
-    ha-card.rm-card:not(.rm-wide) {
-      border-radius: 0;
     }
 
     /* ── Sidebar ─────────────────────────────── */
@@ -1695,12 +1680,16 @@ class RecipeManagerCard extends LitElement {
     /* ── Mobile bottom nav ───────────────── */
 
     .rm-bottom-nav {
+      position: sticky;
+      bottom: 0;
       display: flex;
-      align-items: stretch;
-      border-top: 1px solid var(--rm-border);
+      justify-content: space-around;
       background: var(--rm-bg-surface);
+      border-top: 1px solid var(--rm-border);
+      padding: 6px 0;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+      z-index: 10;
       flex-shrink: 0;
-      height: 56px;
     }
 
     .rm-bn-btn {
@@ -1708,18 +1697,18 @@ class RecipeManagerCard extends LitElement {
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
       gap: 2px;
       background: none;
       border: none;
       cursor: pointer;
       color: var(--rm-text-muted);
-      font-size: 9px;
-      font-weight: 600;
-      padding: 6px 2px;
+      font-size: 10px;
+      font-weight: 500;
+      padding: 6px 4px;
       position: relative;
       transition: color 0.15s;
       -webkit-tap-highlight-color: transparent;
+      outline: none;
     }
     .rm-bn-btn ha-icon { --mdc-icon-size: 22px; }
     .rm-bn-btn.active { color: var(--rm-accent); }
@@ -1741,8 +1730,8 @@ class RecipeManagerCard extends LitElement {
 
     .rm-bn-badge {
       position: absolute;
-      top: 3px;
-      right: calc(50% - 18px);
+      top: 2px;
+      right: calc(50% - 20px);
       background: var(--rm-accent);
       color: #fff;
       border-radius: 8px;
