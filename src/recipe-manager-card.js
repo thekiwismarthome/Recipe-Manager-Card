@@ -1159,11 +1159,18 @@ class RecipeManagerCard extends LitElement {
       display: flex;
       flex-direction: row;
       height: 100vh;
+      height: 100dvh;
       max-height: 100vh;
+      max-height: 100dvh;
       min-height: 100vh;
+      min-height: 100dvh;
       margin: 0;
       color: var(--rm-text);
       position: relative;
+    }
+
+    ha-card.rm-card:not(.rm-wide) {
+      border-radius: 0;
     }
 
     /* ── Sidebar ─────────────────────────────── */
