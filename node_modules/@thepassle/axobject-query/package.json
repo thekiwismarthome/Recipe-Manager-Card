@@ -1,0 +1,78 @@
+{
+  "name": "@thepassle/axobject-query",
+  "version": "4.0.0",
+  "description": "Programmatic access to information about the AXObject Model",
+  "main": "./dist/commonjs/index.js",
+  "exports": {
+    ".": {
+      "import": {
+        "source": "./src/index.ts",
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "source": "./src/index.ts",
+        "types": "./dist/commonjs/index.d.ts",
+        "default": "./dist/commonjs/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "tshy": {
+    "exports": {
+      ".": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "prepare": "tshy",
+    "build": "rimraf lib && tsc",
+    "prepublishOnly": "npm run build",
+    "test": "npm run build && npm run jest",
+    "format": "prettier \"**/*.ts\" --write",
+    "test:ci": "npm run jest -- --ci --runInBand",
+    "jest": "node --experimental-vm-modules ./node_modules/.bin/jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thepassle/axobject-query.git"
+  },
+  "keywords": [
+    "accessibility"
+  ],
+  "author": "Jesse Beach <splendidnoise@gmail.com>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/thepassle/axobject-query/issues"
+  },
+  "homepage": "https://github.com/thepassle/axobject-query#readme",
+  "browserslist": [
+    ">0.2%",
+    "not dead",
+    "not op_mini all",
+    "ie 11"
+  ],
+  "dependencies": {
+    "dequal": "^2.0.3"
+  },
+  "devDependencies": {
+    "expect": "^29.7.0",
+    "jest": "^29.2.1",
+    "prettier": "^3.3.2",
+    "rimraf": "^5.0.7",
+    "tshy": "^1.16.2",
+    "typescript": "^5.5.2"
+  },
+  "jest": {
+    "coverageReporters": [
+      "lcov"
+    ],
+    "coverageDirectory": "reports",
+    "roots": [
+      "<rootDir>/__tests__"
+    ]
+  },
+  "types": "./dist/commonjs/index.d.ts",
+  "type": "module"
+}
