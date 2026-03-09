@@ -21,16 +21,16 @@ const RECENT_RECIPES_KEY = 'rm_recent_recipes';
 const TIMERS_KEY = 'rm_timers';
 
 const DEFAULT_SETTINGS = {
-  theme:             'soft',
-  darkMode:          'system',
-  fontSize:          'medium',
-  columns:           3,
-  showFavourites:    true,
-  showPlanner:       true,
-  recentCount:       12,
-  timerSound:        'beep',
-  keepScreenOn:      false,
-  keepScreenOnMins:  30,
+  theme: 'soft',
+  darkMode: 'system',
+  fontSize: 'medium',
+  columns: 3,
+  showFavourites: true,
+  showPlanner: true,
+  recentCount: 12,
+  timerSound: 'beep',
+  keepScreenOn: false,
+  keepScreenOnMins: 30,
   showUnitConversion: false,
 };
 
@@ -42,92 +42,92 @@ const THEME_VARS = {
   // Adaptive (light/dark)
   soft: {
     light: {
-      '--rm-bg-main':        '#fafbfc', '--rm-bg-surface':     '#ffffff',
-      '--rm-bg-elevated':    '#ffffff', '--rm-text':           '#424242',
-      '--rm-text-secondary': '#757575', '--rm-text-muted':     '#9e9e9e',
-      '--rm-accent':         '#9fa8da', '--rm-accent-soft':    'rgba(159,168,218,0.15)',
-      '--rm-border':         '#e8eaf6', '--rm-shadow':         '0 2px 6px rgba(0,0,0,0.08)',
+      '--rm-bg-main': '#fafbfc', '--rm-bg-surface': '#ffffff',
+      '--rm-bg-elevated': '#ffffff', '--rm-text': '#424242',
+      '--rm-text-secondary': '#757575', '--rm-text-muted': '#9e9e9e',
+      '--rm-accent': '#9fa8da', '--rm-accent-soft': 'rgba(159,168,218,0.15)',
+      '--rm-border': '#e8eaf6', '--rm-shadow': '0 2px 6px rgba(0,0,0,0.08)',
     },
     dark: {
-      '--rm-bg-main':        '#14161a', '--rm-bg-surface':     '#1b1f25',
-      '--rm-bg-elevated':    '#232833', '--rm-text':           '#e4e7ec',
-      '--rm-text-secondary': '#a8b0bd', '--rm-text-muted':     '#7a8594',
-      '--rm-accent':         '#9fa8da', '--rm-accent-soft':    'rgba(159,168,218,0.18)',
-      '--rm-border':         '#2b313c', '--rm-shadow':         '0 2px 6px rgba(0,0,0,0.3)',
+      '--rm-bg-main': '#14161a', '--rm-bg-surface': '#1b1f25',
+      '--rm-bg-elevated': '#232833', '--rm-text': '#e4e7ec',
+      '--rm-text-secondary': '#a8b0bd', '--rm-text-muted': '#7a8594',
+      '--rm-accent': '#9fa8da', '--rm-accent-soft': 'rgba(159,168,218,0.18)',
+      '--rm-border': '#2b313c', '--rm-shadow': '0 2px 6px rgba(0,0,0,0.3)',
     },
   },
 
   // Light-only
   arctic: {
     light: {
-      '--rm-bg-main':        '#f0f4f8', '--rm-bg-surface':     '#ffffff',
-      '--rm-bg-elevated':    '#ffffff', '--rm-text':           '#1a2332',
-      '--rm-text-secondary': '#526070', '--rm-text-muted':     '#8097aa',
-      '--rm-accent':         '#2979ff', '--rm-accent-soft':    'rgba(41,121,255,0.12)',
-      '--rm-border':         '#dce6f0', '--rm-shadow':         '0 2px 6px rgba(26,35,50,0.1)',
+      '--rm-bg-main': '#f0f4f8', '--rm-bg-surface': '#ffffff',
+      '--rm-bg-elevated': '#ffffff', '--rm-text': '#1a2332',
+      '--rm-text-secondary': '#526070', '--rm-text-muted': '#8097aa',
+      '--rm-accent': '#2979ff', '--rm-accent-soft': 'rgba(41,121,255,0.12)',
+      '--rm-border': '#dce6f0', '--rm-shadow': '0 2px 6px rgba(26,35,50,0.1)',
     },
   },
   meadow: {
     light: {
-      '--rm-bg-main':        '#f4f7f0', '--rm-bg-surface':     '#fefffe',
-      '--rm-bg-elevated':    '#fefffe', '--rm-text':           '#2d3a2a',
-      '--rm-text-secondary': '#6b7c64', '--rm-text-muted':     '#96a98e',
-      '--rm-accent':         '#4caf50', '--rm-accent-soft':    'rgba(76,175,80,0.12)',
-      '--rm-border':         '#dde8d8', '--rm-shadow':         '0 2px 6px rgba(45,58,42,0.1)',
+      '--rm-bg-main': '#f4f7f0', '--rm-bg-surface': '#fefffe',
+      '--rm-bg-elevated': '#fefffe', '--rm-text': '#2d3a2a',
+      '--rm-text-secondary': '#6b7c64', '--rm-text-muted': '#96a98e',
+      '--rm-accent': '#4caf50', '--rm-accent-soft': 'rgba(76,175,80,0.12)',
+      '--rm-border': '#dde8d8', '--rm-shadow': '0 2px 6px rgba(45,58,42,0.1)',
     },
   },
   blossom: {
     light: {
-      '--rm-bg-main':        '#fdf8fb', '--rm-bg-surface':     '#ffffff',
-      '--rm-bg-elevated':    '#fff8fc', '--rm-text':           '#3d1f35',
-      '--rm-text-secondary': '#8c5e79', '--rm-text-muted':     '#b48fa5',
-      '--rm-accent':         '#c2668a', '--rm-accent-soft':    'rgba(194,102,138,0.12)',
-      '--rm-border':         '#f0d6e8', '--rm-shadow':         '0 2px 6px rgba(61,31,53,0.1)',
+      '--rm-bg-main': '#fdf8fb', '--rm-bg-surface': '#ffffff',
+      '--rm-bg-elevated': '#fff8fc', '--rm-text': '#3d1f35',
+      '--rm-text-secondary': '#8c5e79', '--rm-text-muted': '#b48fa5',
+      '--rm-accent': '#c2668a', '--rm-accent-soft': 'rgba(194,102,138,0.12)',
+      '--rm-border': '#f0d6e8', '--rm-shadow': '0 2px 6px rgba(61,31,53,0.1)',
     },
     dark: {
-      '--rm-bg-main':        '#1a0d12', '--rm-bg-surface':     '#241420',
-      '--rm-bg-elevated':    '#2e1a28', '--rm-text':           '#f8d0de',
-      '--rm-text-secondary': '#c070a0', '--rm-text-muted':     '#603050',
-      '--rm-accent':         '#f48fb1', '--rm-accent-soft':    'rgba(244,143,177,0.15)',
-      '--rm-border':         'rgba(248,208,222,0.08)', '--rm-shadow': '0 2px 8px rgba(0,0,0,0.4)',
+      '--rm-bg-main': '#1a0d12', '--rm-bg-surface': '#241420',
+      '--rm-bg-elevated': '#2e1a28', '--rm-text': '#f8d0de',
+      '--rm-text-secondary': '#c070a0', '--rm-text-muted': '#603050',
+      '--rm-accent': '#f48fb1', '--rm-accent-soft': 'rgba(244,143,177,0.15)',
+      '--rm-border': 'rgba(248,208,222,0.08)', '--rm-shadow': '0 2px 8px rgba(0,0,0,0.4)',
     },
   },
   ocean: {
     light: {
-      '--rm-bg-main':        '#f0f7ff', '--rm-bg-surface':     '#ffffff',
-      '--rm-bg-elevated':    '#f9fbff', '--rm-text':           '#1a3a5f',
-      '--rm-text-secondary': '#4a6b8c', '--rm-text-muted':     '#7a9bbd',
-      '--rm-accent':         '#0077ff', '--rm-accent-soft':    'rgba(0,119,255,0.12)',
-      '--rm-border':         '#d0e1f2', '--rm-shadow':         '0 2px 6px rgba(26,58,95,0.1)',
+      '--rm-bg-main': '#f0f7ff', '--rm-bg-surface': '#ffffff',
+      '--rm-bg-elevated': '#f9fbff', '--rm-text': '#1a3a5f',
+      '--rm-text-secondary': '#4a6b8c', '--rm-text-muted': '#7a9bbd',
+      '--rm-accent': '#0077ff', '--rm-accent-soft': 'rgba(0,119,255,0.12)',
+      '--rm-border': '#d0e1f2', '--rm-shadow': '0 2px 6px rgba(26,58,95,0.1)',
     },
   },
 
   // Dark-only
   midnight: {
     dark: {
-      '--rm-bg-main':        '#0d1117', '--rm-bg-surface':     '#161b22',
-      '--rm-bg-elevated':    '#1c2333', '--rm-text':           '#c9d1d9',
-      '--rm-text-secondary': '#8b949e', '--rm-text-muted':     '#6e7681',
-      '--rm-accent':         '#58a6ff', '--rm-accent-soft':    'rgba(88,166,255,0.15)',
-      '--rm-border':         '#21262d', '--rm-shadow':         '0 2px 8px rgba(0,0,0,0.5)',
+      '--rm-bg-main': '#0d1117', '--rm-bg-surface': '#161b22',
+      '--rm-bg-elevated': '#1c2333', '--rm-text': '#c9d1d9',
+      '--rm-text-secondary': '#8b949e', '--rm-text-muted': '#6e7681',
+      '--rm-accent': '#58a6ff', '--rm-accent-soft': 'rgba(88,166,255,0.15)',
+      '--rm-border': '#21262d', '--rm-shadow': '0 2px 8px rgba(0,0,0,0.5)',
     },
   },
   ember: {
     dark: {
-      '--rm-bg-main':        '#111111', '--rm-bg-surface':     '#1c1a17',
-      '--rm-bg-elevated':    '#242018', '--rm-text':           '#f5f0e8',
-      '--rm-text-secondary': '#a89880', '--rm-text-muted':     '#7a6a55',
-      '--rm-accent':         '#f0a500', '--rm-accent-soft':    'rgba(240,165,0,0.15)',
-      '--rm-border':         'rgba(245,240,232,0.08)', '--rm-shadow': '0 2px 8px rgba(0,0,0,0.5)',
+      '--rm-bg-main': '#111111', '--rm-bg-surface': '#1c1a17',
+      '--rm-bg-elevated': '#242018', '--rm-text': '#f5f0e8',
+      '--rm-text-secondary': '#a89880', '--rm-text-muted': '#7a6a55',
+      '--rm-accent': '#f0a500', '--rm-accent-soft': 'rgba(240,165,0,0.15)',
+      '--rm-border': 'rgba(245,240,232,0.08)', '--rm-shadow': '0 2px 8px rgba(0,0,0,0.5)',
     },
   },
   neon: {
     dark: {
-      '--rm-bg-main':        '#0a0b10', '--rm-bg-surface':     '#121420',
-      '--rm-bg-elevated':    '#1a1d2e', '--rm-text':           '#e0e0f0',
-      '--rm-text-secondary': '#a0a5c0', '--rm-text-muted':     '#6a6f8e',
-      '--rm-accent':         '#bb86fc', '--rm-accent-soft':    'rgba(187,134,252,0.15)',
-      '--rm-border':         '#2a2d45', '--rm-shadow':         '0 2px 8px rgba(0,0,0,0.6)',
+      '--rm-bg-main': '#0a0b10', '--rm-bg-surface': '#121420',
+      '--rm-bg-elevated': '#1a1d2e', '--rm-text': '#e0e0f0',
+      '--rm-text-secondary': '#a0a5c0', '--rm-text-muted': '#6a6f8e',
+      '--rm-accent': '#bb86fc', '--rm-accent-soft': 'rgba(187,134,252,0.15)',
+      '--rm-border': '#2a2d45', '--rm-shadow': '0 2px 8px rgba(0,0,0,0.6)',
     },
   },
 };
@@ -234,33 +234,33 @@ function playTimerSound(type) {
 
 class RecipeManagerCard extends LitElement {
   static properties = {
-    hass:                 { type: Object },
-    _config:              { type: Object },
-    _view:                { type: String },
-    _recipes:             { type: Array },
-    _tags:                { type: Array },
-    _selectedRecipe:      { type: Object },
-    _loading:             { type: Boolean },
-    _error:               { type: String },
-    _searchQuery:         { type: String },
-    _activeTag:           { type: String },
-    _shoppingLists:       { type: Array },
-    _slmAvailable:        { type: Boolean },
-    _localShoppingItems:  { type: Array },
-    _settings:            { type: Object },
-    _wide:                { type: Boolean },
-    _sidebarCollapsed:    { type: Boolean },
-    _gridScrollPos:       { type: Number },
-    _recentRecipeIds:     { type: Array },
-    _timers:              { type: Array },
-    _timerAlarm:          { type: Object },
-    _timerAlarmQueue:     { type: Array },
-    _timersPrevView:      { type: String },
-    _customTimerInput:    { type: String },
-    _hdrStarHover:        { type: Number },
-    _mobileMenuOpen:      { type: Boolean },
-    _navDirection:        { type: String },
-    _closingDetail:       { type: Boolean },
+    hass: { type: Object },
+    _config: { type: Object },
+    _view: { type: String },
+    _recipes: { type: Array },
+    _tags: { type: Array },
+    _selectedRecipe: { type: Object },
+    _loading: { type: Boolean },
+    _error: { type: String },
+    _searchQuery: { type: String },
+    _activeTag: { type: String },
+    _shoppingLists: { type: Array },
+    _slmAvailable: { type: Boolean },
+    _localShoppingItems: { type: Array },
+    _settings: { type: Object },
+    _wide: { type: Boolean },
+    _sidebarCollapsed: { type: Boolean },
+    _gridScrollPos: { type: Number },
+    _recentRecipeIds: { type: Array },
+    _timers: { type: Array },
+    _timerAlarm: { type: Object },
+    _timerAlarmQueue: { type: Array },
+    _timersPrevView: { type: String },
+    _customTimerInput: { type: String },
+    _hdrStarHover: { type: Number },
+    _mobileMenuOpen: { type: Boolean },
+    _navDirection: { type: String },
+    _closingDetail: { type: Boolean },
   };
 
   constructor() {
@@ -558,7 +558,7 @@ class RecipeManagerCard extends LitElement {
         this._alarmAudio.onerror = () => {
           if (this._alarmLoopActive) this._alarmTimeout = setTimeout(() => playTimerSound('beep'), 2000);
         };
-        this._alarmAudio.play().catch(() => {});
+        this._alarmAudio.play().catch(() => { });
       };
       playNext();
     } else {
@@ -586,8 +586,8 @@ class RecipeManagerCard extends LitElement {
 
   // -- Event handlers -------------------------------------------------------
 
-  _handleSearch(e)     { this._searchQuery = e.detail?.query ?? ''; }
-  _handleTagFilter(e)  { const t = e.detail?.tag; this._activeTag = this._activeTag === t ? null : t; }
+  _handleSearch(e) { this._searchQuery = e.detail?.query ?? ''; }
+  _handleTagFilter(e) { const t = e.detail?.tag; this._activeTag = this._activeTag === t ? null : t; }
 
   _handleBack() {
     if (this._closingDetail) return;
@@ -614,7 +614,7 @@ class RecipeManagerCard extends LitElement {
     }
   }
 
-  _handleShowGrid()    { this._navDirection = 'back'; this._view = 'grid'; this._selectedRecipe = null; }
+  _handleShowGrid() { this._navDirection = 'back'; this._view = 'grid'; this._selectedRecipe = null; }
   _handleShowPlanner() { this._navDirection = 'forward'; this._view = 'planner'; }
 
   _handleOpenRecipe(e) {
@@ -706,7 +706,7 @@ class RecipeManagerCard extends LitElement {
       <div class="header-stars"
         @mouseleave=${() => { this._hdrStarHover = 0; }}
         title="${hover > 0 ? `Set rating: ${hover}★` : r > 0 ? `Rating: ${r}★ — click to change` : 'Click to rate'}">
-        ${[1,2,3,4,5].map(n => html`
+        ${[1, 2, 3, 4, 5].map(n => html`
           <span class="hdr-star ${n <= display ? 'filled' : ''}"
             @mouseover=${() => { this._hdrStarHover = n; }}
             @click=${() => this._handleRateRecipe(n)}>★</span>
@@ -789,8 +789,8 @@ class RecipeManagerCard extends LitElement {
           ${navItem('mdi:home', 'Home', 'grid')}
           ${navItem('mdi:cart-outline', 'Shopping List', 'shopping')}
           ${this._settings.showPlanner
-            ? navItem('mdi:calendar-week', 'Meal Planner', 'planner')
-            : ''}
+        ? navItem('mdi:calendar-week', 'Meal Planner', 'planner')
+        : ''}
           ${navItem('mdi:book-open-variant', 'Cookbook', 'cookbook', true)}
           <button
             class="sb-item ${v === 'timers' ? 'active' : ''}"
@@ -827,13 +827,13 @@ class RecipeManagerCard extends LitElement {
     const wide = this._wide;
 
     const title =
-      inSettings  ? 'Settings'
-      : inAdd     ? 'New Recipe'
-      : inTimers  ? 'Timers'
-      : inDetail  ? this._selectedRecipe.name
-      : this._view === 'planner'  ? 'Meal Planner'
-      : this._view === 'shopping' ? 'Shopping List'
-      :                             'Recipes';
+      inSettings ? 'Settings'
+        : inAdd ? 'New Recipe'
+          : inTimers ? 'Timers'
+            : inDetail ? this._selectedRecipe.name
+              : this._view === 'planner' ? 'Meal Planner'
+                : this._view === 'shopping' ? 'Shopping List'
+                  : 'Recipes';
 
     return html`
       <div class="rm-header">
@@ -1036,18 +1036,18 @@ class RecipeManagerCard extends LitElement {
               .value=${this._customTimerInput}
               @input=${e => { this._customTimerInput = e.target.value; }}
               @keydown=${e => {
-                if (e.key === 'Enter' && hasCustom) {
-                  this._startTimer(parseInt(this._customTimerInput) * 60, `${this._customTimerInput} min timer`);
-                  this._customTimerInput = '';
-                }
-              }}
+        if (e.key === 'Enter' && hasCustom) {
+          this._startTimer(parseInt(this._customTimerInput) * 60, `${this._customTimerInput} min timer`);
+          this._customTimerInput = '';
+        }
+      }}
             />
             <button class="action-btn primary"
               ?disabled=${!hasCustom}
               @click=${() => {
-                this._startTimer(parseInt(this._customTimerInput) * 60, `${this._customTimerInput} min timer`);
-                this._customTimerInput = '';
-              }}>
+        this._startTimer(parseInt(this._customTimerInput) * 60, `${this._customTimerInput} min timer`);
+        this._customTimerInput = '';
+      }}>
               Start
             </button>
           </div>
@@ -1069,10 +1069,10 @@ class RecipeManagerCard extends LitElement {
             <button class="alarm-btn" @click=${() => this._addTimeToTimer(alarm.id, 300)}>+5 min</button>
             <button class="alarm-btn" @click=${() => this._addTimeToTimer(alarm.id, 600)}>+10 min</button>
             <button class="alarm-btn accent" @click=${() => {
-              const mins = parseInt(prompt('Add how many minutes?') || '0');
-              if (mins > 0) this._addTimeToTimer(alarm.id, mins * 60);
-              else this._dismissAlarm();
-            }}>Custom</button>
+        const mins = parseInt(prompt('Add how many minutes?') || '0');
+        if (mins > 0) this._addTimeToTimer(alarm.id, mins * 60);
+        else this._dismissAlarm();
+      }}>Custom</button>
             <button class="alarm-btn stop" @click=${this._dismissAlarm}>Stop</button>
           </div>
         </div>
@@ -1180,6 +1180,16 @@ class RecipeManagerCard extends LitElement {
       font-size: var(--rm-font-size-base);
     }
 
+    ha-card {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      margin: 0;
+      overflow: hidden;
+      position: relative;
+      background: var(--rm-bg-surface);
+    }
     ha-card.rm-card {
       background: var(--rm-bg-main);
       border-radius: 0;
@@ -1847,7 +1857,7 @@ class RecipeManagerCard extends LitElement {
   `;
 }
 
-try { customElements.define('recipe-manager-card', RecipeManagerCard); } catch {}
+try { customElements.define('recipe-manager-card', RecipeManagerCard); } catch { }
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'recipe-manager-card',
