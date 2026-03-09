@@ -305,6 +305,15 @@ class RecipeManagerCard extends LitElement {
   static getStubConfig() { return {}; }
   getCardSize() { return 6; }
 
+  _updateHeight() {
+    const vp = window.visualViewport;
+    const vpH = vp ? vp.height : window.innerHeight;
+    const headerH = parseInt(
+      getComputedStyle(document.documentElement).getPropertyValue('--header-height') || '0'
+    ) || 0;
+    this.style.height = `${vpH - headerH}px`;
+  }
+
   connectedCallback() {
     super.connectedCallback();
     this._darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -313,8 +322,13 @@ class RecipeManagerCard extends LitElement {
     this._resizeObserver = new ResizeObserver(entries => {
       const w = entries[0]?.contentRect?.width ?? 0;
       this._wide = w >= 620;
+      this._updateHeight();
     });
     this._resizeObserver.observe(this);
+    this._onViewportResize = () => this._updateHeight();
+    window.visualViewport?.addEventListener('resize', this._onViewportResize);
+    window.addEventListener('resize', this._onViewportResize);
+    this._updateHeight();
     this._timerTick = setInterval(() => this._tickTimers(), 1000);
   }
 
@@ -323,6 +337,8 @@ class RecipeManagerCard extends LitElement {
     if (this._unsubscribe) { this._unsubscribe(); this._unsubscribe = null; }
     this._darkModeQuery?.removeEventListener('change', this._onSystemDark);
     this._resizeObserver?.disconnect();
+    window.visualViewport?.removeEventListener('resize', this._onViewportResize);
+    window.removeEventListener('resize', this._onViewportResize);
     if (this._timerTick) { clearInterval(this._timerTick); this._timerTick = null; }
     if (this._timerAlarm) { this._stopAlarmLoop(); this._timerAlarm = null; }
     this._timerAlarmQueue = [];
