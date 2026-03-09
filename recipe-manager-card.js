@@ -3525,7 +3525,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     `}static styles=a`
     :host {
       display: block;
-      height: 100%;
+      height: 100vh;
+      height: calc(var(--vh, 1vh) * 100);
+      max-height: -webkit-fill-available;
       --rm-bg-main:        #fafbfc;
       --rm-bg-surface:     #ffffff;
       --rm-bg-elevated:    #ffffff;
