@@ -1,8 +1,8 @@
 {
   "name": "recipe-manager-card",
   "version": "1.0.0",
-  "description": "Recipe Manager Lovelace card for Home Assistant",
-  "main": "dist/recipe-manager-card.js",
+  "description": "A recipe management card for Home Assistant",
+  "private": true,
   "type": "module",
   "scripts": {
     "build": "rollup -c",
