@@ -41,10 +41,16 @@ class RmRecipeGrid extends LitElement {
     this._sortByRating = false;
     this._showRatingMenu = false;
     this._lastScrollPos = 0;
+    this._hasRestoredScroll = false;
   }
 
   updated(changedProps) {
-    if (changedProps.has('scrollPos') && this.scrollPos != null) {
+    if (changedProps.has('scrollPos')) {
+      // New target position — allow a single restore
+      this._hasRestoredScroll = false;
+    }
+    if (this.scrollPos != null && !this._hasRestoredScroll) {
+      this._hasRestoredScroll = true;
       this.updateComplete.then(() => {
         requestAnimationFrame(() => {
           const el = this.shadowRoot?.querySelector('.grid-scroll');

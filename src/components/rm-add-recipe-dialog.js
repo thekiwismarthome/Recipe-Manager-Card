@@ -234,6 +234,7 @@ class RmAddRecipeDialog extends LitElement {
         bubbles: true,
         composed: true,
       }));
+      this._form = this._emptyForm();
     } finally {
       this._saving = false;
     }

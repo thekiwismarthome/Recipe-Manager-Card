@@ -67,11 +67,11 @@ class RmSettingsView extends LitElement {
           <select class="theme-select" @change=${e => this._update({ theme: e.target.value })}>
             <optgroup label="Adaptive">
               <option value="soft"     ?selected=${s.theme === 'soft' || !s.theme}>🎨 Soft Pastel</option>
+              <option value="blossom"  ?selected=${s.theme === 'blossom' }>🌸 Blossom</option>
             </optgroup>
             <optgroup label="Light Themes">
               <option value="arctic"   ?selected=${s.theme === 'arctic'  }>🧊 Arctic</option>
               <option value="meadow"   ?selected=${s.theme === 'meadow'  }>🌿 Meadow</option>
-              <option value="blossom"  ?selected=${s.theme === 'blossom' }>🌸 Blossom</option>
               <option value="ocean"    ?selected=${s.theme === 'ocean'   }>🌊 Ocean Blue</option>
             </optgroup>
             <optgroup label="Dark Themes">

@@ -82,7 +82,6 @@ class RmRecipeDetail extends LitElement {
     _shoppingResult:     { type: String },
     _confirmDelete:      { type: Boolean },
     _downloading:        { type: Boolean },
-    _hoverRating:        { type: Number },
     _photoUrlInput:      { type: String },
     _addingPhotoUrl:     { type: Boolean },
     _metricMode:         { type: Boolean },
@@ -108,7 +107,6 @@ class RmRecipeDetail extends LitElement {
     this._shoppingResult = null;
     this._confirmDelete = false;
     this._downloading = false;
-    this._hoverRating = 0;
     this._photoUrlInput = '';
     this._addingPhotoUrl = false;
     this._metricMode = false;

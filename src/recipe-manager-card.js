@@ -254,6 +254,7 @@ class RecipeManagerCard extends LitElement {
     _recentRecipeIds:     { type: Array },
     _timers:              { type: Array },
     _timerAlarm:          { type: Object },
+    _timerAlarmQueue:     { type: Array },
     _timersPrevView:      { type: String },
     _customTimerInput:    { type: String },
     _hdrStarHover:        { type: Number },
@@ -282,6 +283,7 @@ class RecipeManagerCard extends LitElement {
     this._recentRecipeIds = loadRecentRecipes();
     this._timers = loadTimers();
     this._timerAlarm = null;
+    this._timerAlarmQueue = [];
     this._timersPrevView = null;
     this._customTimerInput = '';
     this._hdrStarHover = 0;
@@ -323,6 +325,7 @@ class RecipeManagerCard extends LitElement {
     this._resizeObserver?.disconnect();
     if (this._timerTick) { clearInterval(this._timerTick); this._timerTick = null; }
     if (this._timerAlarm) { this._stopAlarmLoop(); this._timerAlarm = null; }
+    this._timerAlarmQueue = [];
     saveTimers(this._timers);
   }
 
@@ -453,13 +456,13 @@ class RecipeManagerCard extends LitElement {
   _tickTimers() {
     if (!this._timers.length) return;
     let changed = false;
-    let alarm = null;
+    const newAlarms = [];
     const updated = this._timers.map(t => {
       if (!t.running || t.remaining <= 0) return t;
       const newRemaining = t.remaining - 1;
       changed = true;
-      if (newRemaining <= 0 && !alarm) {
-        alarm = { id: t.id, label: t.label };
+      if (newRemaining <= 0) {
+        newAlarms.push({ id: t.id, label: t.label });
       }
       return { ...t, remaining: newRemaining, running: newRemaining > 0 };
     });
@@ -467,9 +470,14 @@ class RecipeManagerCard extends LitElement {
       this._timers = updated;
       saveTimers(this._timers);
     }
-    if (alarm && !this._timerAlarm) {
-      this._timerAlarm = alarm;
-      this._startAlarmLoop(this._settings.timerSound ?? 'beep', this._settings.timerSoundFile);
+    if (newAlarms.length) {
+      if (!this._timerAlarm) {
+        this._timerAlarm = newAlarms.shift();
+        this._startAlarmLoop(this._settings.timerSound ?? 'beep', this._settings.timerSoundFile);
+      }
+      if (newAlarms.length) {
+        this._timerAlarmQueue = [...this._timerAlarmQueue, ...newAlarms];
+      }
     }
   }
 
@@ -499,7 +507,13 @@ class RecipeManagerCard extends LitElement {
     this._timers = this._timers.map(t =>
       t.id === id ? { ...t, remaining: t.remaining + seconds, total: t.total + seconds, running: true } : t
     );
-    if (this._timerAlarm?.id === id) { this._stopAlarmLoop(); this._timerAlarm = null; }
+    if (this._timerAlarm?.id === id) {
+      this._stopAlarmLoop();
+      this._timerAlarm = this._timerAlarmQueue.length ? this._timerAlarmQueue.shift() : null;
+      if (this._timerAlarm) this._startAlarmLoop(this._settings.timerSound ?? 'beep', this._settings.timerSoundFile);
+    } else {
+      this._timerAlarmQueue = this._timerAlarmQueue.filter(a => a.id !== id);
+    }
     saveTimers(this._timers);
   }
 
@@ -507,7 +521,8 @@ class RecipeManagerCard extends LitElement {
     if (this._timerAlarm) {
       this._stopAlarmLoop();
       this._stopTimer(this._timerAlarm.id);
-      this._timerAlarm = null;
+      this._timerAlarm = this._timerAlarmQueue.length ? this._timerAlarmQueue.shift() : null;
+      if (this._timerAlarm) this._startAlarmLoop(this._settings.timerSound ?? 'beep', this._settings.timerSoundFile);
     }
   }
 
@@ -557,6 +572,7 @@ class RecipeManagerCard extends LitElement {
   _handleTagFilter(e)  { const t = e.detail?.tag; this._activeTag = this._activeTag === t ? null : t; }
 
   _handleBack() {
+    if (this._closingDetail) return;
     if (this._view === 'detail' && this._selectedRecipe && !this._closingDetail) {
       // Set _view to grid immediately so the track CSS class is removed and
       // the transition plays in reverse. Keep _closingDetail=true so the
@@ -1037,7 +1053,7 @@ class RecipeManagerCard extends LitElement {
             <button class="alarm-btn accent" @click=${() => {
               const mins = parseInt(prompt('Add how many minutes?') || '0');
               if (mins > 0) this._addTimeToTimer(alarm.id, mins * 60);
-              else this._timerAlarm = null;
+              else this._dismissAlarm();
             }}>Custom</button>
             <button class="alarm-btn stop" @click=${this._dismissAlarm}>Stop</button>
           </div>
