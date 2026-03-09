@@ -306,12 +306,12 @@ class RecipeManagerCard extends LitElement {
   getCardSize() { return 6; }
 
   _updateHeight() {
-    const vp = window.visualViewport;
-    const vpH = vp ? vp.height : window.innerHeight;
-    const headerH = parseInt(
-      getComputedStyle(document.documentElement).getPropertyValue('--header-height') || '0'
-    ) || 0;
-    this.style.height = `${vpH - headerH}px`;
+    // Deferred to after layout so getBoundingClientRect().top is accurate.
+    requestAnimationFrame(() => {
+      const top = this.getBoundingClientRect().top;
+      const available = window.innerHeight - Math.max(top, 0);
+      if (available > 100) this.style.height = `${available}px`;
+    });
   }
 
   connectedCallback() {
@@ -322,7 +322,8 @@ class RecipeManagerCard extends LitElement {
     this._resizeObserver = new ResizeObserver(entries => {
       const w = entries[0]?.contentRect?.width ?? 0;
       this._wide = w >= 620;
-      this._updateHeight();
+      // Height is only updated on window/visualViewport resize to avoid
+      // a feedback loop (changing style.height triggers the observer again).
     });
     this._resizeObserver.observe(this);
     this._onViewportResize = () => this._updateHeight();
