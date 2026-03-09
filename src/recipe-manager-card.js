@@ -306,12 +306,13 @@ class RecipeManagerCard extends LitElement {
   getCardSize() { return 6; }
 
   _updateHeight() {
-    // Deferred to after layout so getBoundingClientRect().top is accurate.
-    requestAnimationFrame(() => {
+    // Double RAF: first frame lets HA's layout engine position the card,
+    // second frame reads the accurate getBoundingClientRect().top.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
       const top = this.getBoundingClientRect().top;
       const available = window.innerHeight - Math.max(top, 0);
       if (available > 100) this.style.height = `${available}px`;
-    });
+    }));
   }
 
   connectedCallback() {
@@ -1715,8 +1716,6 @@ class RecipeManagerCard extends LitElement {
     /* ── Mobile bottom nav ───────────────── */
 
     .rm-bottom-nav {
-      position: sticky;
-      bottom: 0;
       display: flex;
       justify-content: space-around;
       background: var(--rm-bg-surface);
