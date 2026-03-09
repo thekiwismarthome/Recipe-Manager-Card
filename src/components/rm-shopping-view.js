@@ -8,12 +8,12 @@ import { LitElement, html, css } from 'lit';
 
 class RmShoppingView extends LitElement {
   static properties = {
-    hass:          { type: Object },
-    slmAvailable:  { type: Boolean },
+    hass: { type: Object },
+    slmAvailable: { type: Boolean },
     shoppingLists: { type: Array },
-    api:           { type: Object },
-    localItems:    { type: Array },
-    settings:      { type: Object },
+    api: { type: Object },
+    localItems: { type: Array },
+    settings: { type: Object },
   };
 
   constructor() {
@@ -379,4 +379,4 @@ class RmShoppingView extends LitElement {
   `;
 }
 
-try { customElements.define('rm-shopping-view', RmShoppingView); } catch {}
+try { customElements.define('rm-shopping-view', RmShoppingView); } catch { }
