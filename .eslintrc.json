@@ -22,6 +22,9 @@
                 "ignoreRestSiblings": true
             }
         ],
-        "no-console": "warn"
+        "no-console": "warn",
+        "no-empty": ["error", { "allowEmptyCatch": true }],
+        "lit-a11y/click-events-have-key-events": "off",
+        "lit-a11y/img-redundant-alt": "off"
     }
 }

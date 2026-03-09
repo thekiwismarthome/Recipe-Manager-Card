@@ -8,6 +8,8 @@
     "lint": "eslint src/**/*.js",
     "lint:fix": "eslint src/**/*.js --fix",
     "prebuild": "npm run lint",
+    "build": "rollup -c",
+    "postbuild": "cp recipe-manager-card.js ../Recipe-Manager/custom_components/recipe_manager/www/recipe-manager-card.js",
     "watch": "rollup -c -w"
   },
   "dependencies": {
