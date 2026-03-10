@@ -35,6 +35,19 @@ function parseTimeToSeconds(text) {
   return total || 0;
 }
 
+// Daily Reference Values (FDA / EU)
+const RDA = {
+  calories:      { label: 'Calories',         val: 2000, unit: 'kcal' },
+  fat:           { label: 'Total Fat',         val: 65,   unit: 'g'    },
+  saturated_fat: { label: 'Saturated Fat',     val: 20,   unit: 'g'    },
+  cholesterol:   { label: 'Cholesterol',       val: 300,  unit: 'mg'   },
+  sodium:        { label: 'Sodium',            val: 2300, unit: 'mg'   },
+  carbohydrates: { label: 'Total Carbohydrate',val: 300,  unit: 'g'    },
+  fiber:         { label: 'Dietary Fiber',     val: 28,   unit: 'g'    },
+  sugar:         { label: 'Added Sugars',      val: 50,   unit: 'g'    },
+  protein:       { label: 'Protein',           val: 50,   unit: 'g'    },
+};
+
 // Imperial → metric conversion factors
 const IMPERIAL_TO_METRIC = {
   'oz':     { factor: 28.3495, to: 'g',  toFull: 'g'  },
@@ -88,8 +101,9 @@ class RmRecipeDetail extends LitElement {
     _metricMode:         { type: Boolean },
     _wakeActive:         { type: Boolean },
     _completedSteps:     { type: Object },  // Set of completed step indices
-    _editIngInput:       { type: String },
-    _editStepInput:      { type: String },
+    _editIngInput:        { type: String },
+    _editStepInput:       { type: String },
+    _nutritionExpanded:   { type: Boolean },
   };
 
   constructor() {
@@ -118,6 +132,7 @@ class RmRecipeDetail extends LitElement {
     this._completedSteps = new Set();
     this._editIngInput = '';
     this._editStepInput = '';
+    this._nutritionExpanded = false;
     this._wakeLockSentinel = null;
     this._wakeLockTimeout = null;
   }
@@ -407,8 +422,10 @@ class RmRecipeDetail extends LitElement {
   // -- Timer helpers ----------------------------------------------------------
 
   _fireTimer(seconds, label) {
+    const recipeName = this.recipe?.name;
+    const fullLabel = recipeName ? `${recipeName} — ${label}` : label;
     this.dispatchEvent(new CustomEvent('rm-start-timer', {
-      detail: { seconds, label },
+      detail: { seconds, label: fullLabel },
       bubbles: true,
       composed: true,
     }));
@@ -501,14 +518,12 @@ class RmRecipeDetail extends LitElement {
     const courses    = r.courses    || [];
     const categories = r.categories || [];
     const collections= r.collections|| [];
-    const tags       = r.tags       || [];
-    if (!courses.length && !categories.length && !collections.length && !tags.length) return '';
+    if (!courses.length && !categories.length && !collections.length) return '';
     return html`
       <div class="chips-area">
-        ${courses.map(t     => html`<button class="chip chip-course chip-nav"    @click=${() => this._handleChipNav('courses', t)}    title="Filter by course: ${t}">Course: ${t}</button>`)}
-        ${categories.map(t  => html`<button class="chip chip-category chip-nav"  @click=${() => this._handleChipNav('categories', t)} title="Filter by category: ${t}">Category: ${t}</button>`)}
+        ${courses.map(t     => html`<button class="chip chip-course chip-nav"     @click=${() => this._handleChipNav('courses', t)}     title="Filter by course: ${t}">Course: ${t}</button>`)}
+        ${categories.map(t  => html`<button class="chip chip-category chip-nav"   @click=${() => this._handleChipNav('categories', t)}  title="Filter by category: ${t}">Category: ${t}</button>`)}
         ${collections.map(t => html`<button class="chip chip-collection chip-nav" @click=${() => this._handleChipNav('collections', t)} title="Filter by collection: ${t}">Collection: ${t}</button>`)}
-        ${tags.map(t        => html`<button class="chip chip-tag chip-nav"       @click=${() => this._handleChipNav('tags', t)}        title="Filter by tag: ${t}">${t}</button>`)}
       </div>
     `;
   }
@@ -1099,81 +1114,112 @@ class RmRecipeDetail extends LitElement {
     const total = fatCal + carbCal + protCal;
     const hasData = total > 0 || cal > 0;
 
-    const size = 110;
+    if (!hasData) {
+      return html`<p class="empty-tab" style="margin:0;padding:12px 0">No nutrition data.</p>`;
+    }
+
+    // Donut ring
+    const size = 90;
     const cx = size / 2, cy = size / 2;
-    const ro = 46, ri = 30;
+    const ro = 38, ri = 25;
 
     const MACROS = [
-      { label: 'Carbs',   val: carb, cal: carbCal, color: '#f59e0b' },
-      { label: 'Fat',     val: fat,  cal: fatCal,  color: '#3b82f6' },
-      { label: 'Protein', val: prot, cal: protCal, color: '#22c55e' },
+      { label: 'Carbs',    val: carb, cal: carbCal, color: '#f59e0b' },
+      { label: 'Total fat',val: fat,  cal: fatCal,  color: '#3b82f6' },
+      { label: 'Protein',  val: prot, cal: protCal, color: '#22c55e' },
     ];
 
     function toXY(angleDeg, radius) {
       const rad = (angleDeg - 90) * Math.PI / 180;
       return [cx + radius * Math.cos(rad), cy + radius * Math.sin(rad)];
     }
-
     function arcPath(sa, ea) {
-      const [sox, soy] = toXY(sa, ro);
-      const [eox, eoy] = toXY(ea, ro);
-      const [six, siy] = toXY(sa, ri);
-      const [eix, eiy] = toXY(ea, ri);
+      const [sox, soy] = toXY(sa, ro); const [eox, eoy] = toXY(ea, ro);
+      const [six, siy] = toXY(sa, ri); const [eix, eiy] = toXY(ea, ri);
       const large = (ea - sa) > 180 ? 1 : 0;
       return `M ${sox} ${soy} A ${ro} ${ro} 0 ${large} 1 ${eox} ${eoy} L ${eix} ${eiy} A ${ri} ${ri} 0 ${large} 0 ${six} ${siy} Z`;
     }
 
     const arcs = [];
-    if (hasData && total > 0) {
+    if (total > 0) {
       let angle = 0;
       for (const m of MACROS) {
         if (m.cal <= 0) continue;
-        const sweep = (m.cal / total) * 358; // 358 to leave tiny gap
+        const sweep = (m.cal / total) * 358;
         arcs.push({ ...m, path: arcPath(angle, angle + sweep) });
         angle += sweep + 2;
       }
     }
+    const displayCal = cal > 0 ? cal : (total > 0 ? Math.round(total / 9) : null);
 
-    const displayCal = cal > 0 ? cal : (hasData ? Math.round(total / 9) : null);
+    // RDA progress data
+    const rdaRows = Object.entries(RDA).filter(([k]) => {
+      const v = parseFloat(n[k]);
+      return v > 0;
+    }).map(([k, rda]) => {
+      const v = parseFloat(n[k]);
+      const pct = Math.min(Math.round(v / rda.val * 100), 999);
+      return { key: k, label: rda.label, val: v, unit: rda.unit, pct };
+    });
 
     return html`
-      <div class="nutr-ring-section">
-        <div class="nutr-section-label">Nutrition</div>
-        <div class="nutr-ring-body">
-          <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <div class="nutr-card">
+        <!-- Top row: donut + macro columns -->
+        <div class="nutr-top">
+          <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex-shrink:0">
             <circle cx="${cx}" cy="${cy}" r="${(ro + ri) / 2}"
               fill="none" stroke="var(--rm-border)" stroke-width="${ro - ri}"/>
             ${arcs.map(a => html`<path d="${a.path}" fill="${a.color}" opacity="0.9"/>`)}
-            <text x="${cx}" y="${cy - 3}" text-anchor="middle"
-              fill="var(--rm-text)" font-size="16" font-weight="700" font-family="inherit">
+            <text x="${cx}" y="${cy - 2}" text-anchor="middle"
+              fill="var(--rm-text)" font-size="15" font-weight="700" font-family="inherit">
               ${displayCal != null ? displayCal : '\u2013'}
             </text>
             <text x="${cx}" y="${cy + 11}" text-anchor="middle"
-              fill="var(--rm-text-secondary)" font-size="9" font-family="inherit">
-              ${hasData ? 'kcal' : 'no data'}
-            </text>
+              fill="var(--rm-text-secondary)" font-size="8" font-family="inherit">kcal</text>
           </svg>
-          <div class="nutr-macros">
+
+          <div class="nutr-macro-cols">
             ${MACROS.map(m => {
               const pct = total > 0 ? Math.round(m.cal / total * 100) : 0;
               return html`
-                <div class="nutr-macro-row">
-                  <span class="nutr-macro-dot" style="background:${m.color}"></span>
-                  <span class="nutr-macro-label">${m.label}</span>
-                  <span class="nutr-macro-val">${m.val > 0 ? `${m.val}g` : '\u2014'}</span>
-                  ${pct > 0 ? html`<span class="nutr-macro-pct">${pct}%</span>` : ''}
+                <div class="nutr-macro-col">
+                  <span class="nutr-mcol-num" style="color:${m.color}">${m.val > 0 ? `${m.val} g` : '\u2014'}</span>
+                  <span class="nutr-mcol-label">${m.label}</span>
+                  ${pct > 0 ? html`<span class="nutr-mcol-pct" style="color:${m.color}">${pct}% cals</span>` : ''}
                 </div>
               `;
             })}
-            ${r?.servings ? html`
-              <div class="nutr-macro-row">
-                <span class="nutr-macro-label" style="color:var(--rm-text-muted);font-size:10px">
-                  Per ${r.servings_text || `${r.servings} serving${r.servings !== 1 ? 's' : ''}`}
-                </span>
-              </div>
-            ` : ''}
           </div>
         </div>
+
+        ${r?.servings ? html`
+          <div class="nutr-serving-note">
+            Per ${r.servings_text || `${r.servings} serving${r.servings !== 1 ? 's' : ''}`}
+          </div>
+        ` : ''}
+
+        <!-- Daily RDA collapsible -->
+        ${rdaRows.length ? html`
+          <button class="nutr-rda-toggle" @click=${() => { this._nutritionExpanded = !this._nutritionExpanded; }}>
+            <span class="nutr-rda-title">Daily RDA Nutrition</span>
+            <span class="nutr-rda-count">${rdaRows.length}</span>
+            <ha-icon icon="${this._nutritionExpanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}"></ha-icon>
+          </button>
+          ${this._nutritionExpanded ? html`
+            <div class="nutr-rda-rows">
+              ${rdaRows.map(row => html`
+                <div class="nutr-rda-row">
+                  <span class="nutr-rda-label">${row.label}</span>
+                  <span class="nutr-rda-val">${row.val} ${row.unit}</span>
+                  <span class="nutr-rda-pct">${row.pct}%</span>
+                  <div class="nutr-rda-bar-wrap">
+                    <div class="nutr-rda-bar ${row.pct > 100 ? 'over' : ''}" style="width:${Math.min(row.pct, 100)}%"></div>
+                  </div>
+                </div>
+              `)}
+            </div>
+          ` : ''}
+        ` : ''}
       </div>
     `;
   }
@@ -1923,24 +1969,46 @@ class RmRecipeDetail extends LitElement {
     .nutr-val { font-weight: 600; white-space: nowrap; }
     .nutr-val em { font-style: normal; font-size: 11px; color: var(--rm-text-secondary, #8e8e93); }
 
-    /* Nutrition ring */
-    .nutr-ring-section {
-      margin-top: 16px;
-      padding-top: 14px;
-      border-top: 1px solid var(--rm-border);
+    /* Nutrition card */
+    .nutr-card { display: flex; flex-direction: column; gap: 10px; }
+    .nutr-top { display: flex; align-items: center; gap: 14px; }
+    .nutr-macro-cols { display: flex; gap: 10px; flex: 1; justify-content: space-around; }
+    .nutr-macro-col { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .nutr-mcol-num { font-size: 17px; font-weight: 700; line-height: 1; }
+    .nutr-mcol-label { font-size: 11px; color: var(--rm-text-secondary); font-weight: 500; }
+    .nutr-mcol-pct { font-size: 10px; font-weight: 600; }
+    .nutr-serving-note {
+      font-size: 11px; color: var(--rm-text-muted); text-align: center; margin-top: -4px;
     }
-    .nutr-section-label {
-      font-size: 11px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.08em; color: var(--rm-text-secondary); margin-bottom: 10px;
+    /* Daily RDA expandable */
+    .nutr-rda-toggle {
+      display: flex; align-items: center; gap: 6px;
+      background: none; border: none; border-top: 1px solid var(--rm-border);
+      padding: 10px 0 0; cursor: pointer; color: var(--rm-text); font-size: 13px; font-weight: 600;
+      width: 100%; text-align: left;
     }
-    .nutr-ring-body { display: flex; align-items: center; gap: 14px; }
-    .nutr-ring-body svg { flex-shrink: 0; }
-    .nutr-macros { display: flex; flex-direction: column; gap: 6px; flex: 1; }
-    .nutr-macro-row { display: flex; align-items: center; gap: 6px; font-size: 12px; }
-    .nutr-macro-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .nutr-macro-label { color: var(--rm-text-secondary); flex: 1; }
-    .nutr-macro-val { font-weight: 600; color: var(--rm-text); }
-    .nutr-macro-pct { color: var(--rm-text-muted); font-size: 10px; }
+    .nutr-rda-title { flex: 1; }
+    .nutr-rda-count {
+      font-size: 12px; font-weight: 700; color: var(--rm-text-secondary);
+      background: var(--rm-bg-elevated); border: 1px solid var(--rm-border);
+      border-radius: 10px; padding: 1px 7px;
+    }
+    .nutr-rda-toggle ha-icon { --mdc-icon-size: 18px; color: var(--rm-text-secondary); }
+    .nutr-rda-rows { display: flex; flex-direction: column; gap: 6px; padding-top: 6px; }
+    .nutr-rda-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      grid-template-rows: auto 4px;
+      column-gap: 8px;
+      row-gap: 4px;
+      font-size: 12px;
+    }
+    .nutr-rda-label { color: var(--rm-text-secondary); grid-column: 1; grid-row: 1; }
+    .nutr-rda-val { color: var(--rm-text); font-weight: 600; grid-column: 2; grid-row: 1; white-space: nowrap; }
+    .nutr-rda-pct { color: var(--rm-text-muted); grid-column: 3; grid-row: 1; white-space: nowrap; min-width: 36px; text-align: right; }
+    .nutr-rda-bar-wrap { grid-column: 1 / -1; grid-row: 2; background: var(--rm-border); border-radius: 2px; height: 4px; overflow: hidden; }
+    .nutr-rda-bar { height: 100%; background: var(--rm-accent); border-radius: 2px; transition: width 0.3s; }
+    .nutr-rda-bar.over { background: var(--error-color, #cf6679); }
 
     /* Photos tab */
     .photos-tab { display: flex; flex-direction: column; gap: 16px; }
@@ -2200,7 +2268,10 @@ class RmRecipeDetail extends LitElement {
 
     /* ── Wide grid layout (2 cols × auto rows) ─────────────── */
     /* Whole card scrolls — no independent column scrolling */
-    .detail-container.wide { overflow-y: auto; }
+    .detail-container.wide {
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
 
     .wide-layout {
       display: grid;
@@ -2208,12 +2279,13 @@ class RmRecipeDetail extends LitElement {
       grid-template-rows: auto auto;
       gap: 14px;
       padding: 14px;
+      flex-shrink: 0;   /* don't compress inside flex container */
     }
 
-    /* Row 1, Col 1 — square image */
+    /* Row 1, Col 1 — image card, same height as info card via grid row stretch */
     .wide-image-card {
       grid-column: 1; grid-row: 1;
-      aspect-ratio: 1 / 1;
+      min-height: 200px;
       border-radius: 16px;
       overflow: hidden;
       background: var(--rm-bg-elevated);
@@ -2221,7 +2293,7 @@ class RmRecipeDetail extends LitElement {
     }
     .wide-image-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .wide-image-card .hero-placeholder {
-      width: 100%; height: 100%; display: flex; align-items: center;
+      width: 100%; height: 100%; min-height: 200px; display: flex; align-items: center;
       justify-content: center; color: var(--rm-text-secondary);
     }
     .wide-image-card .hero-placeholder ha-icon { --mdc-icon-size: 64px; opacity: 0.3; }
