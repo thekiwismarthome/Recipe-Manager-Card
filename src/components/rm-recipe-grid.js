@@ -24,6 +24,7 @@ class RmRecipeGrid extends LitElement {
     _selectedCourses:    { type: Object },
     _selectedCategories: { type: Object },
     _selectedCollections:{ type: Object },
+    filterPreset:        { type: Object },  // { filterMode, selectedValues } — applied once on change
   };
 
   constructor() {
@@ -48,6 +49,7 @@ class RmRecipeGrid extends LitElement {
     this._selectedCollections = new Set();
     this._lastScrollPos = 0;
     this._hasRestoredScroll = false;
+    this.filterPreset = null;
   }
 
   _toggleChip(type, value) {
@@ -60,6 +62,17 @@ class RmRecipeGrid extends LitElement {
   }
 
   updated(changedProps) {
+    // Apply filterPreset when it changes (chip navigation from recipe detail)
+    if (changedProps.has('filterPreset') && this.filterPreset) {
+      const { filterMode, selectedValues } = this.filterPreset;
+      this._filterMode = filterMode;
+      this._selectedCourses = new Set();
+      this._selectedCategories = new Set();
+      this._selectedCollections = new Set();
+      if (filterMode === 'courses')     this._selectedCourses    = new Set(selectedValues);
+      if (filterMode === 'categories')  this._selectedCategories  = new Set(selectedValues);
+      if (filterMode === 'collections') this._selectedCollections = new Set(selectedValues);
+    }
     if (changedProps.has('scrollPos')) {
       // New target position — allow a single restore
       this._hasRestoredScroll = false;

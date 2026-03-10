@@ -261,6 +261,7 @@ class RecipeManagerCard extends LitElement {
     _mobileMenuOpen: { type: Boolean },
     _navDirection: { type: String },
     _closingDetail: { type: Boolean },
+    _gridFilterPreset: { type: Object },
   };
 
   constructor() {
@@ -290,6 +291,7 @@ class RecipeManagerCard extends LitElement {
     this._mobileMenuOpen = false;
     this._navDirection = 'forward';
     this._closingDetail = false;
+    this._gridFilterPreset = null;
     this._alarmLoopActive = false;
     this._alarmInterval = null;
     this._alarmTimeout = null;
@@ -588,6 +590,21 @@ class RecipeManagerCard extends LitElement {
 
   _handleSearch(e) { this._searchQuery = e.detail?.query ?? ''; }
   _handleTagFilter(e) { const t = e.detail?.tag; this._activeTag = this._activeTag === t ? null : t; }
+
+  _handleChipNav(e) {
+    const { filterMode, value } = e.detail;
+    this._navDirection = 'back';
+    if (filterMode === 'tags') {
+      // Tags use the parent _activeTag mechanism
+      this._activeTag = value;
+      this._gridFilterPreset = null;
+    } else {
+      this._activeTag = null;
+      // Use a new object each time so the grid always sees a change
+      this._gridFilterPreset = { filterMode, selectedValues: [value] };
+    }
+    this._view = 'grid';
+  }
 
   _handleBack() {
     if (this._closingDetail) return;
@@ -967,6 +984,7 @@ class RecipeManagerCard extends LitElement {
             .scrollPos=${this._gridScrollPos}
             .recentRecipes=${this._recentRecipes}
             .recentCount=${s.recentCount ?? 12}
+            .filterPreset=${this._gridFilterPreset}
             @rm-search=${this._handleSearch}
             @rm-tag-filter=${this._handleTagFilter}
             @rm-open-recipe=${this._handleOpenRecipe}
@@ -989,6 +1007,7 @@ class RecipeManagerCard extends LitElement {
               @rm-add-to-shopping=${this._handleAddToShopping}
               @rm-start-timer=${this._handleStartTimer}
               @rm-show-planner=${this._handleShowPlanner}
+              @rm-chip-nav=${this._handleChipNav}
             ></rm-recipe-detail>
           ` : ''}
         </div>

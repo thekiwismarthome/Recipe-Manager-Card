@@ -396,6 +396,14 @@ class RmRecipeDetail extends LitElement {
     this.dispatchEvent(new CustomEvent('rm-show-planner', { bubbles: true, composed: true }));
   }
 
+  _handleChipNav(filterMode, value) {
+    this.dispatchEvent(new CustomEvent('rm-chip-nav', {
+      detail: { filterMode, value },
+      bubbles: true,
+      composed: true,
+    }));
+  }
+
   // -- Timer helpers ----------------------------------------------------------
 
   _fireTimer(seconds, label) {
@@ -497,10 +505,10 @@ class RmRecipeDetail extends LitElement {
     if (!courses.length && !categories.length && !collections.length && !tags.length) return '';
     return html`
       <div class="chips-area">
-        ${courses.map(t    => html`<span class="chip chip-course">${t}</span>`)}
-        ${categories.map(t => html`<span class="chip chip-category">${t}</span>`)}
-        ${collections.map(t=> html`<span class="chip chip-collection">${t}</span>`)}
-        ${tags.map(t       => html`<span class="chip chip-tag">${t}</span>`)}
+        ${courses.map(t     => html`<button class="chip chip-course chip-nav"    @click=${() => this._handleChipNav('courses', t)}    title="Filter by course: ${t}">Course: ${t}</button>`)}
+        ${categories.map(t  => html`<button class="chip chip-category chip-nav"  @click=${() => this._handleChipNav('categories', t)} title="Filter by category: ${t}">Category: ${t}</button>`)}
+        ${collections.map(t => html`<button class="chip chip-collection chip-nav" @click=${() => this._handleChipNav('collections', t)} title="Filter by collection: ${t}">Collection: ${t}</button>`)}
+        ${tags.map(t        => html`<button class="chip chip-tag chip-nav"       @click=${() => this._handleChipNav('tags', t)}        title="Filter by tag: ${t}">${t}</button>`)}
       </div>
     `;
   }
@@ -560,38 +568,31 @@ class RmRecipeDetail extends LitElement {
           @click=${this._handleToggleFav}
           title="${r.is_favourite ? 'Remove from favourites' : 'Add to favourites'}">
           <ha-icon icon="${r.is_favourite ? 'mdi:heart' : 'mdi:heart-outline'}"></ha-icon>
-          Favourite
+          <span>Favourite</span>
         </button>
         <button class="action-icon-btn"
-          @click=${() => {
-            if (this.wide) {
-              const el = this.shadowRoot?.querySelector('.detail-right-scroll');
-              if (el) el.scrollTop = 0;
-            } else {
-              this._activeTab = 'directions';
-            }
-          }}
+          @click=${() => { this._activeTab = 'directions'; }}
           title="Cook">
           <ha-icon icon="mdi:chef-hat"></ha-icon>
-          Cook
+          <span>Cook</span>
         </button>
         <button class="action-icon-btn" @click=${this._handleShowPlanner} title="Add to meal plan">
           <ha-icon icon="mdi:calendar-plus"></ha-icon>
-          Plan
+          <span>Plan</span>
         </button>
         <button class="action-icon-btn" @click=${this._openShoppingPicker} title="Add to shopping list">
           <ha-icon icon="mdi:cart-plus"></ha-icon>
-          Shop
+          <span>Shop</span>
         </button>
         ${r.source_url ? html`
           <a class="action-icon-btn" href="${r.source_url}" target="_blank" rel="noopener" title="Open source">
             <ha-icon icon="mdi:open-in-new"></ha-icon>
-            Source
+            <span>Source</span>
           </a>
         ` : ''}
         <button class="action-icon-btn" @click=${this._startEdit} title="Edit recipe">
           <ha-icon icon="mdi:pencil-outline"></ha-icon>
-          Edit
+          <span>Edit</span>
         </button>
       </div>
     `;
@@ -645,9 +646,10 @@ class RmRecipeDetail extends LitElement {
     return html`
       <div class="detail-container wide">
         <!--
-          CSS grid: 2 cols (1fr 2fr) × 2 rows (auto 1fr)
-          [image]   [info card]      ← same height, square image
-          [ings]    [directions]     ← fills remaining height, columns align with row above
+          CSS grid: 2 cols (1fr 2fr) × auto rows
+          [image]   [info card]
+          [ings]    [directions]
+          Whole card scrolls — no independent column scrolling
         -->
         <div class="wide-layout">
 
@@ -672,9 +674,52 @@ class RmRecipeDetail extends LitElement {
             ${this._renderChipGroups(r)}
           </div>
 
-          <!-- row 2 col 1: ingredients scroll, aligns under image -->
-          <div class="wide-ing-scroll">
+          <!-- row 2 col 1: ingredients column -->
+          <div class="wide-ing-col">
+            <!-- ingredients header with shopping cart icon -->
+            <div class="wide-col-header">
+              <span class="wide-col-title">Ingredients</span>
+              ${this._shoppingResult === 'success' ? html`
+                <span class="ing-shop-success"><ha-icon icon="mdi:check-circle-outline"></ha-icon></span>
+              ` : html`
+                <button class="ing-shop-btn ${picking ? 'active' : ''}"
+                  @click=${picking ? () => { this._showShoppingPicker = false; } : this._openShoppingPicker}
+                  title="${picking ? 'Cancel' : 'Add to shopping list'}">
+                  <ha-icon icon="${picking ? 'mdi:close' : 'mdi:cart-plus'}"></ha-icon>
+                </button>
+              `}
+            </div>
+
             ${this._renderScaler()}
+
+            <!-- shopping picker (shown inline when picking) -->
+            ${picking ? html`
+              <div class="wide-section-card shopping-picker-panel">
+                <div class="picker-select-row">
+                  <button class="picker-sel-btn" @click=${this._selectAllIngredients}>Select All</button>
+                  <button class="picker-sel-btn" @click=${this._clearAllIngredients}>Clear All</button>
+                  ${this.slmAvailable && this.shoppingLists.length ? html`
+                    <select class="list-select" .value=${this._selectedListId}
+                      @change=${e => { this._selectedListId = e.target.value; }}>
+                      ${this.shoppingLists.map(l => html`
+                        <option value="${l.id}" ?selected=${l.id === this._selectedListId}>${l.name}</option>
+                      `)}
+                    </select>
+                  ` : ''}
+                </div>
+                <div class="picker-btns">
+                  <button class="action-btn" @click=${() => { this._showShoppingPicker = false; }}>Cancel</button>
+                  <button class="action-btn primary"
+                    ?disabled=${this._shoppingAdding || !checkedCount}
+                    @click=${this._handleAddToShopping}>
+                    ${this._shoppingAdding
+                      ? html`<ha-circular-progress active size="tiny"></ha-circular-progress>`
+                      : `Add${checkedCount ? ` (${checkedCount})` : ''}`}
+                  </button>
+                </div>
+              </div>
+            ` : ''}
+
             ${groups.map(g => html`
               <div class="wide-section-card">
                 ${g.header ? html`<div class="wide-section-title">${g.header}</div>` : ''}
@@ -700,56 +745,27 @@ class RmRecipeDetail extends LitElement {
                 ` : ''}
               </div>
             `)}
+
             <div class="wide-section-card">
               ${this._renderNutritionRing(r)}
             </div>
-            <div class="wide-section-card">
-              ${this._shoppingResult === 'success' ? html`
-                <div class="shopping-success">
-                  <ha-icon icon="mdi:check-circle-outline"></ha-icon>
-                  Added to shopping list!
-                </div>
-              ` : picking ? html`
-                <div class="shopping-picker-panel">
-                  <div class="picker-select-row">
-                    <button class="picker-sel-btn" @click=${this._selectAllIngredients}>Select All</button>
-                    <button class="picker-sel-btn" @click=${this._clearAllIngredients}>Clear All</button>
-                    ${this.slmAvailable && this.shoppingLists.length ? html`
-                      <select class="list-select" .value=${this._selectedListId}
-                        @change=${e => { this._selectedListId = e.target.value; }}>
-                        ${this.shoppingLists.map(l => html`
-                          <option value="${l.id}" ?selected=${l.id === this._selectedListId}>${l.name}</option>
-                        `)}
-                      </select>
-                    ` : ''}
-                  </div>
-                  <div class="picker-btns">
-                    <button class="action-btn" @click=${() => { this._showShoppingPicker = false; }}>Cancel</button>
-                    <button class="action-btn primary"
-                      ?disabled=${this._shoppingAdding || !checkedCount}
-                      @click=${this._handleAddToShopping}>
-                      ${this._shoppingAdding
-                        ? html`<ha-circular-progress active size="tiny"></ha-circular-progress>`
-                        : `Add${checkedCount ? ` (${checkedCount})` : ''}`}
-                    </button>
-                  </div>
-                </div>
-              ` : html`
-                <button class="action-btn primary shopping-btn" @click=${this._openShoppingPicker}>
-                  <ha-icon icon="mdi:cart-plus"></ha-icon>
-                  Add to Shopping List
-                </button>
-              `}
-            </div>
           </div>
 
-          <!-- row 2 col 2: directions scroll, aligns under info card -->
-          <div class="wide-dir-scroll">
+          <!-- row 2 col 2: directions column, each step its own card -->
+          <div class="wide-dir-col">
             ${this._renderWakeLock()}
-            <div class="wide-section-card">
-              <div class="wide-section-title">Directions</div>
-              ${this._renderDirections(r)}
-            </div>
+            ${(r.instructions || []).length ? (r.instructions || []).map((step, i) => {
+              const done = this._completedSteps.has(i);
+              return html`
+                <div class="wide-section-card wide-step-card ${done ? 'step-done' : ''}">
+                  <span class="step-num ${done ? 'done' : ''}"
+                    @click=${(e) => { e.stopPropagation(); this._toggleStepComplete(i); }}
+                    title="${done ? 'Mark incomplete' : 'Mark complete'}"
+                  >${done ? html`<ha-icon icon="mdi:check"></ha-icon>` : i + 1}</span>
+                  <span class="step-text">${this._renderStepWithTimers(step)}</span>
+                </div>
+              `;
+            }) : html`<p class="empty-tab">No directions listed.</p>`}
             ${r.notes ? html`
               <div class="wide-section-card">
                 <div class="wide-section-title">Notes</div>
@@ -1451,16 +1467,17 @@ class RmRecipeDetail extends LitElement {
 
     /* Action buttons row */
     .action-btns-row {
-      display: flex; gap: 4px; flex-wrap: wrap; margin: 8px 0 12px;
+      display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 12px;
     }
     .action-icon-btn {
-      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      flex: 1;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
       background: var(--rm-bg-elevated); border: 1px solid var(--rm-border);
-      border-radius: 10px; padding: 8px 10px; cursor: pointer;
+      border-radius: 12px; padding: 12px 8px; cursor: pointer;
       color: var(--rm-text-secondary); font-size: 11px; font-weight: 500;
-      transition: all 0.15s; text-decoration: none; min-width: 52px;
+      transition: all 0.15s; text-decoration: none; min-width: 60px;
     }
-    .action-icon-btn ha-icon { --mdc-icon-size: 20px; }
+    .action-icon-btn ha-icon { --mdc-icon-size: 24px; }
     .action-icon-btn:hover { background: var(--rm-accent-soft); color: var(--rm-accent); border-color: var(--rm-accent); }
     .action-icon-btn.fav-active { color: var(--error-color, #cf6679); }
     .action-icon-btn.danger { background: var(--error-color, #cf6679); color: #fff; border-color: var(--error-color, #cf6679); }
@@ -1590,9 +1607,16 @@ class RmRecipeDetail extends LitElement {
     }
     .chip {
       border-radius: 20px;
-      padding: 2px 9px;
+      padding: 3px 10px;
       font-size: 12px;
+      border: none;
+      cursor: default;
     }
+    .chip-nav {
+      cursor: pointer;
+      transition: filter 0.15s, opacity 0.15s;
+    }
+    .chip-nav:hover { filter: brightness(1.25); opacity: 0.9; }
     .chip-course    { background: rgba(88,166,255,0.15); color: #58a6ff; }
     .chip-category  { background: rgba(63,185,80,0.15);  color: #3fb950; }
     .chip-collection{ background: rgba(210,153,34,0.15); color: #d2a01e; }
@@ -2174,16 +2198,16 @@ class RmRecipeDetail extends LitElement {
       background: var(--error-color, #cf6679); color: #fff;
     }
 
-    /* ── Wide grid layout (2 cols × 2 rows) ─────────────── */
+    /* ── Wide grid layout (2 cols × auto rows) ─────────────── */
+    /* Whole card scrolls — no independent column scrolling */
+    .detail-container.wide { overflow-y: auto; }
+
     .wide-layout {
       display: grid;
       grid-template-columns: 1fr 2fr;
-      grid-template-rows: auto 1fr;
+      grid-template-rows: auto auto;
       gap: 14px;
       padding: 14px;
-      flex: 1;
-      overflow: hidden;
-      min-height: 0;
     }
 
     /* Row 1, Col 1 — square image */
@@ -2209,12 +2233,9 @@ class RmRecipeDetail extends LitElement {
       background: var(--rm-bg-elevated);
       border: 1px solid var(--rm-border);
       padding: 16px 20px;
-      overflow-y: auto;
       display: flex;
       flex-direction: column;
       align-items: center;
-      scrollbar-width: thin;
-      scrollbar-color: var(--rm-border) transparent;
     }
     .wide-title {
       margin: 0 0 4px; font-size: 22px; font-weight: 700;
@@ -2225,46 +2246,75 @@ class RmRecipeDetail extends LitElement {
       font-size: 13px; color: var(--rm-text-secondary); line-height: 1.5;
     }
     .wide-info-card .quick-rating { justify-content: center; margin-bottom: 6px; }
-    .wide-info-card .action-btns-row { justify-content: center; flex-wrap: wrap; }
+    .wide-info-card .action-btns-row { justify-content: center; flex-wrap: wrap; width: 100%; }
     .wide-info-card .meta-chips { justify-content: center; margin-top: 6px; }
     .wide-info-card .chips-area { justify-content: center; margin-top: 4px; }
 
-    /* Row 2, Col 1 — ingredients scroll, aligns under image */
-    .wide-ing-scroll {
+    /* Row 2, Col 1 — ingredients column (no independent scroll) */
+    .wide-ing-col {
       grid-column: 1; grid-row: 2;
-      overflow-y: auto;
       display: flex;
       flex-direction: column;
       gap: 10px;
-      min-height: 0;
-      scrollbar-width: thin;
-      scrollbar-color: var(--rm-border) transparent;
     }
 
-    /* Row 2, Col 2 — directions scroll, aligns under info card */
-    .wide-dir-scroll {
+    /* Row 2, Col 2 — directions column (no independent scroll) */
+    .wide-dir-col {
       grid-column: 2; grid-row: 2;
-      overflow-y: auto;
       display: flex;
       flex-direction: column;
       gap: 10px;
-      min-height: 0;
-      scrollbar-width: thin;
-      scrollbar-color: var(--rm-border) transparent;
     }
 
-    /* Ingredient/directions section cards */
+    /* Ingredients column header (label + cart icon) */
+    .wide-col-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2px 2px;
+    }
+    .wide-col-title {
+      font-size: 13px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.07em;
+      color: var(--rm-text-secondary);
+    }
+    .ing-shop-btn {
+      background: var(--rm-bg-elevated); border: 1px solid var(--rm-border);
+      border-radius: 50%; width: 34px; height: 34px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--rm-text-secondary); padding: 0; transition: all 0.15s;
+    }
+    .ing-shop-btn ha-icon { --mdc-icon-size: 18px; }
+    .ing-shop-btn:hover { background: var(--rm-accent-soft); color: var(--rm-accent); border-color: var(--rm-accent); }
+    .ing-shop-btn.active { background: var(--rm-accent-soft); color: var(--rm-accent); border-color: var(--rm-accent); }
+    .ing-shop-success { color: var(--success-color, #4caf50); display: flex; align-items: center; }
+    .ing-shop-success ha-icon { --mdc-icon-size: 22px; }
+
+    /* Section cards (ingredients, nutrition, notes) */
     .wide-section-card {
       background: var(--rm-bg-elevated);
       border: 1px solid var(--rm-border);
       border-radius: 14px;
       padding: 12px 14px;
-      flex-shrink: 0;
     }
     .wide-section-title {
       font-size: 14px; font-weight: 700; color: var(--rm-text);
       margin-bottom: 10px; padding-bottom: 6px;
       border-bottom: 1px solid var(--rm-border);
+    }
+
+    /* Per-step direction cards in wide layout */
+    .wide-step-card {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    .wide-step-card .step-num { flex-shrink: 0; }
+    .wide-step-card .step-text { flex: 1; }
+    .wide-step-card.step-done .step-text {
+      opacity: 0.45;
+      text-decoration: line-through;
+      text-decoration-color: var(--rm-border);
     }
   `;
 }
