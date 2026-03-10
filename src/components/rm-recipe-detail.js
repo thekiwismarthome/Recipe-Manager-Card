@@ -71,6 +71,7 @@ class RmRecipeDetail extends LitElement {
     shoppingLists:       { type: Array },
     slmAvailable:        { type: Boolean },
     settings:            { type: Object },
+    wide:                { type: Boolean },
     _editing:            { type: Boolean },
     _editData:           { type: Object },
     _servingMult:        { type: Number },
@@ -96,6 +97,7 @@ class RmRecipeDetail extends LitElement {
     this.shoppingLists = [];
     this.slmAvailable = false;
     this.settings = {};
+    this.wide = false;
     this._editing = false;
     this._editData = {};
     this._servingMult = 1;
@@ -341,6 +343,18 @@ class RmRecipeDetail extends LitElement {
     setTimeout(() => { this._shoppingResult = null; }, 2500);
   }
 
+  _handleQuickRate(n) {
+    const newRating = this.recipe.rating === n ? null : n;
+    this.dispatchEvent(new CustomEvent('rm-update-recipe', {
+      detail: { recipeId: this.recipe.id, data: { rating: newRating } },
+      bubbles: true, composed: true,
+    }));
+  }
+
+  _handleShowPlanner() {
+    this.dispatchEvent(new CustomEvent('rm-show-planner', { bubbles: true, composed: true }));
+  }
+
   // -- Timer helpers ----------------------------------------------------------
 
   _fireTimer(seconds, label) {
@@ -434,9 +448,209 @@ class RmRecipeDetail extends LitElement {
     `;
   }
 
+  _renderChipGroups(r) {
+    const courses    = r.courses    || [];
+    const categories = r.categories || [];
+    const collections= r.collections|| [];
+    const tags       = r.tags       || [];
+    if (!courses.length && !categories.length && !collections.length && !tags.length) return '';
+    return html`
+      <div class="chips-area">
+        ${courses.map(t    => html`<span class="chip chip-course">${t}</span>`)}
+        ${categories.map(t => html`<span class="chip chip-category">${t}</span>`)}
+        ${collections.map(t=> html`<span class="chip chip-collection">${t}</span>`)}
+        ${tags.map(t       => html`<span class="chip chip-tag">${t}</span>`)}
+      </div>
+    `;
+  }
+
+  _renderMetaRow(r) {
+    const hasAny = r.servings || r.prep_time || r.cook_time || r.total_time;
+    if (!hasAny) return '';
+    const totalTime = r.total_time || (r.prep_time || 0) + (r.cook_time || 0) || null;
+    const calcTotal = (r.prep_time || 0) + (r.cook_time || 0);
+    const showTotal = totalTime && totalTime !== calcTotal;
+    return html`
+      <div class="meta-chips">
+        ${r.servings ? html`
+          <span class="meta-chip-icon">
+            <ha-icon icon="mdi:silverware-fork-knife"></ha-icon>
+            ${r.servings_text || r.servings}
+          </span>
+        ` : ''}
+        ${r.prep_time ? html`
+          <span class="meta-chip-icon">
+            <ha-icon icon="mdi:pencil-outline"></ha-icon>
+            ${this._formatTime(r.prep_time)}
+          </span>
+        ` : ''}
+        ${r.cook_time ? html`
+          <span class="meta-chip-icon">
+            <ha-icon icon="mdi:pot-steam-outline"></ha-icon>
+            ${this._formatTime(r.cook_time)}
+          </span>
+        ` : ''}
+        ${showTotal ? html`
+          <span class="meta-chip-icon">
+            <ha-icon icon="mdi:clock-outline"></ha-icon>
+            ${this._formatTime(totalTime)}
+          </span>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  _renderQuickRating(r) {
+    const rating = r.rating || 0;
+    return html`
+      <div class="quick-rating">
+        ${[1,2,3,4,5].map(n => html`
+          <span class="qr-star ${n <= rating ? 'filled' : ''}"
+            @click=${() => this._handleQuickRate(n)}>★</span>
+        `)}
+      </div>
+    `;
+  }
+
+  _renderActionButtons(r) {
+    return html`
+      <div class="action-btns-row">
+        <button class="action-icon-btn ${r.is_favourite ? 'fav-active' : ''}"
+          @click=${this._handleToggleFav}
+          title="${r.is_favourite ? 'Remove from favourites' : 'Add to favourites'}">
+          <ha-icon icon="${r.is_favourite ? 'mdi:heart' : 'mdi:heart-outline'}"></ha-icon>
+          Favourite
+        </button>
+        <button class="action-icon-btn"
+          @click=${() => {
+            if (this.wide) {
+              const el = this.shadowRoot?.querySelector('.detail-right-scroll');
+              if (el) el.scrollTop = 0;
+            } else {
+              this._activeTab = 'directions';
+            }
+          }}
+          title="Cook">
+          <ha-icon icon="mdi:chef-hat"></ha-icon>
+          Cook
+        </button>
+        <button class="action-icon-btn" @click=${this._handleShowPlanner} title="Add to meal plan">
+          <ha-icon icon="mdi:calendar-plus"></ha-icon>
+          Plan
+        </button>
+        <button class="action-icon-btn" @click=${this._openShoppingPicker} title="Add to shopping list">
+          <ha-icon icon="mdi:cart-plus"></ha-icon>
+          Shop
+        </button>
+        ${r.source_url ? html`
+          <a class="action-icon-btn" href="${r.source_url}" target="_blank" rel="noopener" title="Open source">
+            <ha-icon icon="mdi:open-in-new"></ha-icon>
+            Source
+          </a>
+        ` : ''}
+        <button class="action-icon-btn" @click=${this._startEdit} title="Edit recipe">
+          <ha-icon icon="mdi:pencil-outline"></ha-icon>
+          Edit
+        </button>
+        <button class="action-icon-btn ${this._confirmDelete ? 'danger' : ''}"
+          @click=${this._handleDeleteRecipe}
+          title="${this._confirmDelete ? 'Confirm delete' : 'Delete recipe'}">
+          <ha-icon icon="${this._confirmDelete ? 'mdi:check' : 'mdi:trash-can-outline'}"></ha-icon>
+          ${this._confirmDelete ? 'Confirm' : 'Delete'}
+        </button>
+      </div>
+    `;
+  }
+
+  _renderScaler() {
+    const r = this.recipe;
+    if (!r?.servings) return '';
+    return html`
+      <div class="scaler-row">
+        <span class="scaler-label">Scale servings:</span>
+        <div class="scaler-ctrl">
+          <button class="scaler-btn" @click=${() => { if (this._servingMult > 0.25) this._servingMult = Math.round((this._servingMult - 0.25) * 4) / 4; }}>
+            <ha-icon icon="mdi:minus"></ha-icon>
+          </button>
+          <span class="scaler-val">×${this._servingMult}</span>
+          <button class="scaler-btn" @click=${() => { this._servingMult = Math.round((this._servingMult + 0.25) * 4) / 4; }}>
+            <ha-icon icon="mdi:plus"></ha-icon>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  _renderWakeLock() {
+    if (!this.settings?.keepScreenOn) return '';
+    return html`
+      <div class="wakelock-row">
+        <button class="wakelock-btn ${this._wakeActive ? 'active' : ''}"
+          @click=${() => this._wakeActive ? this._releaseWakeLock() : this._requestWakeLock()}
+          title="${this._wakeActive ? 'Release screen lock' : 'Keep screen on'}">
+          <ha-icon icon="${this._wakeActive ? 'mdi:eye' : 'mdi:eye-off-outline'}"></ha-icon>
+          ${this._wakeActive ? 'Screen on' : 'Keep screen on'}
+        </button>
+      </div>
+    `;
+  }
+
   render() {
     if (!this.recipe) return html``;
     const r = this.recipe;
+    return this.wide ? this._renderWide(r) : this._renderNarrow(r);
+  }
+
+  _renderWide(r) {
+    return html`
+      <div class="detail-container wide">
+        <!-- Left column: image + meta + ingredients + nutrition -->
+        <div class="detail-left">
+          <div class="hero-img">
+            ${r.image_url ? html`
+              <img src="${r.image_url}" alt="${r.name}" />
+            ` : html`
+              <div class="hero-placeholder">
+                <ha-icon icon="mdi:food"></ha-icon>
+              </div>
+            `}
+          </div>
+          <div class="detail-left-scroll">
+            ${this._renderMetaRow(r)}
+            ${this._renderChipGroups(r)}
+            ${this._renderScaler()}
+            ${this._renderIngredients(r)}
+            ${this._renderNutritionRing(r)}
+          </div>
+        </div>
+
+        <!-- Right column: title + actions + directions + notes -->
+        <div class="detail-right">
+          <div class="detail-right-header">
+            <h1 class="recipe-title">${r.name}</h1>
+            ${this._renderQuickRating(r)}
+            ${this._renderActionButtons(r)}
+            ${r.description ? html`<p class="detail-desc">${r.description}</p>` : ''}
+          </div>
+          <div class="detail-right-scroll">
+            ${this._renderWakeLock()}
+            ${this._renderDirections(r)}
+            ${r.notes ? html`
+              <div class="notes-section">
+                <h3>Notes</h3>
+                <p class="notes-text">${r.notes}</p>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+
+        <!-- Edit overlay -->
+        ${this._editing ? this._renderEditPanel() : ''}
+      </div>
+    `;
+  }
+
+  _renderNarrow(r) {
     const totalTime = r.total_time || (r.prep_time || 0) + (r.cook_time || 0) || null;
 
     return html`
@@ -461,19 +675,15 @@ class RmRecipeDetail extends LitElement {
                 <ha-icon icon="mdi:open-in-new"></ha-icon>
               </a>
             ` : ''}
-            <button class="hero-btn" @click=${this._startEdit} title="Edit">
-              <ha-icon icon="mdi:pencil-outline"></ha-icon>
-            </button>
-            <button class="hero-btn delete-btn ${this._confirmDelete ? 'confirm' : ''}" @click=${this._handleDeleteRecipe}
-              title="${this._confirmDelete ? 'Confirm delete' : 'Delete recipe'}">
-              <ha-icon icon="${this._confirmDelete ? 'mdi:check' : 'mdi:trash-can-outline'}"></ha-icon>
-            </button>
           </div>
         </div>
 
         <div class="detail-scroll">
-          <!-- Recipe meta (description, times, tags — name is shown in parent header) -->
+          <!-- Recipe meta -->
           <div class="detail-head">
+            <h2 class="recipe-title">${r.name}</h2>
+            ${this._renderQuickRating(r)}
+            ${this._renderActionButtons(r)}
             ${r.description ? html`<p class="detail-desc">${r.description}</p>` : ''}
 
             <div class="meta-row">
@@ -503,32 +713,11 @@ class RmRecipeDetail extends LitElement {
               ` : ''}
             </div>
 
-            ${r.tags?.length ? html`
-              <div class="tags-row">
-                ${r.tags.map(t => html`<span class="tag-chip">${t}</span>`)}
-              </div>
-            ` : ''}
-
-            ${this._renderChipGroup('Courses', r.courses, 'chip-course')}
-            ${this._renderChipGroup('Categories', r.categories, 'chip-category')}
-            ${this._renderChipGroup('Collections', r.collections, 'chip-collection')}
+            ${this._renderChipGroups(r)}
           </div>
 
           <!-- Serving scaler -->
-          ${r.servings ? html`
-            <div class="scaler-row">
-              <span class="scaler-label">Scale servings:</span>
-              <div class="scaler-ctrl">
-                <button class="scaler-btn" @click=${() => { if (this._servingMult > 0.25) this._servingMult = Math.round((this._servingMult - 0.25) * 4) / 4; }}>
-                  <ha-icon icon="mdi:minus"></ha-icon>
-                </button>
-                <span class="scaler-val">×${this._servingMult}</span>
-                <button class="scaler-btn" @click=${() => { this._servingMult = Math.round((this._servingMult + 0.25) * 4) / 4; }}>
-                  <ha-icon icon="mdi:plus"></ha-icon>
-                </button>
-              </div>
-            </div>
-          ` : ''}
+          ${this._renderScaler()}
 
           <!-- Tabs -->
           <div class="tabs-row">
@@ -541,23 +730,14 @@ class RmRecipeDetail extends LitElement {
           </div>
 
           <!-- Wake lock button (shown when setting enabled) -->
-          ${this.settings?.keepScreenOn ? html`
-            <div class="wakelock-row">
-              <button class="wakelock-btn ${this._wakeActive ? 'active' : ''}"
-                @click=${() => this._wakeActive ? this._releaseWakeLock() : this._requestWakeLock()}
-                title="${this._wakeActive ? 'Release screen lock' : 'Keep screen on'}">
-                <ha-icon icon="${this._wakeActive ? 'mdi:eye' : 'mdi:eye-off-outline'}"></ha-icon>
-                ${this._wakeActive ? 'Screen on' : 'Keep screen on'}
-              </button>
-            </div>
-          ` : ''}
+          ${this._renderWakeLock()}
 
           <!-- Tab content -->
           <div class="tab-content">
             ${this._activeTab === 'ingredients' ? this._renderIngredients(r) : ''}
             ${this._activeTab === 'directions'  ? this._renderDirections(r)  : ''}
             ${this._activeTab === 'notes'       ? this._renderNotes(r)       : ''}
-            ${this._activeTab === 'nutrition'   ? this._renderNutrition(r)   : ''}
+            ${this._activeTab === 'nutrition'   ? this._renderNutritionRing(r) : ''}
             ${this._activeTab === 'photos'      ? this._renderPhotos(r)      : ''}
           </div>
         </div>
@@ -598,8 +778,9 @@ class RmRecipeDetail extends LitElement {
       ${r.ingredients?.length ? html`
         <ul class="ingredient-list">
           ${r.ingredients.map((ing, i) => {
-            if (ing.is_heading) {
-              return html`<li class="ing-heading">${ing.name}</li>`;
+            if (ing.is_heading || ing.name?.startsWith('#')) {
+              const headingText = ing.name?.startsWith('#') ? ing.name.slice(1).trim() : ing.name;
+              return html`<li class="ing-heading">${headingText}</li>`;
             }
             const { amount, unit } = this._getDisplayAmount(ing);
             return html`
@@ -753,6 +934,98 @@ class RmRecipeDetail extends LitElement {
             <div class="nutr-divider"></div>
           `;
         })}
+      </div>
+    `;
+  }
+
+  _renderNutritionRing(r) {
+    const n = r?.nutrition || {};
+    const cal = parseFloat(n.calories) || 0;
+    const fat = parseFloat(n.fat) || 0;
+    const carb = parseFloat(n.carbohydrates) || 0;
+    const prot = parseFloat(n.protein) || 0;
+
+    const fatCal = fat * 9;
+    const carbCal = carb * 4;
+    const protCal = prot * 4;
+    const total = fatCal + carbCal + protCal;
+    const hasData = total > 0 || cal > 0;
+
+    const size = 110;
+    const cx = size / 2, cy = size / 2;
+    const ro = 46, ri = 30;
+
+    const MACROS = [
+      { label: 'Carbs',   val: carb, cal: carbCal, color: '#f59e0b' },
+      { label: 'Fat',     val: fat,  cal: fatCal,  color: '#3b82f6' },
+      { label: 'Protein', val: prot, cal: protCal, color: '#22c55e' },
+    ];
+
+    function toXY(angleDeg, radius) {
+      const rad = (angleDeg - 90) * Math.PI / 180;
+      return [cx + radius * Math.cos(rad), cy + radius * Math.sin(rad)];
+    }
+
+    function arcPath(sa, ea) {
+      const [sox, soy] = toXY(sa, ro);
+      const [eox, eoy] = toXY(ea, ro);
+      const [six, siy] = toXY(sa, ri);
+      const [eix, eiy] = toXY(ea, ri);
+      const large = (ea - sa) > 180 ? 1 : 0;
+      return `M ${sox} ${soy} A ${ro} ${ro} 0 ${large} 1 ${eox} ${eoy} L ${eix} ${eiy} A ${ri} ${ri} 0 ${large} 0 ${six} ${siy} Z`;
+    }
+
+    const arcs = [];
+    if (hasData && total > 0) {
+      let angle = 0;
+      for (const m of MACROS) {
+        if (m.cal <= 0) continue;
+        const sweep = (m.cal / total) * 358; // 358 to leave tiny gap
+        arcs.push({ ...m, path: arcPath(angle, angle + sweep) });
+        angle += sweep + 2;
+      }
+    }
+
+    const displayCal = cal > 0 ? cal : (hasData ? Math.round(total / 9) : null);
+
+    return html`
+      <div class="nutr-ring-section">
+        <div class="nutr-section-label">Nutrition</div>
+        <div class="nutr-ring-body">
+          <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+            <circle cx="${cx}" cy="${cy}" r="${(ro + ri) / 2}"
+              fill="none" stroke="var(--rm-border)" stroke-width="${ro - ri}"/>
+            ${arcs.map(a => html`<path d="${a.path}" fill="${a.color}" opacity="0.9"/>`)}
+            <text x="${cx}" y="${cy - 3}" text-anchor="middle"
+              fill="var(--rm-text)" font-size="16" font-weight="700" font-family="inherit">
+              ${displayCal != null ? displayCal : '\u2013'}
+            </text>
+            <text x="${cx}" y="${cy + 11}" text-anchor="middle"
+              fill="var(--rm-text-secondary)" font-size="9" font-family="inherit">
+              ${hasData ? 'kcal' : 'no data'}
+            </text>
+          </svg>
+          <div class="nutr-macros">
+            ${MACROS.map(m => {
+              const pct = total > 0 ? Math.round(m.cal / total * 100) : 0;
+              return html`
+                <div class="nutr-macro-row">
+                  <span class="nutr-macro-dot" style="background:${m.color}"></span>
+                  <span class="nutr-macro-label">${m.label}</span>
+                  <span class="nutr-macro-val">${m.val > 0 ? `${m.val}g` : '\u2014'}</span>
+                  ${pct > 0 ? html`<span class="nutr-macro-pct">${pct}%</span>` : ''}
+                </div>
+              `;
+            })}
+            ${r?.servings ? html`
+              <div class="nutr-macro-row">
+                <span class="nutr-macro-label" style="color:var(--rm-text-muted);font-size:10px">
+                  Per ${r.servings_text || `${r.servings} serving${r.servings !== 1 ? 's' : ''}`}
+                </span>
+              </div>
+            ` : ''}
+          </div>
+        </div>
       </div>
     `;
   }
@@ -929,6 +1202,76 @@ class RmRecipeDetail extends LitElement {
       overflow: hidden;
     }
 
+    /* Wide two-column layout */
+    .detail-container.wide { flex-direction: row; }
+    .detail-left {
+      width: 320px; flex-shrink: 0; display: flex; flex-direction: column;
+      border-right: 1px solid var(--rm-border); overflow: hidden;
+    }
+    .detail-left .hero-img {
+      height: 240px; flex-shrink: 0; position: relative; overflow: hidden;
+      background: var(--rm-bg-elevated);
+    }
+    .detail-left .hero-img img { width: 100%; height: 100%; object-fit: cover; }
+    .detail-left .hero-img .hero-placeholder {
+      width: 100%; height: 100%; display: flex; align-items: center;
+      justify-content: center; color: var(--rm-text-secondary);
+    }
+    .detail-left .hero-img .hero-placeholder ha-icon { --mdc-icon-size: 64px; opacity: 0.3; }
+    .detail-left-scroll {
+      flex: 1; overflow-y: auto; padding: 12px 14px 16px;
+      scrollbar-width: thin; scrollbar-color: var(--rm-border) transparent;
+    }
+    .detail-right { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .detail-right-header { padding: 16px 16px 0; flex-shrink: 0; }
+    .detail-right-scroll {
+      flex: 1; overflow-y: auto; padding: 6px 16px 24px;
+      scrollbar-width: thin; scrollbar-color: var(--rm-border) transparent;
+    }
+    .notes-section { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--rm-border); }
+    .notes-section h3 { margin: 0 0 8px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--rm-text-secondary); }
+
+    /* Recipe title */
+    .recipe-title {
+      margin: 0 0 6px; font-size: 20px; font-weight: 700;
+      color: var(--rm-text); line-height: 1.2;
+    }
+
+    /* Quick rating */
+    .quick-rating { display: flex; gap: 2px; margin: 0 0 8px; }
+    .qr-star { font-size: 20px; cursor: pointer; color: var(--rm-border); -webkit-text-stroke: 1px rgba(200,150,0,0.4); transition: color 0.15s; }
+    .qr-star.filled { color: #f5a623; -webkit-text-stroke: 1px #c47f0a; }
+    .qr-star:hover { color: #f5a623; }
+
+    /* Action buttons row */
+    .action-btns-row {
+      display: flex; gap: 4px; flex-wrap: wrap; margin: 8px 0 12px;
+    }
+    .action-icon-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      background: var(--rm-bg-elevated); border: 1px solid var(--rm-border);
+      border-radius: 10px; padding: 8px 10px; cursor: pointer;
+      color: var(--rm-text-secondary); font-size: 11px; font-weight: 500;
+      transition: all 0.15s; text-decoration: none; min-width: 52px;
+    }
+    .action-icon-btn ha-icon { --mdc-icon-size: 20px; }
+    .action-icon-btn:hover { background: var(--rm-accent-soft); color: var(--rm-accent); border-color: var(--rm-accent); }
+    .action-icon-btn.fav-active { color: var(--error-color, #cf6679); }
+    .action-icon-btn.danger { background: var(--error-color, #cf6679); color: #fff; border-color: var(--error-color, #cf6679); }
+
+    /* Meta chips (wide layout) */
+    .meta-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .meta-chip-icon {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: var(--rm-bg-elevated); border: 1px solid var(--rm-border);
+      border-radius: 20px; padding: 4px 10px; font-size: 12px;
+      color: var(--rm-text-secondary); font-weight: 500;
+    }
+    .meta-chip-icon ha-icon { --mdc-icon-size: 14px; }
+
+    /* All chips inline (wide layout) */
+    .chips-area { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+
     /* Hero */
     .hero {
       flex-shrink: 0;
@@ -1047,6 +1390,7 @@ class RmRecipeDetail extends LitElement {
     .chip-course    { background: rgba(88,166,255,0.15); color: #58a6ff; }
     .chip-category  { background: rgba(63,185,80,0.15);  color: #3fb950; }
     .chip-collection{ background: rgba(210,153,34,0.15); color: #d2a01e; }
+    .chip-tag { background: var(--rm-accent-soft); color: var(--rm-accent); }
 
     /* Scaler */
     .scaler-row {
@@ -1314,7 +1658,7 @@ class RmRecipeDetail extends LitElement {
     .empty-tab ha-icon { --mdc-icon-size: 40px; opacity: 0.35; }
     .empty-tab p { margin: 0; }
 
-    /* Nutrition */
+    /* Nutrition (legacy table) */
     .nutrition-panel {
       max-width: 340px;
       border: 2px solid var(--rm-text, #e5e5ea);
@@ -1348,6 +1692,25 @@ class RmRecipeDetail extends LitElement {
     .nutr-indent { padding-left: 14px; font-size: 12px; }
     .nutr-val { font-weight: 600; white-space: nowrap; }
     .nutr-val em { font-style: normal; font-size: 11px; color: var(--rm-text-secondary, #8e8e93); }
+
+    /* Nutrition ring */
+    .nutr-ring-section {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--rm-border);
+    }
+    .nutr-section-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--rm-text-secondary); margin-bottom: 10px;
+    }
+    .nutr-ring-body { display: flex; align-items: center; gap: 14px; }
+    .nutr-ring-body svg { flex-shrink: 0; }
+    .nutr-macros { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+    .nutr-macro-row { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+    .nutr-macro-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .nutr-macro-label { color: var(--rm-text-secondary); flex: 1; }
+    .nutr-macro-val { font-weight: 600; color: var(--rm-text); }
+    .nutr-macro-pct { color: var(--rm-text-muted); font-size: 10px; }
 
     /* Photos tab */
     .photos-tab { display: flex; flex-direction: column; gap: 16px; }

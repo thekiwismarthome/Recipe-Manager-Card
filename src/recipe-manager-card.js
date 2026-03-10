@@ -975,6 +975,7 @@ class RecipeManagerCard extends LitElement {
               .recipe=${this._selectedRecipe}
               .api=${this._api}
               .settings=${s}
+              .wide=${this._wide}
               .shoppingLists=${this._shoppingLists}
               .slmAvailable=${this._slmAvailable}
               @rm-back=${this._handleBack}
@@ -983,6 +984,7 @@ class RecipeManagerCard extends LitElement {
               @rm-update-recipe=${this._handleUpdateRecipe}
               @rm-add-to-shopping=${this._handleAddToShopping}
               @rm-start-timer=${this._handleStartTimer}
+              @rm-show-planner=${this._handleShowPlanner}
             ></rm-recipe-detail>
           ` : ''}
         </div>
