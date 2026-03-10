@@ -88,6 +88,8 @@ class RmRecipeDetail extends LitElement {
     _metricMode:         { type: Boolean },
     _wakeActive:         { type: Boolean },
     _completedSteps:     { type: Object },  // Set of completed step indices
+    _editIngInput:       { type: String },
+    _editStepInput:      { type: String },
   };
 
   constructor() {
@@ -114,6 +116,8 @@ class RmRecipeDetail extends LitElement {
     this._metricMode = false;
     this._wakeActive = false;
     this._completedSteps = new Set();
+    this._editIngInput = '';
+    this._editStepInput = '';
     this._wakeLockSentinel = null;
     this._wakeLockTimeout = null;
   }
@@ -192,6 +196,8 @@ class RmRecipeDetail extends LitElement {
       collections:   (this.recipe.collections || []).join(', '),
       notes:         this.recipe.notes || '',
       rating:        this.recipe.rating || 0,
+      ingredients:   [...(this.recipe.ingredients || [])],
+      instructions:  [...(this.recipe.instructions || [])],
       // Nutrition
       cal:  n.calories      || '',
       fat:  n.fat           || '',
@@ -213,6 +219,39 @@ class RmRecipeDetail extends LitElement {
 
   _handleEditField(field, value) {
     this._editData = { ...this._editData, [field]: value };
+  }
+
+  _editAddIngredient() {
+    const raw = this._editIngInput.trim();
+    if (!raw) return;
+    let newIng;
+    if (raw.startsWith('#')) {
+      newIng = { name: raw, is_heading: true };
+    } else {
+      const parts = raw.split(/\s+/);
+      let amount = '', unit = '', name = '';
+      if (parts.length >= 3 && !isNaN(parseFloat(parts[0]))) {
+        amount = parts[0]; unit = parts[1]; name = parts.slice(2).join(' ');
+      } else if (parts.length === 2 && !isNaN(parseFloat(parts[0]))) {
+        amount = parts[0]; name = parts[1];
+      } else { name = raw; }
+      newIng = { amount, unit, name };
+    }
+    this._editData = { ...this._editData, ingredients: [...(this._editData.ingredients || []), newIng] };
+    this._editIngInput = '';
+  }
+
+  _editRemoveIngredient(idx) {
+    this._editData = { ...this._editData, ingredients: (this._editData.ingredients || []).filter((_, i) => i !== idx) };
+  }
+
+  _editAddStep(text) {
+    if (!text.trim()) return;
+    this._editData = { ...this._editData, instructions: [...(this._editData.instructions || []), text.trim()] };
+  }
+
+  _editRemoveStep(idx) {
+    this._editData = { ...this._editData, instructions: (this._editData.instructions || []).filter((_, i) => i !== idx) };
   }
 
   async _saveEdit() {
@@ -241,9 +280,11 @@ class RmRecipeDetail extends LitElement {
       courses:     splitList(d.courses),
       categories:  splitList(d.categories),
       collections: splitList(d.collections),
-      notes:       d.notes,
-      rating:      d.rating || null,
-      nutrition:   hasNutrition ? nutrition : null,
+      notes:        d.notes,
+      rating:       d.rating || null,
+      ingredients:  d.ingredients || [],
+      instructions: d.instructions || [],
+      nutrition:    hasNutrition ? nutrition : null,
     };
     this.dispatchEvent(new CustomEvent('rm-update-recipe', {
       detail: { recipeId: this.recipe.id, data },
@@ -552,12 +593,6 @@ class RmRecipeDetail extends LitElement {
           <ha-icon icon="mdi:pencil-outline"></ha-icon>
           Edit
         </button>
-        <button class="action-icon-btn ${this._confirmDelete ? 'danger' : ''}"
-          @click=${this._handleDeleteRecipe}
-          title="${this._confirmDelete ? 'Confirm delete' : 'Delete recipe'}">
-          <ha-icon icon="${this._confirmDelete ? 'mdi:check' : 'mdi:trash-can-outline'}"></ha-icon>
-          ${this._confirmDelete ? 'Confirm' : 'Delete'}
-        </button>
       </div>
     `;
   }
@@ -604,7 +639,7 @@ class RmRecipeDetail extends LitElement {
   _renderWide(r) {
     return html`
       <div class="detail-container wide">
-        <!-- Left column: image + meta + ingredients + nutrition -->
+        <!-- Left column: image + scaler + ingredients + nutrition -->
         <div class="detail-left">
           <div class="hero-img">
             ${r.image_url ? html`
@@ -616,21 +651,21 @@ class RmRecipeDetail extends LitElement {
             `}
           </div>
           <div class="detail-left-scroll">
-            ${this._renderMetaRow(r)}
-            ${this._renderChipGroups(r)}
             ${this._renderScaler()}
             ${this._renderIngredients(r)}
             ${this._renderNutritionRing(r)}
           </div>
         </div>
 
-        <!-- Right column: title + actions + directions + notes -->
+        <!-- Right column: title + actions + meta + directions + notes -->
         <div class="detail-right">
           <div class="detail-right-header">
-            <h1 class="recipe-title">${r.name}</h1>
+            <h1 class="recipe-title wide-centered">${r.name}</h1>
             ${this._renderQuickRating(r)}
             ${this._renderActionButtons(r)}
-            ${r.description ? html`<p class="detail-desc">${r.description}</p>` : ''}
+            ${r.description ? html`<p class="detail-desc wide-centered">${r.description}</p>` : ''}
+            ${this._renderMetaRow(r)}
+            ${this._renderChipGroups(r)}
           </div>
           <div class="detail-right-scroll">
             ${this._renderWakeLock()}
@@ -1137,6 +1172,69 @@ class RmRecipeDetail extends LitElement {
             ${this._renderField('Collections (comma-separated)', 'collections', 'text')}
             ${this._renderField('Notes', 'notes', 'textarea')}
 
+            <!-- Ingredients editor -->
+            <div class="edit-section-label">Ingredients (${(d.ingredients || []).length})</div>
+            ${(d.ingredients || []).length ? html`
+              <ul class="edit-ing-list">
+                ${(d.ingredients || []).map((ing, i) => html`
+                  <li class="${ing.is_heading || ing.name?.startsWith('#') ? 'edit-ing-heading' : ''}">
+                    <span class="edit-ing-text">
+                      ${ing.is_heading || ing.name?.startsWith('#')
+                        ? html`<strong>${ing.name?.startsWith('#') ? ing.name.slice(1).trim() : ing.name}</strong>`
+                        : html`${ing.amount ? `${ing.amount}${ing.unit ? ' ' + ing.unit : ''} ` : ''}${ing.name}`}
+                    </span>
+                    <button class="edit-remove-btn" @click=${() => this._editRemoveIngredient(i)}>
+                      <ha-icon icon="mdi:close"></ha-icon>
+                    </button>
+                  </li>
+                `)}
+              </ul>
+            ` : ''}
+            <div class="edit-add-row">
+              <input
+                type="text"
+                .value=${this._editIngInput}
+                @input=${e => { this._editIngInput = e.target.value; }}
+                @keydown=${e => { if (e.key === 'Enter') this._editAddIngredient(); }}
+                placeholder='e.g. "2 cups flour" or "# Section Header"'
+              />
+              <button class="edit-add-btn" @click=${this._editAddIngredient}>Add</button>
+            </div>
+
+            <!-- Instructions editor -->
+            <div class="edit-section-label">Directions (${(d.instructions || []).length} steps)</div>
+            ${(d.instructions || []).length ? html`
+              <ol class="edit-steps-list">
+                ${(d.instructions || []).map((step, i) => html`
+                  <li>
+                    <span class="edit-ing-text">${step}</span>
+                    <button class="edit-remove-btn" @click=${() => this._editRemoveStep(i)}>
+                      <ha-icon icon="mdi:close"></ha-icon>
+                    </button>
+                  </li>
+                `)}
+              </ol>
+            ` : ''}
+            <div class="edit-add-row">
+              <textarea
+                rows="2"
+                .value=${this._editStepInput}
+                @input=${e => { this._editStepInput = e.target.value; }}
+                @keydown=${e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this._editAddStep(this._editStepInput);
+                    this._editStepInput = '';
+                  }
+                }}
+                placeholder="Type a step, press Enter to add…"
+              ></textarea>
+              <button class="edit-add-btn" @click=${() => {
+                this._editAddStep(this._editStepInput);
+                this._editStepInput = '';
+              }}>Add</button>
+            </div>
+
             <!-- Nutrition section -->
             <div class="edit-section-label">Nutrition Facts (per serving)</div>
             <div class="edit-row-3">
@@ -1157,8 +1255,15 @@ class RmRecipeDetail extends LitElement {
 
           </div>
           <div class="edit-footer">
-            <button class="action-btn" @click=${this._cancelEdit}>Cancel</button>
-            <button class="action-btn primary" @click=${this._saveEdit}>Save</button>
+            <button class="action-btn danger-outline" @click=${this._handleDeleteRecipe}
+              title="${this._confirmDelete ? 'Click again to confirm delete' : 'Delete recipe'}">
+              <ha-icon icon="${this._confirmDelete ? 'mdi:alert' : 'mdi:trash-can-outline'}"></ha-icon>
+              ${this._confirmDelete ? 'Confirm?' : 'Delete'}
+            </button>
+            <div class="edit-footer-right">
+              <button class="action-btn" @click=${this._cancelEdit}>Cancel</button>
+              <button class="action-btn primary" @click=${this._saveEdit}>Save</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1236,6 +1341,10 @@ class RmRecipeDetail extends LitElement {
       margin: 0 0 6px; font-size: 20px; font-weight: 700;
       color: var(--rm-text); line-height: 1.2;
     }
+    .recipe-title.wide-centered { text-align: center; font-size: 22px; }
+    .detail-desc.wide-centered { text-align: center; }
+    .detail-right-header .quick-rating { justify-content: center; }
+    .detail-right-header .action-btns-row { justify-content: center; }
 
     /* Quick rating */
     .quick-rating { display: flex; gap: 2px; margin: 0 0 8px; }
@@ -1917,10 +2026,55 @@ class RmRecipeDetail extends LitElement {
     .edit-footer {
       display: flex;
       gap: 8px;
-      justify-content: flex-end;
+      align-items: center;
+      justify-content: space-between;
       padding: 12px 16px;
       border-top: 1px solid var(--rm-border, rgba(255,255,255,0.08));
       flex-shrink: 0;
+    }
+    .edit-footer-right { display: flex; gap: 8px; }
+
+    /* Edit ingredient/step lists */
+    .edit-ing-list, .edit-steps-list {
+      list-style: none; padding: 0; margin: 0 0 6px;
+    }
+    .edit-ing-list li, .edit-steps-list li {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 5px 0; border-bottom: 1px solid var(--rm-border, rgba(255,255,255,0.06));
+      font-size: 13px; color: var(--rm-text, #e5e5ea);
+    }
+    .edit-ing-heading { font-weight: 700; color: var(--rm-accent) !important; }
+    .edit-ing-text { flex: 1; line-height: 1.4; }
+    .edit-remove-btn {
+      background: none; border: none; cursor: pointer; flex-shrink: 0;
+      color: var(--rm-text-secondary, #8e8e93); padding: 2px; margin-top: 1px;
+    }
+    .edit-remove-btn ha-icon { --mdc-icon-size: 14px; }
+    .edit-add-row {
+      display: flex; gap: 8px; align-items: flex-end; margin-bottom: 4px;
+    }
+    .edit-add-row input, .edit-add-row textarea {
+      flex: 1; background: var(--rm-bg-elevated, #232833);
+      border: 1px solid var(--rm-border, rgba(255,255,255,0.12));
+      border-radius: 8px; color: var(--rm-text, #e5e5ea);
+      padding: 7px 10px; font-size: 13px; font-family: inherit; resize: none;
+    }
+    .edit-add-row input:focus, .edit-add-row textarea:focus {
+      outline: none; border-color: var(--rm-accent, #9fa8da);
+    }
+    .edit-add-btn {
+      background: var(--rm-accent, #9fa8da); border: none; border-radius: 8px;
+      color: #fff; padding: 7px 12px; cursor: pointer; font-size: 13px;
+      white-space: nowrap; flex-shrink: 0;
+    }
+
+    /* Danger outline button */
+    .action-btn.danger-outline {
+      color: var(--error-color, #cf6679);
+      border-color: var(--error-color, #cf6679);
+    }
+    .action-btn.danger-outline:hover {
+      background: var(--error-color, #cf6679); color: #fff;
     }
   `;
 }

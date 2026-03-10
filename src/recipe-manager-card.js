@@ -659,10 +659,14 @@ class RecipeManagerCard extends LitElement {
   }
 
   async _handleAddRecipe(e) {
-    await this._api.addRecipe(e.detail.data);
-    this._navDirection = 'back';
-    this._view = 'grid';
-    await this._loadRecipes(); await this._loadTags();
+    try {
+      await this._api.addRecipe(e.detail.data);
+      this._navDirection = 'back';
+      this._view = 'grid';
+      await this._loadRecipes(); await this._loadTags();
+    } catch (err) {
+      console.error('[Recipe Manager] Failed to save recipe:', err);
+    }
   }
 
   async _handleImportDone() {
@@ -830,7 +834,7 @@ class RecipeManagerCard extends LitElement {
       inSettings ? 'Settings'
         : inAdd ? 'New Recipe'
           : inTimers ? 'Timers'
-            : inDetail ? this._selectedRecipe.name
+            : inDetail ? ''
               : this._view === 'planner' ? 'Meal Planner'
                 : this._view === 'shopping' ? 'Shopping List'
                   : 'Recipes';
