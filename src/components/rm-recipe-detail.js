@@ -637,11 +637,16 @@ class RmRecipeDetail extends LitElement {
   }
 
   _renderWide(r) {
+    const groups = this._groupIngredients(r.ingredients);
+    const picking = this._showShoppingPicker;
+    const checkedSet = this._checkedIngredients;
+    const checkedCount = checkedSet?.size ?? 0;
+
     return html`
       <div class="detail-container wide">
-        <!-- Left column: image + scaler + ingredients + nutrition -->
-        <div class="detail-left">
-          <div class="hero-img">
+        <!-- Top row: image card + info card -->
+        <div class="wide-top-row">
+          <div class="wide-image-card">
             ${r.image_url ? html`
               <img src="${r.image_url}" alt="${r.name}" />
             ` : html`
@@ -650,16 +655,8 @@ class RmRecipeDetail extends LitElement {
               </div>
             `}
           </div>
-          <div class="detail-left-scroll">
-            ${this._renderScaler()}
-            ${this._renderIngredients(r)}
-            ${this._renderNutritionRing(r)}
-          </div>
-        </div>
 
-        <!-- Right column: title + actions + meta + directions + notes -->
-        <div class="detail-right">
-          <div class="detail-right-header">
+          <div class="wide-info-card">
             <h1 class="recipe-title wide-centered">${r.name}</h1>
             ${this._renderQuickRating(r)}
             ${this._renderActionButtons(r)}
@@ -667,8 +664,93 @@ class RmRecipeDetail extends LitElement {
             ${this._renderMetaRow(r)}
             ${this._renderChipGroups(r)}
           </div>
-          <div class="detail-right-scroll">
-            ${this._renderWakeLock()}
+        </div>
+
+        <!-- Scaler + wake lock -->
+        <div class="wide-utility-row">
+          ${this._renderScaler()}
+          ${this._renderWakeLock()}
+        </div>
+
+        <!-- Bottom: ingredients (left) + directions (right) -->
+        <div class="wide-bottom-row">
+          <!-- Ingredients column with section cards -->
+          <div class="wide-ing-col">
+            ${groups.map(g => html`
+              <div class="wide-section-card">
+                ${g.header ? html`<div class="wide-section-title">${g.header}</div>` : ''}
+                ${g.items.length ? html`
+                  <ul class="ingredient-list">
+                    ${g.items.map((ing) => {
+                      const globalIdx = (r.ingredients || []).indexOf(ing);
+                      const { amount, unit } = this._getDisplayAmount(ing);
+                      return html`
+                        <li class="ingredient-item ${picking ? 'selectable' : ''}"
+                          @click=${picking ? () => this._toggleIngredient(globalIdx) : undefined}>
+                          ${picking ? html`
+                            <span class="ing-check ${checkedSet?.has(globalIdx) ? 'checked' : ''}">
+                              ${checkedSet?.has(globalIdx) ? html`<ha-icon icon="mdi:check"></ha-icon>` : ''}
+                            </span>
+                          ` : ''}
+                          <span class="ing-amount">${amount} ${unit}</span>
+                          <span class="ing-name">${ing.name}${ing.notes ? html` <em class="ing-notes">(${ing.notes})</em>` : ''}</span>
+                        </li>
+                      `;
+                    })}
+                  </ul>
+                ` : ''}
+              </div>
+            `)}
+
+            <!-- Nutrition ring card -->
+            <div class="wide-section-card">
+              ${this._renderNutritionRing(r)}
+            </div>
+
+            <!-- Shopping section -->
+            <div class="wide-section-card">
+              ${this._shoppingResult === 'success' ? html`
+                <div class="shopping-success">
+                  <ha-icon icon="mdi:check-circle-outline"></ha-icon>
+                  Added to shopping list!
+                </div>
+              ` : picking ? html`
+                <div class="shopping-picker-panel">
+                  <div class="picker-select-row">
+                    <button class="picker-sel-btn" @click=${this._selectAllIngredients}>Select All</button>
+                    <button class="picker-sel-btn" @click=${this._clearAllIngredients}>Clear All</button>
+                    ${this.slmAvailable && this.shoppingLists.length ? html`
+                      <select class="list-select" .value=${this._selectedListId}
+                        @change=${e => { this._selectedListId = e.target.value; }}>
+                        ${this.shoppingLists.map(l => html`
+                          <option value="${l.id}" ?selected=${l.id === this._selectedListId}>${l.name}</option>
+                        `)}
+                      </select>
+                    ` : ''}
+                  </div>
+                  <div class="picker-btns">
+                    <button class="action-btn" @click=${() => { this._showShoppingPicker = false; }}>Cancel</button>
+                    <button class="action-btn primary"
+                      ?disabled=${this._shoppingAdding || !checkedCount}
+                      @click=${this._handleAddToShopping}>
+                      ${this._shoppingAdding
+                        ? html`<ha-circular-progress active size="tiny"></ha-circular-progress>`
+                        : `Add${checkedCount ? ` (${checkedCount})` : ''}`}
+                    </button>
+                  </div>
+                </div>
+              ` : html`
+                <button class="action-btn primary shopping-btn" @click=${this._openShoppingPicker}>
+                  <ha-icon icon="mdi:cart-plus"></ha-icon>
+                  Add to Shopping List
+                </button>
+              `}
+            </div>
+          </div>
+
+          <!-- Directions card -->
+          <div class="wide-directions-card">
+            <div class="wide-section-title">Directions</div>
             ${this._renderDirections(r)}
             ${r.notes ? html`
               <div class="notes-section">
@@ -789,6 +871,22 @@ class RmRecipeDetail extends LitElement {
       if (conv) return conv;
     }
     return { amount: this._scaleAmount(ing.amount) || '', unit: ing.unit || '' };
+  }
+
+  _groupIngredients(ingredients) {
+    const groups = [];
+    let current = { header: null, items: [] };
+    for (const ing of (ingredients || [])) {
+      if (ing.is_heading || ing.name?.startsWith('#')) {
+        if (current.items.length > 0 || current.header !== null) groups.push(current);
+        const label = ing.name?.startsWith('#') ? ing.name.slice(1).trim() : ing.name;
+        current = { header: label || '', items: [] };
+      } else {
+        current.items.push(ing);
+      }
+    }
+    if (current.items.length > 0 || current.header !== null) groups.push(current);
+    return groups.length ? groups : [{ header: null, items: ingredients || [] }];
   }
 
   _renderIngredients(r) {
@@ -2075,6 +2173,100 @@ class RmRecipeDetail extends LitElement {
     }
     .action-btn.danger-outline:hover {
       background: var(--error-color, #cf6679); color: #fff;
+    }
+
+    /* ── Wide card layout ───────────────────────────────── */
+    .wide-top-row {
+      display: flex;
+      gap: 14px;
+      padding: 14px;
+      flex-shrink: 0;
+      height: min(260px, 35vh);
+    }
+    .wide-image-card {
+      flex: 0 0 33%;
+      border-radius: 16px;
+      overflow: hidden;
+      background: var(--rm-bg-elevated);
+      border: 1px solid var(--rm-border);
+    }
+    .wide-image-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .wide-image-card .hero-placeholder {
+      width: 100%; height: 100%; display: flex; align-items: center;
+      justify-content: center; color: var(--rm-text-secondary);
+    }
+    .wide-image-card .hero-placeholder ha-icon { --mdc-icon-size: 64px; opacity: 0.3; }
+
+    .wide-info-card {
+      flex: 1;
+      border-radius: 16px;
+      background: var(--rm-bg-elevated);
+      border: 1px solid var(--rm-border);
+      padding: 16px 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      scrollbar-width: thin;
+      scrollbar-color: var(--rm-border) transparent;
+    }
+    .wide-info-card .recipe-title { font-size: 22px; margin-bottom: 4px; }
+    .wide-info-card .quick-rating { justify-content: center; margin-bottom: 8px; }
+    .wide-info-card .action-btns-row { justify-content: center; }
+    .wide-info-card .detail-desc { text-align: center; margin: 8px 0; }
+    .wide-info-card .meta-chips { justify-content: center; margin-top: 8px; }
+    .wide-info-card .chips-area { justify-content: center; margin-top: 4px; }
+
+    .wide-utility-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px 8px;
+      flex-shrink: 0;
+      min-height: 0;
+    }
+    .wide-utility-row:empty { display: none; }
+
+    .wide-bottom-row {
+      display: flex;
+      gap: 14px;
+      padding: 0 14px 14px;
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+    .wide-ing-col {
+      flex: 0 0 40%;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--rm-border) transparent;
+    }
+    .wide-directions-card {
+      flex: 1;
+      overflow-y: auto;
+      background: var(--rm-bg-elevated);
+      border: 1px solid var(--rm-border);
+      border-radius: 16px;
+      padding: 14px 16px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--rm-border) transparent;
+    }
+    .wide-section-card {
+      background: var(--rm-bg-elevated);
+      border: 1px solid var(--rm-border);
+      border-radius: 14px;
+      padding: 12px 14px;
+    }
+    .wide-section-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--rm-text);
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--rm-border);
     }
   `;
 }
