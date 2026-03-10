@@ -9,7 +9,7 @@ export default {
     format: 'es',
   },
   plugins: [
-    resolve(),
+    resolve({ browser: true, preferBuiltins: false }),
     commonjs(),
     terser({
       ecma: 2021,
