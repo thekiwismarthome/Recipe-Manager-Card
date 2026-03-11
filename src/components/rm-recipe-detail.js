@@ -630,7 +630,7 @@ class RmRecipeDetail extends LitElement {
     if (!r?.servings) return '';
     return html`
       <div class="scaler-row">
-        <span class="scaler-label">Scale servings:</span>
+        <ha-icon class="scaler-icon" icon="mdi:silverware-fork-knife"></ha-icon>
         <div class="scaler-ctrl">
           <button class="scaler-btn" @click=${() => { if (this._servingMult > 0.25) this._servingMult = Math.round((this._servingMult - 0.25) * 4) / 4; }}>
             <ha-icon icon="mdi:minus"></ha-icon>
@@ -1700,29 +1700,27 @@ class RmRecipeDetail extends LitElement {
     .chip-tag { background: var(--rm-accent-soft); color: var(--rm-accent); }
 
     /* Scaler */
-    .scaler-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-    .scaler-label { font-size: 13px; color: var(--rm-text-secondary, #8e8e93); }
-    .scaler-ctrl { display: flex; align-items: center; gap: 8px; }
+    .scaler-row { display: flex; align-items: center; gap: 8px; }
+    .scaler-icon { --mdc-icon-size: 18px; color: var(--rm-text-secondary); flex-shrink: 0; }
+    .scaler-ctrl { display: flex; align-items: center; gap: 6px; }
     .scaler-btn {
-      background: var(--rm-bg-elevated, #2c2c2e);
-      border: 1px solid var(--rm-border, rgba(255,255,255,0.08));
+      background: var(--rm-bg-elevated);
+      border: 1px solid var(--rm-border);
       border-radius: 50%;
-      width: 28px;
-      height: 28px;
+      width: 34px; height: 34px;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--rm-text, #e5e5ea);
-      padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--rm-text-secondary); padding: 0; transition: all 0.15s;
     }
-    .scaler-btn ha-icon { --mdc-icon-size: 16px; }
-    .scaler-val { font-size: 14px; font-weight: 600; color: var(--rm-text, #e5e5ea); min-width: 36px; text-align: center; }
+    .scaler-btn:hover { background: var(--rm-accent-soft); color: var(--rm-accent); border-color: var(--rm-accent); }
+    .scaler-btn ha-icon { --mdc-icon-size: 18px; }
+    .scaler-val {
+      font-size: 13px; font-weight: 600; color: var(--rm-text);
+      min-width: 34px; height: 34px; text-align: center;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--rm-bg-elevated); border: 1px solid var(--rm-border);
+      border-radius: 8px;
+    }
 
     /* Tabs */
     .tabs-row {
