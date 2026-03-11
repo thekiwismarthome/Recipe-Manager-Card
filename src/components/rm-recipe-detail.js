@@ -701,9 +701,8 @@ class RmRecipeDetail extends LitElement {
 
           <!-- col 1: ingredients column -->
           <div class="wide-ing-col">
-            <!-- ingredients header with shopping cart icon -->
+            <!-- ingredients header: cart icon only, no label -->
             <div class="wide-col-header">
-              <span class="wide-col-title">Ingredients</span>
               ${this._shoppingResult === 'success' ? html`
                 <span class="ing-shop-success"><ha-icon icon="mdi:check-circle-outline"></ha-icon></span>
               ` : html`
@@ -1127,7 +1126,10 @@ class RmRecipeDetail extends LitElement {
     const hasData = total > 0 || cal > 0;
 
     if (!hasData) {
-      return html`<p class="empty-tab" style="margin:0;padding:12px 0">No nutrition data.</p>`;
+      return html`
+        <div class="nutr-card">
+          <p class="empty-tab" style="margin:0;padding:8px 0;text-align:center">No nutritional information available.</p>
+        </div>`;
     }
 
     // Donut ring
@@ -2339,6 +2341,7 @@ class RmRecipeDetail extends LitElement {
       width: calc(calc(8 / var(--ion-grid-columns, 12)) * 100% - 14px);
       max-width: calc(calc(8 / var(--ion-grid-columns, 12)) * 100% - 14px);
       min-width: 0;
+      box-sizing: border-box;
       margin-left: 14px;
       border-radius: 16px;
       background: var(--rm-bg-elevated);
@@ -2384,11 +2387,11 @@ class RmRecipeDetail extends LitElement {
       gap: 10px;
     }
 
-    /* Ingredients column header (label + cart icon) */
+    /* Ingredients column header (cart icon only, right-aligned) */
     .wide-col-header {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-end;
       padding: 0 2px 2px;
     }
     .wide-col-title {
