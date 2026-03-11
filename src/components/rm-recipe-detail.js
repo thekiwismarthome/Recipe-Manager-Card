@@ -788,6 +788,7 @@ class RmRecipeDetail extends LitElement {
 
           <!-- col 2: directions column, each step its own card -->
           <div class="wide-dir-col">
+            <div class="wide-dir-spacer"></div>
             ${this._renderWakeLock()}
             ${(r.instructions || []).length ? (r.instructions || []).map((step, i) => {
               const done = this._completedSteps.has(i);
@@ -2410,7 +2411,9 @@ class RmRecipeDetail extends LitElement {
       align-items: center;
       justify-content: space-between;
       padding-bottom: 2px;
+      min-height: 42px;
     }
+    .wide-dir-spacer { min-height: 42px; }
     .ing-shop-btn {
       background: var(--rm-bg-elevated); border: 1px solid var(--rm-border);
       border-radius: 50%; width: 34px; height: 34px; cursor: pointer;
