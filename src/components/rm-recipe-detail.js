@@ -260,6 +260,22 @@ class RmRecipeDetail extends LitElement {
     this._editData = { ...this._editData, ingredients: (this._editData.ingredients || []).filter((_, i) => i !== idx) };
   }
 
+  _editMoveIngredient(idx, dir) {
+    const arr = [...(this._editData.ingredients || [])];
+    const to = idx + dir;
+    if (to < 0 || to >= arr.length) return;
+    [arr[idx], arr[to]] = [arr[to], arr[idx]];
+    this._editData = { ...this._editData, ingredients: arr };
+  }
+
+  _editMoveStep(idx, dir) {
+    const arr = [...(this._editData.instructions || [])];
+    const to = idx + dir;
+    if (to < 0 || to >= arr.length) return;
+    [arr[idx], arr[to]] = [arr[to], arr[idx]];
+    this._editData = { ...this._editData, instructions: arr };
+  }
+
   _editAddStep(text) {
     if (!text.trim()) return;
     this._editData = { ...this._editData, instructions: [...(this._editData.instructions || []), text.trim()] };
@@ -1363,6 +1379,14 @@ class RmRecipeDetail extends LitElement {
               <ul class="edit-ing-list">
                 ${(d.ingredients || []).map((ing, i) => html`
                   <li class="${ing.is_heading || ing.name?.startsWith('#') ? 'edit-ing-heading' : ''}">
+                    <div class="edit-reorder-btns">
+                      <button class="edit-move-btn" ?disabled=${i === 0} @click=${() => this._editMoveIngredient(i, -1)} title="Move up">
+                        <ha-icon icon="mdi:chevron-up"></ha-icon>
+                      </button>
+                      <button class="edit-move-btn" ?disabled=${i === (d.ingredients.length - 1)} @click=${() => this._editMoveIngredient(i, 1)} title="Move down">
+                        <ha-icon icon="mdi:chevron-down"></ha-icon>
+                      </button>
+                    </div>
                     <span class="edit-ing-text">
                       ${ing.is_heading || ing.name?.startsWith('#')
                         ? html`<strong>${ing.name?.startsWith('#') ? ing.name.slice(1).trim() : ing.name}</strong>`
@@ -1392,6 +1416,14 @@ class RmRecipeDetail extends LitElement {
               <ol class="edit-steps-list">
                 ${(d.instructions || []).map((step, i) => html`
                   <li>
+                    <div class="edit-reorder-btns">
+                      <button class="edit-move-btn" ?disabled=${i === 0} @click=${() => this._editMoveStep(i, -1)} title="Move up">
+                        <ha-icon icon="mdi:chevron-up"></ha-icon>
+                      </button>
+                      <button class="edit-move-btn" ?disabled=${i === (d.instructions.length - 1)} @click=${() => this._editMoveStep(i, 1)} title="Move down">
+                        <ha-icon icon="mdi:chevron-down"></ha-icon>
+                      </button>
+                    </div>
                     <span class="edit-ing-text">${step}</span>
                     <button class="edit-remove-btn" @click=${() => this._editRemoveStep(i)}>
                       <ha-icon icon="mdi:close"></ha-icon>
@@ -2263,6 +2295,12 @@ class RmRecipeDetail extends LitElement {
     }
     .edit-ing-heading { font-weight: 700; color: var(--rm-accent) !important; }
     .edit-ing-text { flex: 1; line-height: 1.4; }
+    .edit-reorder-btns { display: flex; flex-direction: column; flex-shrink: 0; gap: 0; }
+    .edit-move-btn {
+      background: none; border: none; cursor: pointer; padding: 0; line-height: 1;
+      color: var(--rm-text-secondary, #8e8e93); --mdc-icon-size: 14px;
+    }
+    .edit-move-btn:disabled { opacity: 0.2; cursor: default; }
     .edit-remove-btn {
       background: none; border: none; cursor: pointer; flex-shrink: 0;
       color: var(--rm-text-secondary, #8e8e93); padding: 2px; margin-top: 1px;
