@@ -104,6 +104,8 @@ class RmRecipeDetail extends LitElement {
     _editIngInput:        { type: String },
     _editStepInput:       { type: String },
     _nutritionExpanded:   { type: Boolean },
+    _dragIngOver:         { type: Number },
+    _dragStepOver:        { type: Number },
   };
 
   constructor() {
@@ -133,6 +135,10 @@ class RmRecipeDetail extends LitElement {
     this._editIngInput = '';
     this._editStepInput = '';
     this._nutritionExpanded = false;
+    this._dragIngOver = -1;
+    this._dragStepOver = -1;
+    this._dragIngFrom = -1;
+    this._dragStepFrom = -1;
     this._wakeLockSentinel = null;
     this._wakeLockTimeout = null;
   }
@@ -274,6 +280,26 @@ class RmRecipeDetail extends LitElement {
     if (to < 0 || to >= arr.length) return;
     [arr[idx], arr[to]] = [arr[to], arr[idx]];
     this._editData = { ...this._editData, instructions: arr };
+  }
+
+  _editDropIngredient(from, to) {
+    if (from === to || from < 0 || to < 0) return;
+    const arr = [...(this._editData.ingredients || [])];
+    const [item] = arr.splice(from, 1);
+    arr.splice(to, 0, item);
+    this._editData = { ...this._editData, ingredients: arr };
+    this._dragIngOver = -1;
+    this._dragIngFrom = -1;
+  }
+
+  _editDropStep(from, to) {
+    if (from === to || from < 0 || to < 0) return;
+    const arr = [...(this._editData.instructions || [])];
+    const [item] = arr.splice(from, 1);
+    arr.splice(to, 0, item);
+    this._editData = { ...this._editData, instructions: arr };
+    this._dragStepOver = -1;
+    this._dragStepFrom = -1;
   }
 
   _editAddStep(text) {
@@ -1378,7 +1404,21 @@ class RmRecipeDetail extends LitElement {
             ${(d.ingredients || []).length ? html`
               <ul class="edit-ing-list">
                 ${(d.ingredients || []).map((ing, i) => html`
-                  <li class="${ing.is_heading || ing.name?.startsWith('#') ? 'edit-ing-heading' : ''}">
+                  <li
+                    draggable="true"
+                    class="${ing.is_heading || ing.name?.startsWith('#') ? 'edit-ing-heading' : ''} ${this._dragIngOver === i ? 'drag-over' : ''}"
+                    @dragstart=${e => { this._dragIngFrom = i; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)); }}
+                    @dragover=${e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (this._dragIngOver !== i) this._dragIngOver = i; }}
+                    @dragleave=${() => { if (this._dragIngOver === i) this._dragIngOver = -1; }}
+                    @drop=${e => { e.preventDefault(); this._editDropIngredient(this._dragIngFrom, i); }}
+                    @dragend=${() => { this._dragIngOver = -1; this._dragIngFrom = -1; }}
+                  >
+                    <ha-icon icon="mdi:drag-vertical" class="drag-handle"></ha-icon>
+                    <span class="edit-ing-text">
+                      ${ing.is_heading || ing.name?.startsWith('#')
+                        ? html`<strong>${ing.name?.startsWith('#') ? ing.name.slice(1).trim() : ing.name}</strong>`
+                        : html`${ing.amount ? `${ing.amount}${ing.unit ? ' ' + ing.unit : ''} ` : ''}${ing.name}`}
+                    </span>
                     <div class="edit-reorder-btns">
                       <button class="edit-move-btn" ?disabled=${i === 0} @click=${() => this._editMoveIngredient(i, -1)} title="Move up">
                         <ha-icon icon="mdi:chevron-up"></ha-icon>
@@ -1387,11 +1427,6 @@ class RmRecipeDetail extends LitElement {
                         <ha-icon icon="mdi:chevron-down"></ha-icon>
                       </button>
                     </div>
-                    <span class="edit-ing-text">
-                      ${ing.is_heading || ing.name?.startsWith('#')
-                        ? html`<strong>${ing.name?.startsWith('#') ? ing.name.slice(1).trim() : ing.name}</strong>`
-                        : html`${ing.amount ? `${ing.amount}${ing.unit ? ' ' + ing.unit : ''} ` : ''}${ing.name}`}
-                    </span>
                     <button class="edit-remove-btn" @click=${() => this._editRemoveIngredient(i)}>
                       <ha-icon icon="mdi:close"></ha-icon>
                     </button>
@@ -1415,7 +1450,17 @@ class RmRecipeDetail extends LitElement {
             ${(d.instructions || []).length ? html`
               <ol class="edit-steps-list">
                 ${(d.instructions || []).map((step, i) => html`
-                  <li>
+                  <li
+                    draggable="true"
+                    class="${this._dragStepOver === i ? 'drag-over' : ''}"
+                    @dragstart=${e => { this._dragStepFrom = i; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)); }}
+                    @dragover=${e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (this._dragStepOver !== i) this._dragStepOver = i; }}
+                    @dragleave=${() => { if (this._dragStepOver === i) this._dragStepOver = -1; }}
+                    @drop=${e => { e.preventDefault(); this._editDropStep(this._dragStepFrom, i); }}
+                    @dragend=${() => { this._dragStepOver = -1; this._dragStepFrom = -1; }}
+                  >
+                    <ha-icon icon="mdi:drag-vertical" class="drag-handle"></ha-icon>
+                    <span class="edit-ing-text">${step}</span>
                     <div class="edit-reorder-btns">
                       <button class="edit-move-btn" ?disabled=${i === 0} @click=${() => this._editMoveStep(i, -1)} title="Move up">
                         <ha-icon icon="mdi:chevron-up"></ha-icon>
@@ -1424,7 +1469,6 @@ class RmRecipeDetail extends LitElement {
                         <ha-icon icon="mdi:chevron-down"></ha-icon>
                       </button>
                     </div>
-                    <span class="edit-ing-text">${step}</span>
                     <button class="edit-remove-btn" @click=${() => this._editRemoveStep(i)}>
                       <ha-icon icon="mdi:close"></ha-icon>
                     </button>
@@ -2295,6 +2339,15 @@ class RmRecipeDetail extends LitElement {
     }
     .edit-ing-heading { font-weight: 700; color: var(--rm-accent) !important; }
     .edit-ing-text { flex: 1; line-height: 1.4; }
+    .drag-handle {
+      flex-shrink: 0; cursor: grab; color: var(--rm-text-muted, #636366);
+      --mdc-icon-size: 18px; touch-action: none;
+    }
+    .drag-handle:active { cursor: grabbing; }
+    .edit-ing-list li.drag-over,
+    .edit-steps-list li.drag-over {
+      border-top: 2px solid var(--rm-accent); margin-top: -1px;
+    }
     .edit-reorder-btns { display: flex; flex-direction: column; flex-shrink: 0; gap: 0; }
     .edit-move-btn {
       background: none; border: none; cursor: pointer; padding: 0; line-height: 1;
