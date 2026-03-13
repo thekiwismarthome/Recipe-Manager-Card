@@ -1,7 +1,7 @@
 /**
  * Recipe detail view — full recipe with ingredients, directions, nutrition, photos and actions.
  */
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, svg, css } from 'lit';
 
 const NUTRITION_FIELDS = [
   { key: 'calories',      label: 'Calories',         unit: 'kcal', bold: true },
@@ -1192,15 +1192,18 @@ class RmRecipeDetail extends LitElement {
       { label: 'Protein',  val: prot, cal: protCal, color: '#22c55e' },
     ];
 
-    // Conic-gradient donut ring (avoids SVG namespace issues with Lit html template)
-    const carbPct  = total > 0 ? carbCal / total * 100 : 0;
-    const fatPct   = total > 0 ? fatCal  / total * 100 : 0;
-    const protPct  = total > 0 ? protCal / total * 100 : 0;
-    const c1 = carbPct.toFixed(2);
-    const c2 = (carbPct + fatPct).toFixed(2);
-    const ringBg = total > 0
-      ? `conic-gradient(#f59e0b 0% ${c1}%, #3b82f6 ${c1}% ${c2}%, #22c55e ${c2}% 100%)`
-      : 'var(--rm-border, #3a3a3c)';
+    // SVG stroke-dasharray arcs using svg`` template tag (correct SVG namespace)
+    const rad = 42, cx = 50, cy = 50;
+    const circ = 2 * Math.PI * rad;
+    const gapDeg = 5; // degrees of gap between segments
+    const gapLen = circ * gapDeg / 360;
+
+    const carbArc = total > 0 ? Math.max(0, (carbCal / total) * circ - gapLen) : 0;
+    const fatArc  = total > 0 ? Math.max(0, (fatCal  / total) * circ - gapLen) : 0;
+    const protArc = total > 0 ? Math.max(0, (protCal / total) * circ - gapLen) : 0;
+    const carbStartDeg = -90;
+    const fatStartDeg  = carbStartDeg + (total > 0 ? (carbCal / total) * 360 : 0);
+    const protStartDeg = fatStartDeg  + (total > 0 ? (fatCal  / total) * 360 : 0);
 
     const displayCal = cal > 0 ? Math.round(cal) : (total > 0 ? Math.round(total) : null);
 
@@ -1218,11 +1221,33 @@ class RmRecipeDetail extends LitElement {
       <div class="nutr-card">
         <!-- Top row: donut ring + macro columns -->
         <div class="nutr-top">
-          <div class="nutr-ring" style="background:${ringBg}">
-            <div class="nutr-ring-hole">
-              <span class="nutr-ring-cal">${displayCal ?? '–'}</span>
-              <span class="nutr-ring-lbl">kcal</span>
-            </div>
+          <div class="nutr-ring-wrap">
+            <svg width="90" height="90" viewBox="0 0 100 100" style="display:block">
+              <!-- Background track -->
+              <circle cx="${cx}" cy="${cy}" r="${rad}" fill="none"
+                stroke="var(--rm-border)" stroke-width="7"/>
+              <!-- Colored arcs — svg`` tag ensures correct SVG namespace -->
+              ${total > 0 ? svg`
+                <circle cx="${cx}" cy="${cy}" r="${rad}" fill="none"
+                  stroke="#f59e0b" stroke-width="7" stroke-linecap="round"
+                  stroke-dasharray="${carbArc} ${circ}"
+                  transform="rotate(${carbStartDeg} ${cx} ${cy})"/>
+                <circle cx="${cx}" cy="${cy}" r="${rad}" fill="none"
+                  stroke="#3b82f6" stroke-width="7" stroke-linecap="round"
+                  stroke-dasharray="${fatArc} ${circ}"
+                  transform="rotate(${fatStartDeg} ${cx} ${cy})"/>
+                <circle cx="${cx}" cy="${cy}" r="${rad}" fill="none"
+                  stroke="#22c55e" stroke-width="7" stroke-linecap="round"
+                  stroke-dasharray="${protArc} ${circ}"
+                  transform="rotate(${protStartDeg} ${cx} ${cy})"/>
+              ` : ''}
+              <text x="${cx}" y="${cy - 2}" text-anchor="middle"
+                fill="var(--rm-text)" font-size="16" font-weight="700" font-family="inherit">
+                ${displayCal ?? '–'}
+              </text>
+              <text x="${cx}" y="${cy + 12}" text-anchor="middle"
+                fill="var(--rm-text-secondary)" font-size="9" font-family="inherit">cals</text>
+            </svg>
           </div>
 
           <div class="nutr-macro-cols">
@@ -2056,18 +2081,7 @@ class RmRecipeDetail extends LitElement {
     /* Nutrition card */
     .nutr-card { display: flex; flex-direction: column; gap: 10px; }
     .nutr-top { display: flex; align-items: center; gap: 14px; }
-    .nutr-ring {
-      width: 90px; height: 90px; flex-shrink: 0;
-      border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    }
-    .nutr-ring-hole {
-      width: 62%; height: 62%;
-      background: var(--ha-card-background, var(--rm-bg, #1c1c1e));
-      border-radius: 50%; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 0;
-    }
-    .nutr-ring-cal { font-size: 15px; font-weight: 700; color: var(--rm-text); line-height: 1.1; }
-    .nutr-ring-lbl { font-size: 8px; color: var(--rm-text-secondary); }
+    .nutr-ring-wrap { flex-shrink: 0; width: 90px; height: 90px; }
     .nutr-macro-cols { display: flex; gap: 10px; flex: 1; justify-content: space-around; }
     .nutr-macro-col { display: flex; flex-direction: column; align-items: center; gap: 2px; }
     .nutr-mcol-num { font-size: 17px; font-weight: 700; line-height: 1; }
