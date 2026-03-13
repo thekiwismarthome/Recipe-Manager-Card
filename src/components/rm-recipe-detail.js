@@ -1186,39 +1186,23 @@ class RmRecipeDetail extends LitElement {
         </div>`;
     }
 
-    // Donut ring
-    const size = 90;
-    const cx = size / 2, cy = size / 2;
-    const ro = 38, ri = 25;
-
     const MACROS = [
       { label: 'Carbs',    val: carb, cal: carbCal, color: '#f59e0b' },
       { label: 'Total fat',val: fat,  cal: fatCal,  color: '#3b82f6' },
       { label: 'Protein',  val: prot, cal: protCal, color: '#22c55e' },
     ];
 
-    function toXY(angleDeg, radius) {
-      const rad = (angleDeg - 90) * Math.PI / 180;
-      return [cx + radius * Math.cos(rad), cy + radius * Math.sin(rad)];
-    }
-    function arcPath(sa, ea) {
-      const [sox, soy] = toXY(sa, ro); const [eox, eoy] = toXY(ea, ro);
-      const [six, siy] = toXY(sa, ri); const [eix, eiy] = toXY(ea, ri);
-      const large = (ea - sa) > 180 ? 1 : 0;
-      return `M ${sox} ${soy} A ${ro} ${ro} 0 ${large} 1 ${eox} ${eoy} L ${eix} ${eiy} A ${ri} ${ri} 0 ${large} 0 ${six} ${siy} Z`;
-    }
+    // Conic-gradient donut ring (avoids SVG namespace issues with Lit html template)
+    const carbPct  = total > 0 ? carbCal / total * 100 : 0;
+    const fatPct   = total > 0 ? fatCal  / total * 100 : 0;
+    const protPct  = total > 0 ? protCal / total * 100 : 0;
+    const c1 = carbPct.toFixed(2);
+    const c2 = (carbPct + fatPct).toFixed(2);
+    const ringBg = total > 0
+      ? `conic-gradient(#f59e0b 0% ${c1}%, #3b82f6 ${c1}% ${c2}%, #22c55e ${c2}% 100%)`
+      : 'var(--rm-border, #3a3a3c)';
 
-    const arcs = [];
-    if (total > 0) {
-      let angle = 0;
-      for (const m of MACROS) {
-        if (m.cal <= 0) continue;
-        const sweep = (m.cal / total) * 358;
-        arcs.push({ ...m, path: arcPath(angle, angle + sweep) });
-        angle += sweep + 2;
-      }
-    }
-    const displayCal = cal > 0 ? cal : (total > 0 ? Math.round(total / 9) : null);
+    const displayCal = cal > 0 ? Math.round(cal) : (total > 0 ? Math.round(total) : null);
 
     // RDA progress data
     const rdaRows = Object.entries(RDA).filter(([k]) => {
@@ -1232,19 +1216,14 @@ class RmRecipeDetail extends LitElement {
 
     return html`
       <div class="nutr-card">
-        <!-- Top row: donut + macro columns -->
+        <!-- Top row: donut ring + macro columns -->
         <div class="nutr-top">
-          <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex-shrink:0">
-            <circle cx="${cx}" cy="${cy}" r="${(ro + ri) / 2}"
-              fill="none" stroke="var(--rm-border)" stroke-width="${ro - ri}"/>
-            ${arcs.map(a => html`<path d="${a.path}" fill="${a.color}" opacity="0.9"/>`)}
-            <text x="${cx}" y="${cy - 2}" text-anchor="middle"
-              fill="var(--rm-text)" font-size="15" font-weight="700" font-family="inherit">
-              ${displayCal != null ? displayCal : '\u2013'}
-            </text>
-            <text x="${cx}" y="${cy + 11}" text-anchor="middle"
-              fill="var(--rm-text-secondary)" font-size="8" font-family="inherit">kcal</text>
-          </svg>
+          <div class="nutr-ring" style="background:${ringBg}">
+            <div class="nutr-ring-hole">
+              <span class="nutr-ring-cal">${displayCal ?? '–'}</span>
+              <span class="nutr-ring-lbl">kcal</span>
+            </div>
+          </div>
 
           <div class="nutr-macro-cols">
             ${MACROS.map(m => {
@@ -2077,6 +2056,18 @@ class RmRecipeDetail extends LitElement {
     /* Nutrition card */
     .nutr-card { display: flex; flex-direction: column; gap: 10px; }
     .nutr-top { display: flex; align-items: center; gap: 14px; }
+    .nutr-ring {
+      width: 90px; height: 90px; flex-shrink: 0;
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    }
+    .nutr-ring-hole {
+      width: 62%; height: 62%;
+      background: var(--ha-card-background, var(--rm-bg, #1c1c1e));
+      border-radius: 50%; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 0;
+    }
+    .nutr-ring-cal { font-size: 15px; font-weight: 700; color: var(--rm-text); line-height: 1.1; }
+    .nutr-ring-lbl { font-size: 8px; color: var(--rm-text-secondary); }
     .nutr-macro-cols { display: flex; gap: 10px; flex: 1; justify-content: space-around; }
     .nutr-macro-col { display: flex; flex-direction: column; align-items: center; gap: 2px; }
     .nutr-mcol-num { font-size: 17px; font-weight: 700; line-height: 1; }
