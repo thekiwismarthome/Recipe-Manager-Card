@@ -1,7 +1,7 @@
 /**
  * Recipe detail view — full recipe with ingredients, directions, nutrition, photos and actions.
  */
-import { LitElement, html, svg, css } from 'lit';
+import { LitElement, html, css } from 'lit';
 
 const NUTRITION_FIELDS = [
   { key: 'calories',      label: 'Calories',         unit: 'kcal', bold: true },
@@ -1223,24 +1223,27 @@ class RmRecipeDetail extends LitElement {
         <div class="nutr-top">
           <div class="nutr-ring-wrap">
             <svg width="90" height="90" viewBox="0 0 100 100" style="display:block">
-              <!-- Background track -->
+              <!-- Background track — always visible -->
               <circle cx="${cx}" cy="${cy}" r="${rad}" fill="none"
                 stroke="var(--rm-border)" stroke-width="7"/>
-              <!-- Colored arcs — svg`` tag ensures correct SVG namespace -->
-              ${total > 0 ? svg`
-                <circle cx="${cx}" cy="${cy}" r="${rad}" fill="none"
-                  stroke="#f59e0b" stroke-width="7" stroke-linecap="round"
-                  stroke-dasharray="${carbArc} ${circ}"
-                  transform="rotate(${carbStartDeg} ${cx} ${cy})"/>
-                <circle cx="${cx}" cy="${cy}" r="${rad}" fill="none"
-                  stroke="#3b82f6" stroke-width="7" stroke-linecap="round"
-                  stroke-dasharray="${fatArc} ${circ}"
-                  transform="rotate(${fatStartDeg} ${cx} ${cy})"/>
-                <circle cx="${cx}" cy="${cy}" r="${rad}" fill="none"
-                  stroke="#22c55e" stroke-width="7" stroke-linecap="round"
-                  stroke-dasharray="${protArc} ${circ}"
-                  transform="rotate(${protStartDeg} ${cx} ${cy})"/>
-              ` : ''}
+              <!-- Colored arcs: all 3 inline in the same html template so they
+                   inherit SVG namespace from the parser. Hidden via opacity when
+                   there's no data. Dynamic values are attributes, not new elements. -->
+              <circle cx="${cx}" cy="${cy}" r="${rad}" fill="none"
+                stroke="#f59e0b" stroke-width="7" stroke-linecap="round"
+                stroke-dasharray="${carbArc} ${circ}"
+                transform="rotate(${carbStartDeg} ${cx} ${cy})"
+                opacity="${total > 0 && carbArc > 0 ? 0.95 : 0}"/>
+              <circle cx="${cx}" cy="${cy}" r="${rad}" fill="none"
+                stroke="#3b82f6" stroke-width="7" stroke-linecap="round"
+                stroke-dasharray="${fatArc} ${circ}"
+                transform="rotate(${fatStartDeg} ${cx} ${cy})"
+                opacity="${total > 0 && fatArc > 0 ? 0.95 : 0}"/>
+              <circle cx="${cx}" cy="${cy}" r="${rad}" fill="none"
+                stroke="#22c55e" stroke-width="7" stroke-linecap="round"
+                stroke-dasharray="${protArc} ${circ}"
+                transform="rotate(${protStartDeg} ${cx} ${cy})"
+                opacity="${total > 0 && protArc > 0 ? 0.95 : 0}"/>
               <text x="${cx}" y="${cy - 2}" text-anchor="middle"
                 fill="var(--rm-text)" font-size="16" font-weight="700" font-family="inherit">
                 ${displayCal ?? '–'}
