@@ -106,6 +106,8 @@ class RmRecipeDetail extends LitElement {
     _nutritionExpanded:   { type: Boolean },
     _dragIngOver:         { type: Number },
     _dragStepOver:        { type: Number },
+    _editImageUploading:  { type: Boolean },
+    _slideIdx:            { type: Number },
   };
 
   constructor() {
@@ -139,6 +141,10 @@ class RmRecipeDetail extends LitElement {
     this._dragStepOver = -1;
     this._dragIngFrom = -1;
     this._dragStepFrom = -1;
+    this._editImageUploading = false;
+    this._slideIdx = 0;
+    this._slideTimer = null;
+    this._slideTouchStartX = null;
     this._wakeLockSentinel = null;
     this._wakeLockTimeout = null;
   }
@@ -146,6 +152,7 @@ class RmRecipeDetail extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     this._releaseWakeLock();
+    this._stopSlideTimer();
   }
 
   // -- Wake Lock -----------------------------------------------------------
@@ -180,6 +187,11 @@ class RmRecipeDetail extends LitElement {
       this._photoUrlInput = '';
       this._metricMode = false;
       this._completedSteps = new Set();
+      this._slideIdx = 0;
+      this._startSlideTimer();
+    }
+    if (changedProps.has('settings')) {
+      this._startSlideTimer();
     }
     if (changedProps.has('shoppingLists') && this.shoppingLists.length && !this._selectedListId) {
       this._selectedListId = this.shoppingLists[0]?.id ?? '';
@@ -217,6 +229,7 @@ class RmRecipeDetail extends LitElement {
       collections:   (this.recipe.collections || []).join(', '),
       notes:         this.recipe.notes || '',
       rating:        this.recipe.rating || 0,
+      image_url:     this.recipe.image_url || '',
       ingredients:   [...(this.recipe.ingredients || [])],
       instructions:  [...(this.recipe.instructions || [])],
       // Nutrition
@@ -311,6 +324,25 @@ class RmRecipeDetail extends LitElement {
     this._editData = { ...this._editData, instructions: (this._editData.instructions || []).filter((_, i) => i !== idx) };
   }
 
+  async _editUploadImage(file) {
+    if (!file || !this.recipe?.id) return;
+    this._editImageUploading = true;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const b64 = ev.target.result.split(',')[1];
+      try {
+        const result = await this.api.uploadRecipeImage(this.recipe.id, b64);
+        const url = result?.image_url || result?.local_url;
+        if (url) this._editData = { ...this._editData, image_url: url };
+      } catch (err) {
+        console.warn('Image upload failed:', err);
+      } finally {
+        this._editImageUploading = false;
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
   async _saveEdit() {
     const d = this._editData;
     const splitList = v => v ? v.split(',').map(t => t.trim()).filter(Boolean) : [];
@@ -330,6 +362,7 @@ class RmRecipeDetail extends LitElement {
       name:        d.name,
       description: d.description,
       source_url:  d.source_url,
+      image_url:   d.image_url || null,
       servings:    parseInt(d.servings) || null,
       prep_time:   parseInt(d.prep_time) || null,
       cook_time:   parseInt(d.cook_time) || null,
@@ -544,7 +577,86 @@ class RmRecipeDetail extends LitElement {
     }));
   }
 
+  // -- Slideshow ----------------------------------------------------------
+
+  _getSlideImages() {
+    const r = this.recipe;
+    if (!r) return [];
+    const all = [r.image_url, ...(r.photos || [])].filter(Boolean);
+    return [...new Set(all)];
+  }
+
+  _prevSlide() {
+    const imgs = this._getSlideImages();
+    if (imgs.length < 2) return;
+    this._slideIdx = (this._slideIdx - 1 + imgs.length) % imgs.length;
+    this._startSlideTimer();
+  }
+
+  _nextSlide() {
+    const imgs = this._getSlideImages();
+    if (imgs.length < 2) return;
+    this._slideIdx = (this._slideIdx + 1) % imgs.length;
+    this._startSlideTimer();
+  }
+
+  _startSlideTimer() {
+    this._stopSlideTimer();
+    const interval = this.settings?.slideshowInterval ?? 5;
+    if (interval <= 0) return;
+    const imgs = this._getSlideImages();
+    if (imgs.length < 2) return;
+    this._slideTimer = setInterval(() => {
+      this._slideIdx = (this._slideIdx + 1) % this._getSlideImages().length;
+    }, interval * 1000);
+  }
+
+  _stopSlideTimer() {
+    if (this._slideTimer) { clearInterval(this._slideTimer); this._slideTimer = null; }
+  }
+
+  _slideTouchStart(e) {
+    this._slideTouchStartX = e.touches[0]?.clientX ?? null;
+  }
+
+  _slideTouchEnd(e) {
+    if (this._slideTouchStartX == null) return;
+    const dx = (e.changedTouches[0]?.clientX ?? 0) - this._slideTouchStartX;
+    this._slideTouchStartX = null;
+    if (Math.abs(dx) < 50) return;
+    if (dx < 0) this._nextSlide(); else this._prevSlide();
+  }
+
   // -- Render -------------------------------------------------------------------
+
+  _renderSlideshow(r) {
+    const imgs = this._getSlideImages();
+    const idx = Math.min(this._slideIdx, imgs.length - 1);
+    const multi = imgs.length > 1;
+    const src = imgs[idx] || null;
+    return html`
+      <div class="wide-image-square"
+        @touchstart=${multi ? this._slideTouchStart : null}
+        @touchend=${multi ? this._slideTouchEnd : null}>
+        ${src ? html`<img src="${src}" alt="${r.name}" />` : html`
+          <div class="hero-placeholder">
+            <ha-icon icon="mdi:food"></ha-icon>
+          </div>
+        `}
+        ${multi ? html`
+          <button class="slide-btn slide-prev" @click=${this._prevSlide} title="Previous">
+            <ha-icon icon="mdi:chevron-left"></ha-icon>
+          </button>
+          <button class="slide-btn slide-next" @click=${this._nextSlide} title="Next">
+            <ha-icon icon="mdi:chevron-right"></ha-icon>
+          </button>
+          <div class="slide-dots">
+            ${imgs.map((_, i) => html`<span class="slide-dot ${i === idx ? 'active' : ''}"></span>`)}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
 
   _renderChipGroup(label, items, cssClass) {
     if (!items?.length) return '';
@@ -639,19 +751,9 @@ class RmRecipeDetail extends LitElement {
           <ha-icon icon="${r.is_favourite ? 'mdi:heart' : 'mdi:heart-outline'}"></ha-icon>
           <span>Favourite</span>
         </button>
-        <button class="action-icon-btn"
-          @click=${() => { this._activeTab = 'directions'; }}
-          title="Cook">
-          <ha-icon icon="mdi:chef-hat"></ha-icon>
-          <span>Cook</span>
-        </button>
         <button class="action-icon-btn" @click=${this._handleShowPlanner} title="Add to meal plan">
           <ha-icon icon="mdi:calendar-plus"></ha-icon>
           <span>Plan</span>
-        </button>
-        <button class="action-icon-btn" @click=${this._openShoppingPicker} title="Add to shopping list">
-          <ha-icon icon="mdi:cart-plus"></ha-icon>
-          <span>Shop</span>
         </button>
         ${r.source_url ? html`
           <a class="action-icon-btn" href="${r.source_url}" target="_blank" rel="noopener" title="Open source">
@@ -727,21 +829,12 @@ class RmRecipeDetail extends LitElement {
 
           <!-- col 1: square image card (padding-top:100% inner wrapper forces square) -->
           <div class="wide-image-card">
-            <div class="wide-image-square">
-              ${r.image_url ? html`
-                <img src="${r.image_url}" alt="${r.name}" />
-              ` : html`
-                <div class="hero-placeholder">
-                  <ha-icon icon="mdi:food"></ha-icon>
-                </div>
-              `}
-            </div>
+            ${this._renderSlideshow(r)}
           </div>
 
           <!-- col 2: info card -->
           <div class="wide-info-card">
             <h1 class="wide-title">${r.name}</h1>
-            ${this._renderQuickRating(r)}
             ${this._renderActionButtons(r)}
             ${r.description ? html`<p class="wide-desc">${r.description}</p>` : ''}
             ${this._renderMetaRow(r)}
@@ -894,7 +987,6 @@ class RmRecipeDetail extends LitElement {
           <!-- Recipe meta -->
           <div class="detail-head">
             <h2 class="recipe-title">${r.name}</h2>
-            ${this._renderQuickRating(r)}
             ${this._renderActionButtons(r)}
             ${r.description ? html`<p class="detail-desc">${r.description}</p>` : ''}
 
@@ -1503,6 +1595,24 @@ class RmRecipeDetail extends LitElement {
               }}>Add</button>
             </div>
 
+            <!-- Image section -->
+            <div class="edit-section-label">Image</div>
+            <div class="edit-field">
+              <label>Image URL</label>
+              <input type="url" .value=${d.image_url ?? ''}
+                @input=${e => this._handleEditField('image_url', e.target.value)}
+                placeholder="https://…" />
+            </div>
+            ${d.image_url ? html`
+              <img src="${d.image_url}" class="edit-image-preview" alt="Recipe image preview" />
+            ` : ''}
+            <label class="edit-upload-btn ${this._editImageUploading ? 'loading' : ''}">
+              <input type="file" accept="image/*" style="display:none"
+                @change=${e => { const f = e.target.files?.[0]; if (f) this._editUploadImage(f); e.target.value = ''; }} />
+              <ha-icon icon="${this._editImageUploading ? 'mdi:loading' : 'mdi:image-plus'}"></ha-icon>
+              ${this._editImageUploading ? 'Uploading…' : 'Upload photo from device'}
+            </label>
+
             <!-- Nutrition section -->
             <div class="edit-section-label">Nutrition Facts (per serving)</div>
             <div class="edit-row-3">
@@ -1622,20 +1732,20 @@ class RmRecipeDetail extends LitElement {
 
     /* Action buttons row */
     .action-btns-row {
-      display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 12px;
+      display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 10px; justify-content: center;
     }
     .action-icon-btn {
-      flex: 1;
-      display: flex; flex-direction: column; align-items: center; gap: 4px;
-      background: var(--rm-bg-elevated); border: 1px solid var(--rm-border);
-      border-radius: 12px; padding: 12px 8px; cursor: pointer;
-      color: var(--rm-text-secondary); font-size: 11px; font-weight: 500;
-      transition: all 0.15s; text-decoration: none; min-width: 60px;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      background: var(--rm-accent-soft, rgba(255,107,53,0.12));
+      border: none;
+      border-radius: 20px; padding: 7px 14px; cursor: pointer;
+      color: var(--rm-text-secondary); font-size: 10px; font-weight: 600;
+      transition: all 0.15s; text-decoration: none;
     }
-    .action-icon-btn ha-icon { --mdc-icon-size: 24px; }
-    .action-icon-btn:hover { background: var(--rm-accent-soft); color: var(--rm-accent); border-color: var(--rm-accent); }
-    .action-icon-btn.fav-active { color: var(--error-color, #cf6679); }
-    .action-icon-btn.danger { background: var(--error-color, #cf6679); color: #fff; border-color: var(--error-color, #cf6679); }
+    .action-icon-btn ha-icon { --mdc-icon-size: 20px; }
+    .action-icon-btn:hover { background: var(--rm-accent-soft); color: var(--rm-accent); }
+    .action-icon-btn.fav-active { color: var(--error-color, #cf6679); background: rgba(207,102,121,0.12); }
+    .action-icon-btn.danger { background: var(--error-color, #cf6679); color: #fff; }
 
     /* Meta chips (wide layout) */
     .meta-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; justify-content: center; }
@@ -2310,6 +2420,22 @@ class RmRecipeDetail extends LitElement {
       outline: none;
       border-color: var(--rm-accent, #ff6b35);
     }
+    .edit-image-preview {
+      width: 100%; max-height: 180px; object-fit: cover;
+      border-radius: 8px; border: 1px solid var(--rm-border, rgba(255,255,255,0.12));
+    }
+    .edit-upload-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--rm-accent-soft, rgba(255,107,53,0.12));
+      border: 1px dashed var(--rm-accent, #ff6b35);
+      border-radius: 8px; padding: 8px 14px; cursor: pointer;
+      color: var(--rm-accent, #ff6b35); font-size: 13px; font-weight: 500;
+      width: 100%; box-sizing: border-box; justify-content: center;
+      transition: background 0.15s;
+    }
+    .edit-upload-btn:hover { background: rgba(255,107,53,0.2); }
+    .edit-upload-btn.loading { opacity: 0.7; cursor: not-allowed; }
+    .edit-upload-btn ha-icon { --mdc-icon-size: 18px; }
     .edit-stars {
       display: flex;
       gap: 4px;
@@ -2438,6 +2564,8 @@ class RmRecipeDetail extends LitElement {
     .wide-image-square {
       width: 100%;
       height: 100%;
+      position: relative;
+      overflow: hidden;
     }
     .wide-image-square img {
       width: 100%; height: 100%; object-fit: cover; display: block;
@@ -2448,6 +2576,26 @@ class RmRecipeDetail extends LitElement {
       color: var(--rm-text-secondary);
     }
     .wide-image-square .hero-placeholder ha-icon { --mdc-icon-size: 64px; opacity: 0.3; }
+    .slide-btn {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      background: rgba(0,0,0,0.45); border: none; color: #fff; cursor: pointer;
+      border-radius: 50%; width: 30px; height: 30px;
+      display: flex; align-items: center; justify-content: center; padding: 0;
+      z-index: 2; transition: background 0.15s;
+    }
+    .slide-btn:hover { background: rgba(0,0,0,0.7); }
+    .slide-btn ha-icon { --mdc-icon-size: 20px; }
+    .slide-prev { left: 6px; }
+    .slide-next { right: 6px; }
+    .slide-dots {
+      position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 5px; z-index: 2;
+    }
+    .slide-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: rgba(255,255,255,0.45); transition: background 0.15s;
+    }
+    .slide-dot.active { background: #fff; }
 
     /* Col 2 — info card: 8/12 minus the 14px gap, with margin-left for the gap */
     .wide-info-card {

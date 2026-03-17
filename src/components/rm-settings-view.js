@@ -254,6 +254,24 @@ class RmSettingsView extends LitElement {
           </label>
         </div>
       </div>
+
+      <!-- ── Image Slideshow ── -->
+      <div class="section">
+        <div class="section-label">Image Slideshow</div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-name">Auto-advance interval</span>
+            <span class="setting-hint">Seconds between slides when a recipe has multiple images (0 = off)</span>
+          </div>
+          <div class="btn-group">
+            ${[0, 3, 5, 10, 15].map(n => html`
+              <button class="seg-btn ${(s.slideshowInterval ?? 5) === n ? 'active' : ''}"
+                @click=${() => this._update({ slideshowInterval: n })}>${n === 0 ? 'Off' : `${n}s`}</button>
+            `)}
+          </div>
+        </div>
+      </div>
     `;
   }
 

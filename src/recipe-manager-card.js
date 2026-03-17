@@ -277,6 +277,7 @@ class RecipeManagerCard extends LitElement {
     _presetNameInput: { type: String },
     _presetMinsInput: { type: String },
     _alarmAddInput: { type: String },
+    _plannerFromRecipe: { type: Object },
   };
 
   constructor() {
@@ -311,6 +312,7 @@ class RecipeManagerCard extends LitElement {
     this._presetNameInput = '';
     this._presetMinsInput = '';
     this._alarmAddInput = '';
+    this._plannerFromRecipe = null;
     this._alarmLoopActive = false;
     this._alarmInterval = null;
     this._alarmTimeout = null;
@@ -672,7 +674,19 @@ class RecipeManagerCard extends LitElement {
   }
 
   _handleShowGrid() { this._navDirection = 'back'; this._view = 'grid'; this._selectedRecipe = null; }
-  _handleShowPlanner() { this._navDirection = 'forward'; this._view = 'planner'; }
+  _handleShowPlanner() {
+    this._plannerFromRecipe = this._selectedRecipe || null;
+    this._navDirection = 'forward';
+    this._view = 'planner';
+  }
+  _handleBackToRecipe() {
+    if (this._plannerFromRecipe) {
+      this._selectedRecipe = this._plannerFromRecipe;
+      this._plannerFromRecipe = null;
+      this._navDirection = 'back';
+      this._view = 'detail';
+    }
+  }
 
   _handleOpenRecipe(e) {
     const grid = this.shadowRoot?.querySelector('rm-recipe-grid');
@@ -790,11 +804,11 @@ class RecipeManagerCard extends LitElement {
     const v = this._view;
     const collapsed = this._sidebarCollapsed;
 
-    const navItem = (icon, label, view, placeholder = false) => html`
+    const navItem = (icon, label, view, placeholder = false, clickFn = null) => html`
       <button
         class="sb-item ${v === view ? 'active' : ''} ${placeholder ? 'placeholder' : ''}"
         title="${placeholder ? label + ' — coming soon' : label}"
-        @click=${placeholder ? undefined : () => { this._navDirection = 'forward'; this._view = view; this._selectedRecipe = null; }}
+        @click=${placeholder ? undefined : (clickFn || (() => { this._navDirection = 'forward'; this._view = view; this._selectedRecipe = null; }))}
         ?disabled=${placeholder}
       >
         <ha-icon icon="${icon}"></ha-icon>
@@ -850,7 +864,7 @@ class RecipeManagerCard extends LitElement {
           ${navItem('mdi:home', 'Home', 'grid')}
           ${navItem('mdi:cart-outline', 'Shopping List', 'shopping')}
           ${this._settings.showPlanner
-        ? navItem('mdi:calendar-week', 'Meal Planner', 'planner')
+        ? navItem('mdi:calendar-week', 'Meal Planner', 'planner', false, () => { this._plannerFromRecipe = null; this._navDirection = 'forward'; this._view = 'planner'; this._selectedRecipe = null; })
         : ''}
           ${navItem('mdi:book-open-variant', 'Cookbook', 'cookbook', true)}
           <button
@@ -978,7 +992,9 @@ class RecipeManagerCard extends LitElement {
       <rm-meal-planner
         .api=${this._api}
         .recipes=${this._recipes}
+        .fromRecipe=${this._plannerFromRecipe}
         @rm-open-recipe=${this._handleOpenRecipe}
+        @rm-back-to-recipe=${this._handleBackToRecipe}
       ></rm-meal-planner>
     `;
     if (this._view === 'shopping') return html`
@@ -1275,7 +1291,7 @@ class RecipeManagerCard extends LitElement {
           title="New Recipe">
           <ha-icon icon="mdi:plus"></ha-icon>
         </button>
-        ${btn('mdi:calendar-week', 'Planner', 'planner')}
+        ${btn('mdi:calendar-week', 'Planner', 'planner', () => { this._plannerFromRecipe = null; this._navDirection = 'forward'; this._view = 'planner'; this._selectedRecipe = null; })}
         <button class="rm-bn-btn ${v === 'timers' ? 'active' : ''}"
           @click=${() => { this._navDirection = 'forward'; this._timersPrevView = this._view; this._view = 'timers'; }}
           title="Timers">

@@ -10,6 +10,7 @@ class RmMealPlanner extends LitElement {
   static properties = {
     api: { type: Object },
     recipes: { type: Array },
+    fromRecipe: { type: Object },    // recipe to return to (set when navigated from recipe detail)
     _weekStart: { type: String },    // ISO date string YYYY-MM-DD (Monday)
     _plan: { type: Array },          // MealPlanEntry[]
     _loading: { type: Boolean },
@@ -23,6 +24,7 @@ class RmMealPlanner extends LitElement {
     super();
     this.api = null;
     this.recipes = [];
+    this.fromRecipe = null;
     this._plan = [];
     this._loading = false;
     this._showPicker = false;
@@ -148,6 +150,14 @@ class RmMealPlanner extends LitElement {
 
     return html`
       <div class="planner-container">
+        ${this.fromRecipe ? html`
+          <div class="back-to-recipe">
+            <button class="back-recipe-btn" @click=${() => this.dispatchEvent(new CustomEvent('rm-back-to-recipe', { bubbles: true, composed: true }))}>
+              <ha-icon icon="mdi:arrow-left"></ha-icon>
+              <span>Back to ${this.fromRecipe.name}</span>
+            </button>
+          </div>
+        ` : ''}
         <!-- Week navigation -->
         <div class="week-nav">
           <button class="nav-btn" @click=${this._prevWeek}>
@@ -301,6 +311,20 @@ class RmMealPlanner extends LitElement {
       overflow: hidden;
       position: relative;
     }
+
+    /* Back to recipe */
+    .back-to-recipe {
+      padding: 6px 14px 0;
+      flex-shrink: 0;
+    }
+    .back-recipe-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: none; border: none; cursor: pointer;
+      color: var(--rm-accent, #ff6b35); font-size: 13px; font-weight: 500;
+      padding: 4px 6px; border-radius: 8px; transition: background 0.15s;
+    }
+    .back-recipe-btn:hover { background: var(--rm-accent-soft, rgba(255,107,53,0.12)); }
+    .back-recipe-btn ha-icon { --mdc-icon-size: 18px; }
 
     /* Week nav */
     .week-nav {
