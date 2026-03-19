@@ -450,10 +450,15 @@ class RecipeManagerCard extends LitElement {
   async _subscribe() {
     if (this._unsubscribe) return;
     try {
-      this._unsubscribe = await this._api.subscribe(msg => {
+      this._unsubscribe = await this._api.subscribe(async msg => {
         const t = msg.event_type ?? msg.event;
         if (/recipe_(added|updated|deleted)/.test(t)) {
-          this._loadRecipes(); this._loadTags();
+          await Promise.all([this._loadRecipes(), this._loadTags()]);
+          // Keep the open recipe in sync with the freshly loaded data
+          if (this._selectedRecipe) {
+            this._selectedRecipe = this._recipes.find(r => r.id === this._selectedRecipe.id)
+              ?? this._selectedRecipe;
+          }
         }
       });
     } catch { /* optional */ }

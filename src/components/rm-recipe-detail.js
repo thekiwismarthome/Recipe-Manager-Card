@@ -1464,15 +1464,29 @@ class RmRecipeDetail extends LitElement {
 
             <!-- Image section -->
             <div class="edit-section-label">Image</div>
-            ${d.image_url ? html`
-              <img src="${d.image_url}" class="edit-image-preview" alt="Recipe image preview" />
-            ` : ''}
-            <label class="edit-upload-btn ${this._editImageUploading ? 'loading' : ''}">
-              <input type="file" accept="image/*" style="display:none"
-                @change=${e => { const f = e.target.files?.[0]; if (f) this._editUploadImage(f); e.target.value = ''; }} />
-              <ha-icon icon="${this._editImageUploading ? 'mdi:loading' : 'mdi:image-plus'}"></ha-icon>
-              ${this._editImageUploading ? 'Uploading…' : 'Upload photo from device'}
-            </label>
+            <div class="edit-photo-row">
+              ${(() => {
+                const allUrls = [...new Set([
+                  this.recipe?.image_url,
+                  ...(this.recipe?.photos || []),
+                ].filter(Boolean))];
+                return html`
+                  ${allUrls.map(url => html`
+                    <div class="edit-photo-thumb ${url === d.image_url ? 'selected' : ''}"
+                      @click=${() => this._handleEditField('image_url', url)}
+                      title="Set as main image">
+                      <img src="${url}" alt="" />
+                      ${url === d.image_url ? html`<span class="edit-thumb-badge"><ha-icon icon="mdi:check"></ha-icon></span>` : ''}
+                    </div>
+                  `)}
+                  <label class="edit-photo-add ${this._editImageUploading ? 'loading' : ''}" title="Upload photo">
+                    <input type="file" accept="image/*" style="display:none"
+                      @change=${e => { const f = e.target.files?.[0]; if (f) this._editUploadImage(f); e.target.value = ''; }} />
+                    <ha-icon icon="${this._editImageUploading ? 'mdi:loading' : 'mdi:plus'}"></ha-icon>
+                  </label>
+                `;
+              })()}
+            </div>
             <div class="edit-field">
               <label>Or paste image URL</label>
               <input type="url" .value=${d.image_url ?? ''}
@@ -2418,22 +2432,33 @@ class RmRecipeDetail extends LitElement {
       outline: none;
       border-color: var(--rm-accent, #ff6b35);
     }
-    .edit-image-preview {
-      width: 100%; max-height: 180px; object-fit: cover;
-      border-radius: 8px; border: 1px solid var(--rm-border, rgba(255,255,255,0.12));
+    .edit-photo-row {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start;
     }
-    .edit-upload-btn {
-      display: inline-flex; align-items: center; gap: 8px;
+    .edit-photo-thumb {
+      position: relative; width: 72px; height: 72px;
+      border-radius: 8px; overflow: hidden; cursor: pointer; flex-shrink: 0;
+      border: 2px solid transparent; transition: border-color 0.15s;
+    }
+    .edit-photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .edit-photo-thumb.selected { border-color: var(--rm-accent, #ff6b35); }
+    .edit-thumb-badge {
+      position: absolute; bottom: 3px; right: 3px;
+      background: var(--rm-accent, #ff6b35); border-radius: 50%;
+      width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;
+    }
+    .edit-thumb-badge ha-icon { --mdc-icon-size: 12px; color: #fff; }
+    .edit-photo-add {
+      width: 72px; height: 72px; border-radius: 8px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
       background: var(--rm-accent-soft, rgba(255,107,53,0.12));
-      border: 1px dashed var(--rm-accent, #ff6b35);
-      border-radius: 8px; padding: 8px 14px; cursor: pointer;
-      color: var(--rm-accent, #ff6b35); font-size: 13px; font-weight: 500;
-      width: 100%; box-sizing: border-box; justify-content: center;
+      border: 2px dashed var(--rm-accent, #ff6b35);
+      cursor: pointer; color: var(--rm-accent, #ff6b35);
       transition: background 0.15s;
     }
-    .edit-upload-btn:hover { background: rgba(255,107,53,0.2); }
-    .edit-upload-btn.loading { opacity: 0.7; cursor: not-allowed; }
-    .edit-upload-btn ha-icon { --mdc-icon-size: 18px; }
+    .edit-photo-add:hover { background: rgba(255,107,53,0.22); }
+    .edit-photo-add.loading { opacity: 0.6; cursor: not-allowed; }
+    .edit-photo-add ha-icon { --mdc-icon-size: 26px; }
     .edit-stars {
       display: flex;
       gap: 4px;
