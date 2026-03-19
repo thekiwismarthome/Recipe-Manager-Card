@@ -68,16 +68,28 @@ A Lovelace card that brings a full-featured recipe management UI to your Home As
 
 ### Step 1 — Install the Backend Integration First
 
-If you haven't already, install [Recipe Manager](https://github.com/thekiwismarthome/Recipe-Manager) via HACS and restart Home Assistant. The card will not work without it.
+If you haven't already, install the Recipe Manager integration first using the button below, then restart Home Assistant. The card will not work without it.
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=thekiwismarthome&repository=Recipe-Manager&category=integration)
+
+[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=recipe_manager)
 
 ### Step 2 — Add the Card via HACS
+
+Click the button below to add this card to HACS:
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=thekiwismarthome&repository=Recipe-Manager-Card&category=dashboard)
+
+<details>
+<summary>Manual HACS steps</summary>
 
 1. Open HACS in your Home Assistant sidebar
 2. Click **Frontend**
 3. Click the three-dot menu (top right) → **Custom repositories**
 4. Paste `https://github.com/thekiwismarthome/Recipe-Manager-Card` and select category **Dashboard**
-5. Click **Add**
-6. Search for **Recipe Manager Card** and click **Download**
+5. Click **Add**, then search for **Recipe Manager Card** and click **Download**
+
+</details>
 
 ### Step 3 — Add to Your Dashboard
 
