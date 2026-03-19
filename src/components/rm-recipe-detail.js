@@ -537,18 +537,8 @@ class RmRecipeDetail extends LitElement {
     reader.onload = async (ev) => {
       const b64 = ev.target.result.split(',')[1];
       try {
-        const result = await this.api.uploadRecipeImage(this.recipe.id, b64);
-        if (result?.image_url || result?.local_url) {
-          const newUrl = result.image_url || result.local_url;
-          const newPhotos = [...(this.recipe.photos || []), newUrl];
-          const updateData = { photos: newPhotos };
-          if (!this.recipe.image_url) updateData.image_url = newUrl;
-          this.dispatchEvent(new CustomEvent('rm-update-recipe', {
-            detail: { recipeId: this.recipe.id, data: updateData },
-            bubbles: true,
-            composed: true,
-          }));
-        }
+        // Backend handles appending to photos list and firing recipe_updated event
+        await this.api.uploadRecipeImage(this.recipe.id, b64);
       } catch (err) {
         console.warn('Camera upload failed:', err);
       }
