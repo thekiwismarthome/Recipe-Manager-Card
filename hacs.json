@@ -1,6 +1,6 @@
 {
   "name": "Recipe Manager Card",
-  "content_in_root": false,
+  "content_in_root": true,
   "render_readme": true,
   "domains": ["plugin"],
   "filename": "recipe-manager-card.js"
