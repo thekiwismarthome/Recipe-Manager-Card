@@ -748,21 +748,21 @@ class RmRecipeDetail extends LitElement {
         <button class="action-icon-btn ${r.is_favourite ? 'fav-active' : ''}"
           @click=${this._handleToggleFav}
           title="${r.is_favourite ? 'Remove from favourites' : 'Add to favourites'}">
-          <ha-icon icon="${r.is_favourite ? 'mdi:heart' : 'mdi:heart-outline'}"></ha-icon>
+          <span class="btn-icon"><ha-icon icon="${r.is_favourite ? 'mdi:heart' : 'mdi:heart-outline'}"></ha-icon></span>
           <span>Favourite</span>
         </button>
         <button class="action-icon-btn" @click=${this._handleShowPlanner} title="Add to meal plan">
-          <ha-icon icon="mdi:calendar-plus"></ha-icon>
+          <span class="btn-icon"><ha-icon icon="mdi:calendar-plus"></ha-icon></span>
           <span>Plan</span>
         </button>
         ${r.source_url ? html`
           <a class="action-icon-btn" href="${r.source_url}" target="_blank" rel="noopener" title="Open source">
-            <ha-icon icon="mdi:open-in-new"></ha-icon>
+            <span class="btn-icon"><ha-icon icon="mdi:open-in-new"></ha-icon></span>
             <span>Source</span>
           </a>
         ` : ''}
         <button class="action-icon-btn" @click=${this._startEdit} title="Edit recipe">
-          <ha-icon icon="mdi:pencil-outline"></ha-icon>
+          <span class="btn-icon"><ha-icon icon="mdi:pencil-outline"></ha-icon></span>
           <span>Edit</span>
         </button>
       </div>
@@ -1471,6 +1471,25 @@ class RmRecipeDetail extends LitElement {
           <div class="edit-body">
 
             ${this._renderField('Name', 'name', 'text')}
+
+            <!-- Image section -->
+            <div class="edit-section-label">Image</div>
+            ${d.image_url ? html`
+              <img src="${d.image_url}" class="edit-image-preview" alt="Recipe image preview" />
+            ` : ''}
+            <label class="edit-upload-btn ${this._editImageUploading ? 'loading' : ''}">
+              <input type="file" accept="image/*" style="display:none"
+                @change=${e => { const f = e.target.files?.[0]; if (f) this._editUploadImage(f); e.target.value = ''; }} />
+              <ha-icon icon="${this._editImageUploading ? 'mdi:loading' : 'mdi:image-plus'}"></ha-icon>
+              ${this._editImageUploading ? 'Uploading…' : 'Upload photo from device'}
+            </label>
+            <div class="edit-field">
+              <label>Or paste image URL</label>
+              <input type="url" .value=${d.image_url ?? ''}
+                @input=${e => this._handleEditField('image_url', e.target.value)}
+                placeholder="https://…" />
+            </div>
+
             ${this._renderField('Description', 'description', 'textarea')}
             ${this._renderField('Source URL', 'source_url', 'url')}
 
@@ -1595,24 +1614,6 @@ class RmRecipeDetail extends LitElement {
               }}>Add</button>
             </div>
 
-            <!-- Image section -->
-            <div class="edit-section-label">Image</div>
-            <div class="edit-field">
-              <label>Image URL</label>
-              <input type="url" .value=${d.image_url ?? ''}
-                @input=${e => this._handleEditField('image_url', e.target.value)}
-                placeholder="https://…" />
-            </div>
-            ${d.image_url ? html`
-              <img src="${d.image_url}" class="edit-image-preview" alt="Recipe image preview" />
-            ` : ''}
-            <label class="edit-upload-btn ${this._editImageUploading ? 'loading' : ''}">
-              <input type="file" accept="image/*" style="display:none"
-                @change=${e => { const f = e.target.files?.[0]; if (f) this._editUploadImage(f); e.target.value = ''; }} />
-              <ha-icon icon="${this._editImageUploading ? 'mdi:loading' : 'mdi:image-plus'}"></ha-icon>
-              ${this._editImageUploading ? 'Uploading…' : 'Upload photo from device'}
-            </label>
-
             <!-- Nutrition section -->
             <div class="edit-section-label">Nutrition Facts (per serving)</div>
             <div class="edit-row-3">
@@ -1732,20 +1733,27 @@ class RmRecipeDetail extends LitElement {
 
     /* Action buttons row */
     .action-btns-row {
-      display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 10px; justify-content: center;
+      display: flex; gap: 16px; flex-wrap: wrap; margin: 6px 0 10px; justify-content: center;
     }
     .action-icon-btn {
-      display: flex; flex-direction: column; align-items: center; gap: 3px;
-      background: var(--rm-accent-soft, rgba(255,107,53,0.12));
-      border: none;
-      border-radius: 20px; padding: 7px 14px; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
+      background: none; border: none; cursor: pointer;
       color: var(--rm-text-secondary); font-size: 10px; font-weight: 600;
-      transition: all 0.15s; text-decoration: none;
+      transition: color 0.15s; text-decoration: none; width: 56px;
     }
-    .action-icon-btn ha-icon { --mdc-icon-size: 20px; }
-    .action-icon-btn:hover { background: var(--rm-accent-soft); color: var(--rm-accent); }
-    .action-icon-btn.fav-active { color: var(--error-color, #cf6679); background: rgba(207,102,121,0.12); }
-    .action-icon-btn.danger { background: var(--error-color, #cf6679); color: #fff; }
+    .action-icon-btn .btn-icon {
+      width: 46px; height: 46px; border-radius: 50%;
+      background: var(--rm-accent-soft, rgba(255,107,53,0.12));
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s; flex-shrink: 0;
+    }
+    .action-icon-btn ha-icon { --mdc-icon-size: 22px; }
+    .action-icon-btn:hover .btn-icon { background: rgba(255,107,53,0.25); }
+    .action-icon-btn:hover { color: var(--rm-accent, #ff6b35); }
+    .action-icon-btn.fav-active .btn-icon { background: rgba(207,102,121,0.15); }
+    .action-icon-btn.fav-active { color: var(--error-color, #cf6679); }
+    .action-icon-btn.danger .btn-icon { background: var(--error-color, #cf6679); }
+    .action-icon-btn.danger { color: #fff; }
 
     /* Meta chips (wide layout) */
     .meta-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; justify-content: center; }

@@ -824,12 +824,6 @@ class RecipeManagerCard extends LitElement {
               title="${collapsed ? 'Expand sidebar' : 'Collapse sidebar'}">
               <ha-icon icon="${collapsed ? 'mdi:menu-close' : 'mdi:menu-open'}"></ha-icon>
             </button>
-            ${!collapsed ? html`
-              <div class="sb-logo">
-                <ha-icon icon="mdi:chef-hat"></ha-icon>
-                <span>Recipes</span>
-              </div>
-            ` : ''}
           </div>
 
           ${!collapsed ? html`
@@ -923,16 +917,15 @@ class RecipeManagerCard extends LitElement {
               title="Back to recipe">
               <ha-icon icon="mdi:arrow-left"></ha-icon>
             </button>
-          ` : !wide ? html`
-            ${this._view !== 'grid' && !inSettings && !inTimers ? html`
-              <button class="icon-btn" @click=${this._handleShowGrid}>
-                <ha-icon icon="mdi:arrow-left"></ha-icon>
-              </button>
-            ` : html`
-              <ha-icon icon="mdi:chef-hat" class="rm-logo"></ha-icon>
-            `}
+          ` : !wide && this._view !== 'grid' && !inSettings && !inTimers ? html`
+            <button class="icon-btn" @click=${this._handleShowGrid}>
+              <ha-icon icon="mdi:arrow-left"></ha-icon>
+            </button>
           ` : ''}
-          <span class="rm-title">${title}</span>
+          <div class="rm-title">
+            <ha-icon icon="mdi:chef-hat"></ha-icon>
+            <span>${title}</span>
+          </div>
         </div>
 
         <div class="rm-header-right">
@@ -1573,13 +1566,13 @@ class RecipeManagerCard extends LitElement {
     .rm-header-left { flex: 1; min-width: 0; }
     .rm-header-right { flex-shrink: 0; }
 
-    .rm-logo { color: var(--rm-accent); --mdc-icon-size: 24px; }
-
     .rm-title {
+      display: flex; align-items: center; gap: 8px;
       font-size: 17px; font-weight: 600; color: var(--rm-text);
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      flex: 1; min-width: 0;
+      overflow: hidden; white-space: nowrap; flex: 1; min-width: 0;
     }
+    .rm-title ha-icon { --mdc-icon-size: 22px; color: var(--rm-accent); flex-shrink: 0; }
+    .rm-title span { overflow: hidden; text-overflow: ellipsis; }
 
     /* Star rating in header */
     .header-stars {
