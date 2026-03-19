@@ -178,15 +178,19 @@ class RmRecipeDetail extends LitElement {
 
   updated(changedProps) {
     if (changedProps.has('recipe') && this.recipe) {
+      const prev = changedProps.get('recipe');
+      const differentRecipe = !prev || prev.id !== this.recipe.id;
       this._servingMult = 1;
-      this._editing = false;
-      this._confirmDelete = false;
-      this._shoppingResult = null;
-      this._showShoppingPicker = false;
-      this._checkedIngredients = null;
-      this._photoUrlInput = '';
-      this._metricMode = false;
-      this._completedSteps = new Set();
+      if (differentRecipe) {
+        this._editing = false;
+        this._confirmDelete = false;
+        this._shoppingResult = null;
+        this._showShoppingPicker = false;
+        this._checkedIngredients = null;
+        this._photoUrlInput = '';
+        this._metricMode = false;
+        this._completedSteps = new Set();
+      }
       this._slideIdx = 0;
       this._startSlideTimer();
     }
@@ -2436,20 +2440,20 @@ class RmRecipeDetail extends LitElement {
       display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start;
     }
     .edit-photo-thumb {
-      position: relative; width: 72px; height: 72px;
+      position: relative; width: 144px; height: 144px;
       border-radius: 8px; overflow: hidden; cursor: pointer; flex-shrink: 0;
       border: 2px solid transparent; transition: border-color 0.15s;
     }
     .edit-photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .edit-photo-thumb.selected { border-color: var(--rm-accent, #ff6b35); }
     .edit-thumb-badge {
-      position: absolute; bottom: 3px; right: 3px;
+      position: absolute; bottom: 6px; right: 6px;
       background: var(--rm-accent, #ff6b35); border-radius: 50%;
-      width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
     }
-    .edit-thumb-badge ha-icon { --mdc-icon-size: 12px; color: #fff; }
+    .edit-thumb-badge ha-icon { --mdc-icon-size: 16px; color: #fff; }
     .edit-photo-add {
-      width: 72px; height: 72px; border-radius: 8px; flex-shrink: 0;
+      width: 144px; height: 144px; border-radius: 8px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       background: var(--rm-accent-soft, rgba(255,107,53,0.12));
       border: 2px dashed var(--rm-accent, #ff6b35);
@@ -2458,7 +2462,7 @@ class RmRecipeDetail extends LitElement {
     }
     .edit-photo-add:hover { background: rgba(255,107,53,0.22); }
     .edit-photo-add.loading { opacity: 0.6; cursor: not-allowed; }
-    .edit-photo-add ha-icon { --mdc-icon-size: 26px; }
+    .edit-photo-add ha-icon { --mdc-icon-size: 40px; }
     .edit-stars {
       display: flex;
       gap: 4px;
