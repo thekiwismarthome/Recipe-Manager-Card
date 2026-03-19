@@ -19,6 +19,17 @@ const SETTINGS_KEY = 'rm_settings';
 const LOCAL_SHOPPING_KEY = 'rm_shopping';
 const RECENT_RECIPES_KEY = 'rm_recent_recipes';
 const TIMERS_KEY = 'rm_timers';
+const TIMER_PRESETS_KEY = 'rm_timer_presets';
+
+function loadTimerPresets() {
+  try {
+    const raw = localStorage.getItem(TIMER_PRESETS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+function saveTimerPresets(presets) {
+  try { localStorage.setItem(TIMER_PRESETS_KEY, JSON.stringify(presets)); } catch { /* ignore */ }
+}
 
 const DEFAULT_SETTINGS = {
   theme: 'soft',
@@ -261,6 +272,12 @@ class RecipeManagerCard extends LitElement {
     _mobileMenuOpen: { type: Boolean },
     _navDirection: { type: String },
     _closingDetail: { type: Boolean },
+    _gridFilterPreset: { type: Object },
+    _timerPresets: { type: Array },
+    _presetNameInput: { type: String },
+    _presetMinsInput: { type: String },
+    _alarmAddInput: { type: String },
+    _plannerFromRecipe: { type: Object },
   };
 
   constructor() {
@@ -290,6 +307,12 @@ class RecipeManagerCard extends LitElement {
     this._mobileMenuOpen = false;
     this._navDirection = 'forward';
     this._closingDetail = false;
+    this._gridFilterPreset = null;
+    this._timerPresets = loadTimerPresets();
+    this._presetNameInput = '';
+    this._presetMinsInput = '';
+    this._alarmAddInput = '';
+    this._plannerFromRecipe = null;
     this._alarmLoopActive = false;
     this._alarmInterval = null;
     this._alarmTimeout = null;
@@ -480,6 +503,10 @@ class RecipeManagerCard extends LitElement {
       const newRemaining = t.remaining - 1;
       changed = true;
       if (newRemaining <= 0) {
+        if (t.presetId) {
+          // alarm handled in-tile, no popup
+          return { ...t, remaining: 0, running: false, alarming: true };
+        }
         newAlarms.push({ id: t.id, label: t.label });
       }
       return { ...t, remaining: newRemaining, running: newRemaining > 0 };
@@ -499,7 +526,7 @@ class RecipeManagerCard extends LitElement {
     }
   }
 
-  _startTimer(seconds, label) {
+  _startTimer(seconds, label, presetId = null) {
     const id = Date.now().toString(36);
     this._timers = [...this._timers, {
       id,
@@ -507,6 +534,7 @@ class RecipeManagerCard extends LitElement {
       total: seconds,
       remaining: seconds,
       running: true,
+      presetId: presetId || null,
     }];
     saveTimers(this._timers);
   }
@@ -523,7 +551,7 @@ class RecipeManagerCard extends LitElement {
 
   _addTimeToTimer(id, seconds) {
     this._timers = this._timers.map(t =>
-      t.id === id ? { ...t, remaining: t.remaining + seconds, total: t.total + seconds, running: true } : t
+      t.id === id ? { ...t, remaining: t.remaining + seconds, total: t.total + seconds, running: true, alarming: false } : t
     );
     if (this._timerAlarm?.id === id) {
       this._stopAlarmLoop();
@@ -542,6 +570,22 @@ class RecipeManagerCard extends LitElement {
       this._timerAlarm = this._timerAlarmQueue.length ? this._timerAlarmQueue.shift() : null;
       if (this._timerAlarm) this._startAlarmLoop(this._settings.timerSound ?? 'beep', this._settings.timerSoundFile);
     }
+  }
+
+  _addPresetTimer() {
+    const name = this._presetNameInput.trim();
+    const mins = parseFloat(this._presetMinsInput);
+    if (!name || !mins || mins <= 0) return;
+    const preset = { id: Date.now().toString(36), name, seconds: Math.round(mins * 60) };
+    this._timerPresets = [...this._timerPresets, preset];
+    saveTimerPresets(this._timerPresets);
+    this._presetNameInput = '';
+    this._presetMinsInput = '';
+  }
+
+  _removePreset(id) {
+    this._timerPresets = this._timerPresets.filter(p => p.id !== id);
+    saveTimerPresets(this._timerPresets);
   }
 
   _startAlarmLoop(type, fileUrl) {
@@ -589,6 +633,21 @@ class RecipeManagerCard extends LitElement {
   _handleSearch(e) { this._searchQuery = e.detail?.query ?? ''; }
   _handleTagFilter(e) { const t = e.detail?.tag; this._activeTag = this._activeTag === t ? null : t; }
 
+  _handleChipNav(e) {
+    const { filterMode, value } = e.detail;
+    this._navDirection = 'back';
+    if (filterMode === 'tags') {
+      // Tags use the parent _activeTag mechanism
+      this._activeTag = value;
+      this._gridFilterPreset = null;
+    } else {
+      this._activeTag = null;
+      // Use a new object each time so the grid always sees a change
+      this._gridFilterPreset = { filterMode, selectedValues: [value] };
+    }
+    this._view = 'grid';
+  }
+
   _handleBack() {
     if (this._closingDetail) return;
     if (this._view === 'detail' && this._selectedRecipe && !this._closingDetail) {
@@ -615,7 +674,19 @@ class RecipeManagerCard extends LitElement {
   }
 
   _handleShowGrid() { this._navDirection = 'back'; this._view = 'grid'; this._selectedRecipe = null; }
-  _handleShowPlanner() { this._navDirection = 'forward'; this._view = 'planner'; }
+  _handleShowPlanner() {
+    this._plannerFromRecipe = this._selectedRecipe || null;
+    this._navDirection = 'forward';
+    this._view = 'planner';
+  }
+  _handleBackToRecipe() {
+    if (this._plannerFromRecipe) {
+      this._selectedRecipe = this._plannerFromRecipe;
+      this._plannerFromRecipe = null;
+      this._navDirection = 'back';
+      this._view = 'detail';
+    }
+  }
 
   _handleOpenRecipe(e) {
     const grid = this.shadowRoot?.querySelector('rm-recipe-grid');
@@ -659,10 +730,14 @@ class RecipeManagerCard extends LitElement {
   }
 
   async _handleAddRecipe(e) {
-    await this._api.addRecipe(e.detail.data);
-    this._navDirection = 'back';
-    this._view = 'grid';
-    await this._loadRecipes(); await this._loadTags();
+    try {
+      await this._api.addRecipe(e.detail.data);
+      this._navDirection = 'back';
+      this._view = 'grid';
+      await this._loadRecipes(); await this._loadTags();
+    } catch (err) {
+      console.error('[Recipe Manager] Failed to save recipe:', err);
+    }
   }
 
   async _handleImportDone() {
@@ -729,11 +804,11 @@ class RecipeManagerCard extends LitElement {
     const v = this._view;
     const collapsed = this._sidebarCollapsed;
 
-    const navItem = (icon, label, view, placeholder = false) => html`
+    const navItem = (icon, label, view, placeholder = false, clickFn = null) => html`
       <button
         class="sb-item ${v === view ? 'active' : ''} ${placeholder ? 'placeholder' : ''}"
         title="${placeholder ? label + ' — coming soon' : label}"
-        @click=${placeholder ? undefined : () => { this._navDirection = 'forward'; this._view = view; this._selectedRecipe = null; }}
+        @click=${placeholder ? undefined : (clickFn || (() => { this._navDirection = 'forward'; this._view = view; this._selectedRecipe = null; }))}
         ?disabled=${placeholder}
       >
         <ha-icon icon="${icon}"></ha-icon>
@@ -749,12 +824,6 @@ class RecipeManagerCard extends LitElement {
               title="${collapsed ? 'Expand sidebar' : 'Collapse sidebar'}">
               <ha-icon icon="${collapsed ? 'mdi:menu-close' : 'mdi:menu-open'}"></ha-icon>
             </button>
-            ${!collapsed ? html`
-              <div class="sb-logo">
-                <ha-icon icon="mdi:chef-hat"></ha-icon>
-                <span>Recipes</span>
-              </div>
-            ` : ''}
           </div>
 
           ${!collapsed ? html`
@@ -789,7 +858,7 @@ class RecipeManagerCard extends LitElement {
           ${navItem('mdi:home', 'Home', 'grid')}
           ${navItem('mdi:cart-outline', 'Shopping List', 'shopping')}
           ${this._settings.showPlanner
-        ? navItem('mdi:calendar-week', 'Meal Planner', 'planner')
+        ? navItem('mdi:calendar-week', 'Meal Planner', 'planner', false, () => { this._plannerFromRecipe = null; this._navDirection = 'forward'; this._view = 'planner'; this._selectedRecipe = null; })
         : ''}
           ${navItem('mdi:book-open-variant', 'Cookbook', 'cookbook', true)}
           <button
@@ -830,7 +899,7 @@ class RecipeManagerCard extends LitElement {
       inSettings ? 'Settings'
         : inAdd ? 'New Recipe'
           : inTimers ? 'Timers'
-            : inDetail ? this._selectedRecipe.name
+            : inDetail ? ''
               : this._view === 'planner' ? 'Meal Planner'
                 : this._view === 'shopping' ? 'Shopping List'
                   : 'Recipes';
@@ -848,16 +917,15 @@ class RecipeManagerCard extends LitElement {
               title="Back to recipe">
               <ha-icon icon="mdi:arrow-left"></ha-icon>
             </button>
-          ` : !wide ? html`
-            ${this._view !== 'grid' && !inSettings && !inTimers ? html`
-              <button class="icon-btn" @click=${this._handleShowGrid}>
-                <ha-icon icon="mdi:arrow-left"></ha-icon>
-              </button>
-            ` : html`
-              <ha-icon icon="mdi:chef-hat" class="rm-logo"></ha-icon>
-            `}
+          ` : !wide && this._view !== 'grid' && !inSettings && !inTimers ? html`
+            <button class="icon-btn" @click=${this._handleShowGrid}>
+              <ha-icon icon="mdi:arrow-left"></ha-icon>
+            </button>
           ` : ''}
-          <span class="rm-title">${title}</span>
+          <div class="rm-title">
+            <ha-icon icon="mdi:chef-hat"></ha-icon>
+            <span>${title}</span>
+          </div>
         </div>
 
         <div class="rm-header-right">
@@ -917,7 +985,9 @@ class RecipeManagerCard extends LitElement {
       <rm-meal-planner
         .api=${this._api}
         .recipes=${this._recipes}
+        .fromRecipe=${this._plannerFromRecipe}
         @rm-open-recipe=${this._handleOpenRecipe}
+        @rm-back-to-recipe=${this._handleBackToRecipe}
       ></rm-meal-planner>
     `;
     if (this._view === 'shopping') return html`
@@ -963,6 +1033,7 @@ class RecipeManagerCard extends LitElement {
             .scrollPos=${this._gridScrollPos}
             .recentRecipes=${this._recentRecipes}
             .recentCount=${s.recentCount ?? 12}
+            .filterPreset=${this._gridFilterPreset}
             @rm-search=${this._handleSearch}
             @rm-tag-filter=${this._handleTagFilter}
             @rm-open-recipe=${this._handleOpenRecipe}
@@ -975,6 +1046,7 @@ class RecipeManagerCard extends LitElement {
               .recipe=${this._selectedRecipe}
               .api=${this._api}
               .settings=${s}
+              .wide=${this._wide}
               .shoppingLists=${this._shoppingLists}
               .slmAvailable=${this._slmAvailable}
               @rm-back=${this._handleBack}
@@ -983,6 +1055,8 @@ class RecipeManagerCard extends LitElement {
               @rm-update-recipe=${this._handleUpdateRecipe}
               @rm-add-to-shopping=${this._handleAddToShopping}
               @rm-start-timer=${this._handleStartTimer}
+              @rm-show-planner=${this._handleShowPlanner}
+              @rm-chip-nav=${this._handleChipNav}
             ></rm-recipe-detail>
           ` : ''}
         </div>
@@ -992,66 +1066,161 @@ class RecipeManagerCard extends LitElement {
 
   _renderTimersView() {
     const hasCustom = this._customTimerInput.trim();
+    const hasPreset = this._presetNameInput.trim() && this._presetMinsInput.trim();
+    const quickAdd = [
+      { label: '+30s', secs: 30 },
+      { label: '+1m',  secs: 60 },
+      { label: '+5m',  secs: 300 },
+      { label: '+10m', secs: 600 },
+    ];
+    const nonPresetTimers = this._timers.filter(t => !t.presetId);
+    const circ = 263.9;
     return html`
       <div class="timers-view">
-        ${this._timers.length === 0 ? html`
+
+        <!-- Active timers (non-preset): horizontal wrap of square arc tiles -->
+        ${nonPresetTimers.length ? html`
+          <div class="timer-list">
+            ${nonPresetTimers.map(t => {
+              const tArcColor = t.remaining < 60 ? '#f59e0b' : 'var(--rm-accent)';
+              const tOffset = circ * (1 - t.remaining / t.total);
+              return html`
+                <div class="timer-card">
+                  <button class="preset-remove" @click=${() => this._stopTimer(t.id)} title="Remove">
+                    <ha-icon icon="mdi:close"></ha-icon>
+                  </button>
+                  <span class="timer-card-name">${t.label}</span>
+                  <div class="preset-arc-wrap">
+                    <svg viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="42" fill="none" stroke="var(--rm-border)" stroke-width="6"/>
+                      <circle cx="50" cy="50" r="42" fill="none"
+                        stroke="${tArcColor}" stroke-width="6" stroke-linecap="round"
+                        stroke-dasharray="${circ}" stroke-dashoffset="${tOffset}"
+                        transform="rotate(-90 50 50)"
+                        style="transition: stroke-dashoffset 0.8s linear, stroke 0.3s;"/>
+                    </svg>
+                    <div class="preset-arc-center">
+                      <span class="preset-arc-time">${formatTimerDisplay(t.remaining)}</span>
+                    </div>
+                  </div>
+                  <div class="preset-arc-btns">
+                    <button class="timer-ctrl-btn" @click=${() => this._pauseTimer(t.id)} title="${t.running ? 'Pause' : 'Resume'}">
+                      <ha-icon icon="${t.running ? 'mdi:pause' : 'mdi:play'}"></ha-icon>
+                    </button>
+                    <button class="timer-ctrl-btn danger" @click=${() => this._stopTimer(t.id)} title="Stop">
+                      <ha-icon icon="mdi:stop"></ha-icon>
+                    </button>
+                  </div>
+                </div>
+              `;
+            })}
+          </div>
+        ` : html`
           <div class="timer-empty">
             <ha-icon icon="mdi:timer-off-outline"></ha-icon>
             <p>No active timers.</p>
             <p class="timer-empty-hint">Tap a highlighted time in a recipe's directions to start one.</p>
           </div>
-        ` : html`
-          <div class="timer-list">
-            ${this._timers.map(t => html`
-              <div class="timer-item">
-                <div class="timer-info">
-                  <span class="timer-label">${t.label}</span>
-                  <div class="timer-bar-wrap">
-                    <div class="timer-bar" style="width:${Math.round((t.remaining / t.total) * 100)}%"></div>
-                  </div>
-                </div>
-                <div class="timer-time">${formatTimerDisplay(t.remaining)}</div>
-                <div class="timer-controls">
-                  <button class="timer-ctrl-btn" @click=${() => this._pauseTimer(t.id)} title="${t.running ? 'Pause' : 'Resume'}">
-                    <ha-icon icon="${t.running ? 'mdi:pause' : 'mdi:play'}"></ha-icon>
-                  </button>
-                  <button class="timer-ctrl-btn danger" @click=${() => this._stopTimer(t.id)} title="Stop">
-                    <ha-icon icon="mdi:stop"></ha-icon>
-                  </button>
-                </div>
-              </div>
-            `)}
-          </div>
         `}
 
-        <!-- Manual timer entry -->
+        <!-- Spacer pushes add+presets to bottom -->
+        <div style="flex:1"></div>
+
+        <!-- Add preset (compact, just above presets) -->
         <div class="timer-add-section">
-          <div class="timer-add-label">Add a timer (minutes):</div>
-          <div class="timer-add-ctrl">
-            <input
-              type="number"
-              class="timer-input"
-              placeholder="e.g. 10"
-              min="1"
+          <div class="timer-add-row">
+            <input type="text" class="timer-input" placeholder="Preset name"
+              .value=${this._presetNameInput}
+              @input=${e => { this._presetNameInput = e.target.value; }}
+              @keydown=${e => { if (e.key === 'Enter') this._addPresetTimer(); }}
+            />
+            <input type="number" class="timer-input timer-mins-input" placeholder="min" min="0.5" step="0.5"
+              .value=${this._presetMinsInput}
+              @input=${e => { this._presetMinsInput = e.target.value; }}
+              @keydown=${e => { if (e.key === 'Enter') this._addPresetTimer(); }}
+            />
+            <button class="action-btn primary" ?disabled=${!hasPreset} @click=${this._addPresetTimer}>+ Preset</button>
+            <input type="number" class="timer-input timer-mins-input" placeholder="quick min" min="0.5" step="0.5"
               .value=${this._customTimerInput}
               @input=${e => { this._customTimerInput = e.target.value; }}
               @keydown=${e => {
-        if (e.key === 'Enter' && hasCustom) {
-          this._startTimer(parseInt(this._customTimerInput) * 60, `${this._customTimerInput} min timer`);
-          this._customTimerInput = '';
-        }
-      }}
+                if (e.key === 'Enter' && hasCustom) {
+                  this._startTimer(Math.round(parseFloat(this._customTimerInput) * 60), `${this._customTimerInput} min`);
+                  this._customTimerInput = '';
+                }
+              }}
             />
-            <button class="action-btn primary"
-              ?disabled=${!hasCustom}
+            <button class="action-btn primary" ?disabled=${!hasCustom}
               @click=${() => {
-        this._startTimer(parseInt(this._customTimerInput) * 60, `${this._customTimerInput} min timer`);
-        this._customTimerInput = '';
-      }}>
-              Start
-            </button>
+                this._startTimer(Math.round(parseFloat(this._customTimerInput) * 60), `${this._customTimerInput} min`);
+                this._customTimerInput = '';
+              }}>Start</button>
           </div>
         </div>
+
+        <!-- Preset timers grid (bottom) -->
+        ${this._timerPresets.length ? html`
+          <div class="timer-presets-grid">
+            ${this._timerPresets.map(p => {
+              const activeTimer = this._timers.find(t => t.presetId === p.id);
+              const isRunning = activeTimer && activeTimer.running;
+              const isAlarming = activeTimer && activeTimer.alarming;
+              const remaining = activeTimer ? activeTimer.remaining : p.seconds;
+              const total = activeTimer ? activeTimer.total : p.seconds;
+              const arcColor = isAlarming
+                ? 'var(--error-color, #cf6679)'
+                : (remaining < 60 && activeTimer ? '#f59e0b' : 'var(--rm-accent)');
+              const offset = isAlarming ? 0 : (!activeTimer ? circ : circ * (1 - remaining / total));
+              return html`
+                <div class="timer-preset-card ${isAlarming ? 'alarming' : ''}">
+                  <button class="preset-remove" @click=${() => { if (activeTimer) this._stopTimer(activeTimer.id); this._removePreset(p.id); }} title="Remove">
+                    <ha-icon icon="mdi:close"></ha-icon>
+                  </button>
+                  <span class="preset-arc-name">${p.name}</span>
+                  <div class="preset-arc-wrap">
+                    <svg viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="44" fill="none" stroke="var(--rm-border)" stroke-width="7"/>
+                      <circle cx="50" cy="50" r="44" fill="none"
+                        stroke="${arcColor}" stroke-width="7" stroke-linecap="round"
+                        stroke-dasharray="${circ}" stroke-dashoffset="${offset}"
+                        transform="rotate(-90 50 50)"
+                        style="transition: stroke-dashoffset 0.8s linear, stroke 0.3s;"/>
+                    </svg>
+                    <div class="preset-arc-center">
+                      ${isAlarming ? html`
+                        <span class="preset-arc-time" style="color:var(--error-color,#cf6679)">Done!</span>
+                      ` : html`
+                        <span class="preset-arc-time">${formatTimerDisplay(remaining)}</span>
+                      `}
+                    </div>
+                  </div>
+                  <div class="preset-arc-btns">
+                    ${isAlarming ? html`
+                      <button class="preset-arc-btn" @click=${() => this._addTimeToTimer(activeTimer.id, 30)}>+30s</button>
+                      <button class="preset-arc-btn" @click=${() => this._addTimeToTimer(activeTimer.id, 60)}>+1m</button>
+                      <button class="preset-arc-btn" @click=${() => this._addTimeToTimer(activeTimer.id, 300)}>+5m</button>
+                      <button class="preset-arc-btn stop" @click=${() => this._stopTimer(activeTimer.id)}>Stop</button>
+                    ` : isRunning ? html`
+                      <button class="preset-arc-btn" @click=${() => this._addTimeToTimer(activeTimer.id, 30)}>+30s</button>
+                      <button class="preset-arc-btn" @click=${() => this._addTimeToTimer(activeTimer.id, 60)}>+1m</button>
+                      <button class="preset-arc-btn" @click=${() => this._pauseTimer(activeTimer.id)}>
+                        <ha-icon icon="mdi:pause" style="--mdc-icon-size:12px;vertical-align:middle"></ha-icon>
+                      </button>
+                      <button class="preset-arc-btn stop" @click=${() => this._stopTimer(activeTimer.id)}>Stop</button>
+                    ` : activeTimer ? html`
+                      <button class="preset-arc-btn" @click=${() => this._pauseTimer(activeTimer.id)}>Resume</button>
+                      <button class="preset-arc-btn stop" @click=${() => this._stopTimer(activeTimer.id)}>Stop</button>
+                    ` : html`
+                      <button class="preset-arc-btn play" @click=${() => this._startTimer(p.seconds, p.name, p.id)}>
+                        <ha-icon icon="mdi:play" style="--mdc-icon-size:14px;vertical-align:middle"></ha-icon> Start
+                      </button>
+                    `}
+                  </div>
+                </div>
+              `;
+            })}
+          </div>
+        ` : ''}
       </div>
     `;
   }
@@ -1066,13 +1235,29 @@ class RecipeManagerCard extends LitElement {
           <div class="alarm-label">${alarm.label}</div>
           <div class="alarm-sub">Timer complete!</div>
           <div class="alarm-btns">
+            <button class="alarm-btn" @click=${() => this._addTimeToTimer(alarm.id, 30)}>+30s</button>
+            <button class="alarm-btn" @click=${() => this._addTimeToTimer(alarm.id, 60)}>+1 min</button>
             <button class="alarm-btn" @click=${() => this._addTimeToTimer(alarm.id, 300)}>+5 min</button>
             <button class="alarm-btn" @click=${() => this._addTimeToTimer(alarm.id, 600)}>+10 min</button>
-            <button class="alarm-btn accent" @click=${() => {
-        const mins = parseInt(prompt('Add how many minutes?') || '0');
-        if (mins > 0) this._addTimeToTimer(alarm.id, mins * 60);
-        else this._dismissAlarm();
-      }}>Custom</button>
+            <div class="alarm-custom-row">
+              <input type="number" class="alarm-custom-input" placeholder="min" min="1"
+                .value=${this._alarmAddInput}
+                @input=${e => { this._alarmAddInput = e.target.value; }}
+                @keydown=${e => {
+                  if (e.key === 'Enter' && this._alarmAddInput) {
+                    const m = parseInt(this._alarmAddInput);
+                    if (m > 0) this._addTimeToTimer(alarm.id, m * 60);
+                    this._alarmAddInput = '';
+                  }
+                }}
+              />
+              <button class="alarm-btn accent" ?disabled=${!this._alarmAddInput}
+                @click=${() => {
+                  const m = parseInt(this._alarmAddInput);
+                  if (m > 0) this._addTimeToTimer(alarm.id, m * 60);
+                  this._alarmAddInput = '';
+                }}>+min</button>
+            </div>
             <button class="alarm-btn stop" @click=${this._dismissAlarm}>Stop</button>
           </div>
         </div>
@@ -1099,7 +1284,7 @@ class RecipeManagerCard extends LitElement {
           title="New Recipe">
           <ha-icon icon="mdi:plus"></ha-icon>
         </button>
-        ${btn('mdi:calendar-week', 'Planner', 'planner')}
+        ${btn('mdi:calendar-week', 'Planner', 'planner', () => { this._plannerFromRecipe = null; this._navDirection = 'forward'; this._view = 'planner'; this._selectedRecipe = null; })}
         <button class="rm-bn-btn ${v === 'timers' ? 'active' : ''}"
           @click=${() => { this._navDirection = 'forward'; this._timersPrevView = this._view; this._view = 'timers'; }}
           title="Timers">
@@ -1381,13 +1566,13 @@ class RecipeManagerCard extends LitElement {
     .rm-header-left { flex: 1; min-width: 0; }
     .rm-header-right { flex-shrink: 0; }
 
-    .rm-logo { color: var(--rm-accent); --mdc-icon-size: 24px; }
-
     .rm-title {
+      display: flex; align-items: center; gap: 8px;
       font-size: 17px; font-weight: 600; color: var(--rm-text);
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      flex: 1; min-width: 0;
+      overflow: hidden; white-space: nowrap; flex: 1; min-width: 0;
     }
+    .rm-title ha-icon { --mdc-icon-size: 22px; color: var(--rm-accent); flex-shrink: 0; }
+    .rm-title span { overflow: hidden; text-overflow: ellipsis; }
 
     /* Star rating in header */
     .header-stars {
@@ -1476,8 +1661,8 @@ class RecipeManagerCard extends LitElement {
       flex-direction: column;
       height: 100%;
       overflow-y: auto;
-      padding: 16px;
-      gap: 16px;
+      padding: 12px 16px 16px;
+      gap: 12px;
     }
 
     .timer-empty {
@@ -1494,97 +1679,144 @@ class RecipeManagerCard extends LitElement {
     .timer-empty p { margin: 0; }
     .timer-empty-hint { font-size: 12px !important; color: var(--rm-text-muted) !important; }
 
+    /* Active timer list: horizontal wrap of square arc tiles */
     .timer-list {
       display: flex;
-      flex-direction: column;
-      gap: 10px;
+      flex-wrap: wrap;
+      gap: 12px;
     }
-
-    .timer-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
+    .timer-card {
+      position: relative;
+      width: 180px; height: 180px;
       background: var(--rm-bg-elevated);
-      border-radius: 10px;
-      padding: 12px 14px;
+      border-radius: 16px;
       border: 1px solid var(--rm-border);
+      padding: 10px 8px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      box-sizing: border-box;
     }
-
-    .timer-info { flex: 1; min-width: 0; }
-    .timer-label {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--rm-text);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    .timer-card-name {
+      font-size: 11px; font-weight: 600; color: var(--rm-text);
+      text-align: center; width: 100%;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .timer-bar-wrap {
-      height: 4px;
-      background: var(--rm-border);
-      border-radius: 2px;
-      margin-top: 6px;
-      overflow: hidden;
-    }
-    .timer-bar {
-      height: 100%;
-      background: var(--rm-accent);
-      border-radius: 2px;
-      transition: width 1s linear;
-    }
-
-    .timer-time {
-      font-size: 20px;
-      font-weight: 700;
-      color: var(--rm-accent);
-      white-space: nowrap;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .timer-controls { display: flex; gap: 4px; }
     .timer-ctrl-btn {
       background: none;
       border: 1px solid var(--rm-border);
       border-radius: 50%;
-      width: 30px;
-      height: 30px;
+      width: 28px; height: 28px;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: flex; align-items: center; justify-content: center;
       color: var(--rm-text-secondary);
-      padding: 0;
-      transition: background 0.15s, color 0.15s;
+      padding: 0; transition: background 0.15s, color 0.15s;
     }
-    .timer-ctrl-btn ha-icon { --mdc-icon-size: 15px; }
+    .timer-ctrl-btn ha-icon { --mdc-icon-size: 14px; }
     .timer-ctrl-btn:hover { background: var(--rm-accent-soft); color: var(--rm-accent); }
     .timer-ctrl-btn.danger:hover { background: rgba(207,102,121,0.12); color: var(--error-color, #cf6679); border-color: var(--error-color, #cf6679); }
 
-    .timer-add-section {
-      border-top: 1px solid var(--rm-border);
-      padding-top: 14px;
+    /* Preset timer grid: square arc tiles */
+    .timer-presets-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .timer-preset-card {
+      position: relative;
+      width: 160px; height: 160px;
+      background: var(--rm-bg-elevated);
+      border: 1px solid var(--rm-border);
+      border-radius: 16px;
+      padding: 8px 8px 8px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      margin-top: auto;
+      align-items: center;
+      gap: 4px;
+      box-sizing: border-box;
     }
-    .timer-add-label {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--rm-text-secondary);
+    .timer-preset-card.alarming {
+      border-color: var(--error-color, #cf6679);
+      animation: alarm-pulse-border 0.8s ease-in-out infinite alternate;
     }
-    .timer-add-ctrl { display: flex; gap: 8px; }
+    @keyframes alarm-pulse-border {
+      from { box-shadow: 0 0 0 0 rgba(207,102,121,0); }
+      to   { box-shadow: 0 0 0 6px rgba(207,102,121,0.3); }
+    }
+    /* Arc wrap fills available vertical space in the square tile */
+    .preset-arc-wrap {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      min-height: 0;
+    }
+    .preset-arc-wrap svg {
+      width: 100%; height: 100%;
+      display: block;
+    }
+    .preset-arc-center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .preset-arc-time {
+      font-size: 17px; font-weight: 700;
+      color: var(--rm-text); line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .preset-arc-name {
+      font-size: 11px; font-weight: 600; color: var(--rm-text);
+      text-align: center; width: 100%;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .preset-arc-btns {
+      display: flex; gap: 4px; flex-wrap: wrap; justify-content: center;
+    }
+    .preset-arc-btn {
+      background: var(--rm-bg); border: 1px solid var(--rm-border);
+      border-radius: 10px; padding: 2px 6px; font-size: 10px;
+      color: var(--rm-text-secondary); cursor: pointer; transition: all 0.15s;
+    }
+    .preset-arc-btn:hover { background: var(--rm-accent-soft); color: var(--rm-accent); border-color: var(--rm-accent); }
+    .preset-arc-btn.stop { color: var(--error-color, #cf6679); border-color: var(--error-color, #cf6679); }
+    .preset-arc-btn.stop:hover { background: rgba(207,102,121,0.12); }
+    .preset-arc-btn.play {
+      background: var(--rm-accent); color: #fff; border-color: var(--rm-accent);
+      padding: 3px 12px; font-size: 11px; border-radius: 12px;
+    }
+    .preset-arc-btn.play:hover { opacity: 0.85; }
+    .preset-remove {
+      position: absolute; top: 4px; right: 4px;
+      background: none; border: none; cursor: pointer;
+      color: var(--rm-text-muted); opacity: 0; padding: 2px;
+      border-radius: 50%; transition: opacity 0.15s; z-index: 1;
+    }
+    .timer-preset-card:hover .preset-remove,
+    .timer-card:hover .preset-remove { opacity: 1; }
+    .preset-remove ha-icon { --mdc-icon-size: 13px; }
+
+    /* Compact add-section: single row, just above presets */
+    .timer-add-section {
+      border-top: 1px solid var(--rm-border);
+      padding-top: 10px;
+    }
+    .timer-add-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
     .timer-input {
       flex: 1;
       background: var(--rm-bg-elevated);
       border: 1px solid var(--rm-border);
       border-radius: 8px;
       color: var(--rm-text);
-      padding: 8px 10px;
-      font-size: 14px;
+      padding: 5px 8px;
+      font-size: 12px;
+      font-family: inherit;
+      min-width: 60px;
     }
+    .timer-mins-input { max-width: 70px; flex: 0 0 70px; }
     .timer-input:focus { outline: none; border-color: var(--rm-accent); }
 
     .action-btn {
@@ -1670,11 +1902,12 @@ class RecipeManagerCard extends LitElement {
       color: var(--rm-text);
       padding: 10px;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 500;
       transition: background 0.15s;
     }
     .alarm-btn:hover { background: var(--rm-accent-soft); }
+    .alarm-btn:disabled { opacity: 0.45; cursor: not-allowed; }
     .alarm-btn.accent { background: var(--rm-accent); color: #fff; border-color: var(--rm-accent); }
     .alarm-btn.stop {
       background: var(--error-color, #cf6679);
@@ -1683,6 +1916,15 @@ class RecipeManagerCard extends LitElement {
       grid-column: 1 / -1;
     }
     .alarm-btn.stop:hover { opacity: 0.85; }
+    .alarm-custom-row {
+      display: flex; gap: 6px; grid-column: 1 / -1;
+    }
+    .alarm-custom-input {
+      flex: 1; background: var(--rm-bg-elevated); border: 1px solid var(--rm-border);
+      border-radius: 8px; color: var(--rm-text); padding: 8px 10px;
+      font-size: 13px; font-family: inherit;
+    }
+    .alarm-custom-input:focus { outline: none; border-color: var(--rm-accent); }
 
     /* ── View transitions ───────────────────────────────────── */
 

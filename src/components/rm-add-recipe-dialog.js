@@ -247,23 +247,47 @@ class RmAddRecipeDialog extends LitElement {
   _addIngredient() {
     const raw = this._ingredientInput.trim();
     if (!raw) return;
-    const parts = raw.split(/\s+/);
-    let amount = '', unit = '', name = '';
-    if (parts.length >= 3 && !isNaN(parseFloat(parts[0]))) {
-      amount = parts[0];
-      unit = parts[1];
-      name = parts.slice(2).join(' ');
-    } else if (parts.length === 2 && !isNaN(parseFloat(parts[0]))) {
-      amount = parts[0];
-      name = parts[1];
+    let newIng;
+    if (raw.startsWith('#')) {
+      newIng = { name: raw, is_heading: true };
     } else {
-      name = raw;
+      const parts = raw.split(/\s+/);
+      let amount = '', unit = '', name = '';
+      if (parts.length >= 3 && !isNaN(parseFloat(parts[0]))) {
+        amount = parts[0];
+        unit = parts[1];
+        name = parts.slice(2).join(' ');
+      } else if (parts.length === 2 && !isNaN(parseFloat(parts[0]))) {
+        amount = parts[0];
+        name = parts[1];
+      } else {
+        name = raw;
+      }
+      newIng = { amount, unit, name };
     }
     this._form = {
       ...this._form,
-      ingredients: [...this._form.ingredients, { amount, unit, name }],
+      ingredients: [...this._form.ingredients, newIng],
     };
     this._ingredientInput = '';
+  }
+
+  _addIngredientsBulk(text) {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const newIngs = lines.map(raw => {
+      if (raw.startsWith('#')) return { name: raw, is_heading: true };
+      const parts = raw.split(/\s+/);
+      let amount = '', unit = '', name = '';
+      if (parts.length >= 3 && !isNaN(parseFloat(parts[0]))) {
+        amount = parts[0]; unit = parts[1]; name = parts.slice(2).join(' ');
+      } else if (parts.length === 2 && !isNaN(parseFloat(parts[0]))) {
+        amount = parts[0]; name = parts[1];
+      } else { name = raw; }
+      return { amount, unit, name };
+    });
+    if (newIngs.length) {
+      this._form = { ...this._form, ingredients: [...this._form.ingredients, ...newIngs] };
+    }
   }
 
   _removeIngredient(idx) {
@@ -544,8 +568,12 @@ class RmAddRecipeDialog extends LitElement {
           ${f.ingredients.length ? html`
             <ul class="ing-list">
               ${f.ingredients.map((ing, i) => html`
-                <li>
-                  <span class="ing-text">${ing.amount ? `${ing.amount} ${ing.unit} ` : ''}${ing.name}</span>
+                <li class="${ing.is_heading || ing.name?.startsWith('#') ? 'ing-heading' : ''}">
+                  <span class="ing-text">
+                    ${ing.is_heading || ing.name?.startsWith('#')
+                      ? html`<strong>${ing.name?.startsWith('#') ? ing.name.slice(1).trim() : ing.name}</strong>`
+                      : html`${ing.amount ? `${ing.amount}${ing.unit ? ' ' + ing.unit : ''} ` : ''}${ing.name}`}
+                  </span>
                   <button class="remove-btn" @click=${() => this._removeIngredient(i)}>
                     <ha-icon icon="mdi:close"></ha-icon>
                   </button>
@@ -559,9 +587,18 @@ class RmAddRecipeDialog extends LitElement {
               .value=${this._ingredientInput}
               @input=${e => { this._ingredientInput = e.target.value; }}
               @keydown=${e => { if (e.key === 'Enter') this._addIngredient(); }}
-              placeholder='e.g. "2 cups flour" or "salt"'
+              placeholder='e.g. "2 cups flour", "salt", or "# Section"'
             />
             <button class="action-btn sm" @click=${this._addIngredient}>Add</button>
+          </div>
+          <div class="bulk-hint">
+            Tip: Use <code>#Section Name</code> to add a section header. Or paste multiple lines at once:
+            <button class="action-btn sm bulk-btn" @click=${() => {
+              const text = prompt('Paste ingredients (one per line, use # for headers):');
+              if (text) this._addIngredientsBulk(text);
+            }}>
+              <ha-icon icon="mdi:text-box-multiple-outline"></ha-icon> Bulk paste
+            </button>
           </div>
         </div>
 
@@ -863,7 +900,16 @@ class RmAddRecipeDialog extends LitElement {
       font-size: 13px;
       color: var(--rm-text, #e5e5ea);
     }
+    .ing-list li.ing-heading { font-weight: 700; color: var(--rm-accent, #9fa8da); }
     .ing-text, .step-text { flex: 1; }
+    .bulk-hint {
+      font-size: 11px; color: var(--rm-text-secondary, #8e8e93);
+      margin-top: 6px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+    .bulk-hint code {
+      background: rgba(255,255,255,0.08); border-radius: 4px; padding: 1px 5px; font-size: 11px;
+    }
+    .bulk-btn { padding: 4px 8px !important; font-size: 11px !important; }
     .remove-btn {
       background: none; border: none; cursor: pointer;
       color: var(--rm-text-secondary, #8e8e93); padding: 2px; flex-shrink: 0;

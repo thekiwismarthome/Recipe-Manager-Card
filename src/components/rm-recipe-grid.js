@@ -17,10 +17,14 @@ class RmRecipeGrid extends LitElement {
     scrollPos:      { type: Number },
     recentRecipes:  { type: Array },
     recentCount:    { type: Number },
-    _filterMode:    { type: String },   // 'all'|'courses'|'categories'|'collections'|'favourites'|'recent'
-    _starFilter:    { type: Number },   // 0 = no filter; 1-5 = minimum rating
-    _sortByRating:  { type: Boolean },  // sort recipes by rating desc
-    _showRatingMenu:{ type: Boolean },  // star filter dropdown open
+    _filterMode:         { type: String },   // 'all'|'courses'|'categories'|'collections'|'favourites'|'recent'
+    _starFilter:         { type: Number },   // 0 = no filter; 1-5 = minimum rating
+    _sortByRating:       { type: Boolean },  // sort recipes by rating desc
+    _showRatingMenu:     { type: Boolean },  // star filter dropdown open
+    _selectedCourses:    { type: Object },
+    _selectedCategories: { type: Object },
+    _selectedCollections:{ type: Object },
+    filterPreset:        { type: Object },  // { filterMode, selectedValues } — applied once on change
   };
 
   constructor() {
@@ -40,11 +44,35 @@ class RmRecipeGrid extends LitElement {
     this._starFilter = 0;
     this._sortByRating = false;
     this._showRatingMenu = false;
+    this._selectedCourses = new Set();
+    this._selectedCategories = new Set();
+    this._selectedCollections = new Set();
     this._lastScrollPos = 0;
     this._hasRestoredScroll = false;
+    this.filterPreset = null;
+  }
+
+  _toggleChip(type, value) {
+    const key = type === 'courses' ? '_selectedCourses'
+      : type === 'categories' ? '_selectedCategories'
+      : '_selectedCollections';
+    const next = new Set(this[key]);
+    if (next.has(value)) next.delete(value); else next.add(value);
+    this[key] = next;
   }
 
   updated(changedProps) {
+    // Apply filterPreset when it changes (chip navigation from recipe detail)
+    if (changedProps.has('filterPreset') && this.filterPreset) {
+      const { filterMode, selectedValues } = this.filterPreset;
+      this._filterMode = filterMode;
+      this._selectedCourses = new Set();
+      this._selectedCategories = new Set();
+      this._selectedCollections = new Set();
+      if (filterMode === 'courses')     this._selectedCourses    = new Set(selectedValues);
+      if (filterMode === 'categories')  this._selectedCategories  = new Set(selectedValues);
+      if (filterMode === 'collections') this._selectedCollections = new Set(selectedValues);
+    }
     if (changedProps.has('scrollPos')) {
       // New target position — allow a single restore
       this._hasRestoredScroll = false;
@@ -123,37 +151,37 @@ class RmRecipeGrid extends LitElement {
   // -- Compute filtered + sorted list --------------------------------------
 
   _getFilteredList() {
-    let base = this.recipes;
+    const hasCourseFilter    = this._selectedCourses.size > 0;
+    const hasCategoryFilter  = this._selectedCategories.size > 0;
+    const hasCollectionFilter= this._selectedCollections.size > 0;
+    const hasMultiFilter = hasCourseFilter || hasCategoryFilter || hasCollectionFilter;
 
-    // Wide Courses/Categories chips should still filter correctly even if
-    // an older parent bundle only filters against `tags`.
-    const wideTagMode = this.hideSidebar
-      && this.activeTag
-      && (this._filterMode === 'courses' || this._filterMode === 'categories' || this._filterMode === 'collections');
-    if (wideTagMode) {
-      base = this.allRecipes.filter(r =>
-        this._recipeMatchesTag(r, this.activeTag) && this._recipeMatchesSearch(r, this.searchQuery)
-      );
+    let base;
+    if (hasMultiFilter) {
+      // Filter from ALL recipes (bypass parent's single-tag filter)
+      base = this.allRecipes.filter(r => {
+        const mc = !hasCourseFilter     || (r.courses     || []).some(c => this._selectedCourses.has(c));
+        const mk = !hasCategoryFilter   || (r.categories  || []).some(c => this._selectedCategories.has(c));
+        const ml = !hasCollectionFilter || (r.collections || []).some(c => this._selectedCollections.has(c));
+        return mc && mk && ml && this._recipeMatchesSearch(r, this.searchQuery);
+      });
+    } else {
+      base = this.recipes; // uses parent's already-filtered list
     }
 
     switch (this._filterMode) {
       case 'favourites':
         base = this.allRecipes.filter(r => r.is_favourite)
-          .filter(r => base.find(b => b.id === r.id));
+          .filter(r => !hasMultiFilter || base.some(b => b.id === r.id));
         break;
       case 'recent':
         base = this.recentRecipes.slice(0, this.recentCount)
-          .filter(r => base.find(b => b.id === r.id));
+          .filter(r => !hasMultiFilter || base.some(b => b.id === r.id));
         break;
     }
-    // Star filter — minimum rating
-    if (this._starFilter > 0) {
-      base = base.filter(r => (r.rating || 0) >= this._starFilter);
-    }
-    // Sort by rating descending
-    if (this._sortByRating) {
-      base = [...base].sort((a, b) => (b.rating || 0) - (a.rating || 0));
-    }
+
+    if (this._starFilter > 0) base = base.filter(r => (r.rating || 0) >= this._starFilter);
+    if (this._sortByRating) base = [...base].sort((a, b) => (b.rating || 0) - (a.rating || 0));
     return base;
   }
 
@@ -302,19 +330,27 @@ class RmRecipeGrid extends LitElement {
           <div class="filter-tabs-row">
             <div class="filter-tabs">
               ${[
-                ['all',         'mdi:view-grid',           'All'],
-                ['courses',     'mdi:silverware-fork-knife','Courses'],
-                ['categories',  'mdi:tag-multiple-outline', 'Categories'],
-                ['collections', 'mdi:folder-multiple-outline', 'Collections'],
-                ['favourites',  'mdi:heart-outline',        'Favourites'],
-                ['recent',      'mdi:history',              'Recent'],
-              ].map(([mode, icon, label]) => html`
+                ['all',         'mdi:view-grid',           'All',         null],
+                ['courses',     'mdi:silverware-fork-knife','Courses',    '_selectedCourses'],
+                ['categories',  'mdi:tag-multiple-outline', 'Categories', '_selectedCategories'],
+                ['collections', 'mdi:folder-multiple-outline', 'Collections', '_selectedCollections'],
+                ['favourites',  'mdi:heart-outline',        'Favourites', null],
+                ['recent',      'mdi:history',              'Recent',     null],
+              ].map(([mode, icon, label, badgeKey]) => html`
                 <button
                   class="filter-tab ${this._filterMode === mode ? 'active' : ''}"
-                  @click=${() => { this._filterMode = mode; }}
+                  @click=${() => {
+                    this._filterMode = mode;
+                    if (mode === 'all') {
+                      this._selectedCourses = new Set();
+                      this._selectedCategories = new Set();
+                      this._selectedCollections = new Set();
+                    }
+                  }}
                 >
                   <ha-icon icon="${icon}"></ha-icon>
                   <span>${label}</span>
+                  ${badgeKey && this[badgeKey]?.size > 0 ? html`<span class="tab-badge"></span>` : ''}
                 </button>
               `)}
             </div>
@@ -333,33 +369,39 @@ class RmRecipeGrid extends LitElement {
           </div>
         ` : ''}
 
-        <!-- Sub-filter chips for Courses / Categories -->
+        <!-- Sub-filter chips for Courses / Categories / Collections (multi-select) -->
         ${this.hideSidebar && this._filterMode === 'courses' && this._allCourses.length ? html`
           <div class="sub-filter-row">
+            <button class="sub-chip ${!this._selectedCourses.size ? 'active' : ''}"
+              @click=${() => { this._selectedCourses = new Set(); }}>All</button>
             ${this._allCourses.map(c => html`
               <button
-                class="sub-chip ${this.activeTag === c ? 'active' : ''}"
-                @click=${() => this._handleTagClick(c)}
+                class="sub-chip ${this._selectedCourses.has(c) ? 'active' : ''}"
+                @click=${() => this._toggleChip('courses', c)}
               >${c}<span class="sub-chip-count">${this._coursecounts[c] || 0}</span></button>
             `)}
           </div>
         ` : ''}
         ${this.hideSidebar && this._filterMode === 'categories' && this._allCategories.length ? html`
           <div class="sub-filter-row">
+            <button class="sub-chip ${!this._selectedCategories.size ? 'active' : ''}"
+              @click=${() => { this._selectedCategories = new Set(); }}>All</button>
             ${this._allCategories.map(c => html`
               <button
-                class="sub-chip ${this.activeTag === c ? 'active' : ''}"
-                @click=${() => this._handleTagClick(c)}
+                class="sub-chip ${this._selectedCategories.has(c) ? 'active' : ''}"
+                @click=${() => this._toggleChip('categories', c)}
               >${c}<span class="sub-chip-count">${this._categorycounts[c] || 0}</span></button>
             `)}
           </div>
         ` : ''}
         ${this.hideSidebar && this._filterMode === 'collections' && this._allCollections.length ? html`
           <div class="sub-filter-row">
+            <button class="sub-chip ${!this._selectedCollections.size ? 'active' : ''}"
+              @click=${() => { this._selectedCollections = new Set(); }}>All</button>
             ${this._allCollections.map(c => html`
               <button
-                class="sub-chip ${this.activeTag === c ? 'active' : ''}"
-                @click=${() => this._handleTagClick(c)}
+                class="sub-chip ${this._selectedCollections.has(c) ? 'active' : ''}"
+                @click=${() => this._toggleChip('collections', c)}
               >${c}<span class="sub-chip-count">${this._collectioncounts[c] || 0}</span></button>
             `)}
           </div>
@@ -485,6 +527,12 @@ class RmRecipeGrid extends LitElement {
     }
     .filter-tab ha-icon { --mdc-icon-size: 16px; flex-shrink: 0; }
     .filter-tab:hover { background: var(--rm-accent-soft); color: var(--rm-text); }
+    .filter-tab { position: relative; }
+    .tab-badge {
+      position: absolute; top: 4px; right: 4px;
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--rm-accent);
+    }
     .filter-tab.active {
       background: var(--rm-accent-soft);
       color: var(--rm-accent); font-weight: 600;
