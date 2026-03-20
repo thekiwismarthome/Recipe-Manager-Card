@@ -234,6 +234,7 @@ class RmRecipeDetail extends LitElement {
       notes:         this.recipe.notes || '',
       rating:        this.recipe.rating || 0,
       image_url:     this.recipe.image_url || '',
+      photos:        [...(this.recipe.photos || [])],
       ingredients:   [...(this.recipe.ingredients || [])],
       instructions:  [...(this.recipe.instructions || [])],
       // Nutrition
@@ -337,7 +338,13 @@ class RmRecipeDetail extends LitElement {
       try {
         const result = await this.api.uploadRecipeImage(this.recipe.id, b64);
         const url = result?.image_url || result?.local_url;
-        if (url) this._editData = { ...this._editData, image_url: url };
+        if (url) {
+          this._editData = {
+            ...this._editData,
+            image_url: this._editData.image_url || url,
+            photos: [...new Set([...(this._editData.photos || []), url])],
+          };
+        }
       } catch (err) {
         console.warn('Image upload failed:', err);
       } finally {
@@ -376,6 +383,7 @@ class RmRecipeDetail extends LitElement {
       collections: splitList(d.collections),
       notes:        d.notes,
       rating:       d.rating || null,
+      photos:       d.photos || [],
       ingredients:  d.ingredients || [],
       instructions: d.instructions || [],
       nutrition:    hasNutrition ? nutrition : null,
@@ -1471,8 +1479,8 @@ class RmRecipeDetail extends LitElement {
             <div class="edit-photo-row">
               ${(() => {
                 const allUrls = [...new Set([
-                  this.recipe?.image_url,
-                  ...(this.recipe?.photos || []),
+                  d.image_url,
+                  ...(d.photos || []),
                 ].filter(Boolean))];
                 return html`
                   ${allUrls.map(url => html`
