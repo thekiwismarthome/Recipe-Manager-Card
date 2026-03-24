@@ -94,6 +94,7 @@ class RmRecipeDetail extends LitElement {
     _checkedIngredients: { type: Object },  // Set of indices
     _shoppingAdding:     { type: Boolean },
     _shoppingResult:     { type: String },
+    _shoppingReview:     { type: Array },
     _confirmDelete:      { type: Boolean },
     _downloading:        { type: Boolean },
     _photoUrlInput:      { type: String },
@@ -127,6 +128,7 @@ class RmRecipeDetail extends LitElement {
     this._checkedIngredients = null;
     this._shoppingAdding = false;
     this._shoppingResult = null;
+    this._shoppingReview = null;
     this._confirmDelete = false;
     this._downloading = false;
     this._photoUrlInput = '';
@@ -185,6 +187,7 @@ class RmRecipeDetail extends LitElement {
         this._editing = false;
         this._confirmDelete = false;
         this._shoppingResult = null;
+        this._shoppingReview = null;
         this._showShoppingPicker = false;
         this._checkedIngredients = null;
         this._photoUrlInput = '';
@@ -466,12 +469,51 @@ class RmRecipeDetail extends LitElement {
     if (!checked?.size) return;
 
     const ingredients = (this.recipe.ingredients || [])
-      .filter((_, i) => checked.has(i))
-      .map(ing => ({
-        ...ing,
-        amount: this._scaleAmount(ing.amount),
-      }));
+      .filter((_, i) => checked.has(i) && !this.recipe.ingredients[i]?.is_heading && !this.recipe.ingredients[i]?.name?.startsWith('#'))
+      .map(ing => ({ ...ing, amount: this._scaleAmount(ing.amount) }));
 
+    // No SLM or no list selected → dispatch directly (no product matching)
+    if (!this.slmAvailable || !this._selectedListId) {
+      await this._dispatchShoppingAdd(ingredients.map(ing => ({ ing, selectedId: null, products: [] })));
+      return;
+    }
+
+    // Search SLM product catalog for each ingredient to build review
+    this._shoppingAdding = true;
+    const reviewItems = await Promise.all(ingredients.map(async (ing) => {
+      try {
+        const res = await this.api.searchSlmProducts(ing.name, 4);
+        const products = res?.products ?? [];
+        const exact = products.find(p => p.name.toLowerCase() === ing.name.toLowerCase());
+        return { ing, products, selectedId: exact?.id ?? null };
+      } catch {
+        return { ing, products: [], selectedId: null };
+      }
+    }));
+    this._shoppingAdding = false;
+    this._shoppingReview = reviewItems;
+  }
+
+  _selectReviewMatch(idx, productId) {
+    this._shoppingReview = this._shoppingReview.map((item, i) =>
+      i === idx ? { ...item, selectedId: productId } : item
+    );
+  }
+
+  async _confirmShoppingReview() {
+    await this._dispatchShoppingAdd(this._shoppingReview);
+  }
+
+  async _dispatchShoppingAdd(reviewItems) {
+    const ingredients = reviewItems.map(({ ing, selectedId, products }) => {
+      const product = products?.find(p => p.id === selectedId);
+      return {
+        ...ing,
+        product_id: product?.id ?? null,
+        product_name: product?.name ?? null,
+        category_id: product?.category_id ?? null,
+      };
+    });
     this._shoppingAdding = true;
     this._shoppingResult = null;
     this.dispatchEvent(new CustomEvent('rm-add-to-shopping', {
@@ -482,8 +524,51 @@ class RmRecipeDetail extends LitElement {
     await new Promise(r => setTimeout(r, 600));
     this._shoppingAdding = false;
     this._shoppingResult = 'success';
+    this._shoppingReview = null;
     this._showShoppingPicker = false;
     setTimeout(() => { this._shoppingResult = null; }, 2500);
+  }
+
+  _renderShoppingReview() {
+    const review = this._shoppingReview;
+    if (!review) return html``;
+    return html`
+      <div class="shopping-review-panel">
+        <div class="review-title">Match Items to Products</div>
+        <div class="review-list">
+          ${review.map((item, idx) => html`
+            <div class="review-row">
+              <div class="review-ing">
+                ${item.ing.amount ? html`<span class="review-qty">${item.ing.amount}${item.ing.unit ? ` ${item.ing.unit}` : ''}</span>` : ''}
+                <span class="review-ing-name">${item.ing.name}</span>
+              </div>
+              <div class="review-chips">
+                ${item.products.slice(0, 3).map(p => html`
+                  <button class="review-chip ${item.selectedId === p.id ? 'selected' : ''}"
+                    @click=${() => this._selectReviewMatch(idx, p.id)}>
+                    ${item.selectedId === p.id ? html`<ha-icon icon="mdi:check"></ha-icon>` : ''}${p.name}
+                  </button>
+                `)}
+                <button class="review-chip manual ${item.selectedId === null ? 'selected' : ''}"
+                  @click=${() => this._selectReviewMatch(idx, null)}>
+                  ${item.selectedId === null ? html`<ha-icon icon="mdi:check"></ha-icon>` : ''}Add manually
+                </button>
+              </div>
+            </div>
+          `)}
+        </div>
+        <div class="picker-btns review-btns">
+          <button class="action-btn" @click=${() => { this._shoppingReview = null; }}>Back</button>
+          <button class="action-btn primary"
+            ?disabled=${this._shoppingAdding}
+            @click=${this._confirmShoppingReview}>
+            ${this._shoppingAdding
+              ? html`<ha-circular-progress active size="tiny"></ha-circular-progress>`
+              : `Confirm & Add ${review.length}`}
+          </button>
+        </div>
+      </div>
+    `;
   }
 
   _handleQuickRate(n) {
@@ -864,8 +949,10 @@ class RmRecipeDetail extends LitElement {
               `}
             </div>
 
-            <!-- shopping picker (shown inline when picking) -->
-            ${picking ? html`
+            <!-- shopping picker / review (shown inline when picking) -->
+            ${picking ? (this._shoppingReview ? html`
+              <div class="wide-section-card">${this._renderShoppingReview()}</div>
+            ` : html`
               <div class="wide-section-card shopping-picker-panel">
                 <div class="picker-select-row">
                   <button class="picker-sel-btn" @click=${this._selectAllIngredients}>Select All</button>
@@ -890,7 +977,7 @@ class RmRecipeDetail extends LitElement {
                   </button>
                 </div>
               </div>
-            ` : ''}
+            `) : ''}
 
             ${groups.map(g => html`
               <div class="wide-section-card">
@@ -1128,7 +1215,8 @@ class RmRecipeDetail extends LitElement {
             <ha-icon icon="mdi:check-circle-outline"></ha-icon>
             Added to shopping list!
           </div>
-        ` : picking ? html`
+        ` : picking && this._shoppingReview ? this._renderShoppingReview()
+        : picking ? html`
           <div class="shopping-picker-panel">
             <div class="picker-select-row">
               <button class="picker-sel-btn" @click=${this._selectAllIngredients}>Select All</button>
@@ -2705,6 +2793,41 @@ class RmRecipeDetail extends LitElement {
     .ing-shop-btn.active { background: var(--rm-accent-soft); color: var(--rm-accent); border-color: var(--rm-accent); }
     .ing-shop-success { color: var(--success-color, #4caf50); display: flex; align-items: center; }
     .ing-shop-success ha-icon { --mdc-icon-size: 22px; }
+    .shopping-review-panel {
+      display: flex; flex-direction: column; gap: 10px;
+      background: var(--rm-bg-elevated, #2c2c2e);
+      border: 1px solid var(--rm-border, rgba(255,255,255,0.12));
+      border-radius: 10px; padding: 12px;
+    }
+    .review-title {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--rm-text-secondary, #8e8e93);
+    }
+    .review-list {
+      display: flex; flex-direction: column; gap: 10px;
+      max-height: 300px; overflow-y: auto;
+    }
+    .review-row { display: flex; flex-direction: column; gap: 4px; }
+    .review-ing { display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap; }
+    .review-qty { font-size: 0.8rem; color: var(--rm-text-secondary, #8e8e93); flex-shrink: 0; }
+    .review-ing-name { font-size: 0.9rem; font-weight: 500; }
+    .review-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+    .review-chip {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 4px 10px; border-radius: 999px;
+      border: 1.5px solid var(--rm-border, rgba(255,255,255,0.12));
+      background: none; cursor: pointer;
+      font-size: 12px; color: var(--rm-text, #e5e5ea);
+      font-family: inherit; transition: all 0.15s; white-space: nowrap;
+    }
+    .review-chip ha-icon { --mdc-icon-size: 13px; }
+    .review-chip.selected {
+      border-color: var(--rm-accent, #ff6b35);
+      background: var(--rm-accent-soft, rgba(255,107,53,0.12));
+      color: var(--rm-accent, #ff6b35); font-weight: 600;
+    }
+    .review-chip.manual { border-style: dashed; }
+    .review-btns { margin-top: 2px; }
 
     /* Section cards (ingredients, nutrition, notes) */
     .wide-section-card {

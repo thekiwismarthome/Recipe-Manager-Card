@@ -169,11 +169,13 @@ export class RecipeManagerAPI {
     for (const ing of ingredients) {
       try {
         const cleanName = _slmCleanName(ing);
+        // Use matched product name if available, otherwise cleaned ingredient name
+        const itemName = ing.product_name ?? cleanName;
         const note = recipeName ? _slmBuildNote(recipeName, ing, cleanName) : null;
 
-        // Try to match an existing unchecked item by name (case-insensitive)
+        // Try to match an existing unchecked item by resolved name (case-insensitive)
         const match = existingItems.find(
-          item => item.name.toLowerCase().trim() === cleanName.toLowerCase().trim()
+          item => item.name.toLowerCase().trim() === itemName.toLowerCase().trim()
         );
 
         if (match && note) {
@@ -184,19 +186,21 @@ export class RecipeManagerAPI {
             item_id: match.id,
             note: combined,
           });
-          results.push({ success: true, name: cleanName, merged: true });
+          results.push({ success: true, name: itemName, merged: true });
         } else {
-          // Create new item
+          // Create new item — use product_id/category_id when matched via review
           const payload = {
             type: 'shopping_list_manager/items/add',
             list_id: listId,
-            name: cleanName,
+            name: itemName,
             quantity: _slmParseQty(ing.amount),
             unit: ing.unit || null,
           };
+          if (ing.product_id) payload.product_id = ing.product_id;
+          if (ing.category_id) payload.category_id = ing.category_id;
           if (note) payload.note = note;
           await this.hass.callWS(payload);
-          results.push({ success: true, name: cleanName });
+          results.push({ success: true, name: itemName });
         }
       } catch (err) {
         results.push({ success: false, name: ing.name, error: err.message });
@@ -243,6 +247,10 @@ export class RecipeManagerAPI {
 
   async getSlmProductSuggestions(limit = 20) {
     return this.hass.callWS({ type: 'shopping_list_manager/products/suggestions', limit });
+  }
+
+  async searchSlmProducts(query, limit = 5) {
+    return this.hass.callWS({ type: 'shopping_list_manager/products/search', query, limit });
   }
 
   // -- Import ---------------------------------------------------------------
