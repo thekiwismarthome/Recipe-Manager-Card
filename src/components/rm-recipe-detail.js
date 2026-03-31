@@ -1376,9 +1376,11 @@ class RmRecipeDetail extends LitElement {
 
     // SVG stroke-dasharray arcs using svg`` template tag (correct SVG namespace)
     const rad = 42, cx = 50, cy = 50;
+    const strokeW = 7;
     const circ = 2 * Math.PI * rad;
-    const gapDeg = 5; // degrees of gap between segments
-    const gapLen = circ * gapDeg / 360;
+    // With stroke-linecap="round", each end cap extends strokeW/2 beyond the arc endpoint.
+    // gapLen must exceed strokeW (both caps combined) to leave a visible gap between rounded ends.
+    const gapLen = strokeW + circ * 4 / 360; // stroke-width + 4° of visible separation
 
     const carbArc = total > 0 ? Math.max(0, (carbCal / total) * circ - gapLen) : 0;
     const fatArc  = total > 0 ? Math.max(0, (fatCal  / total) * circ - gapLen) : 0;
