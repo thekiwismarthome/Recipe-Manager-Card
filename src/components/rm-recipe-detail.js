@@ -2,6 +2,42 @@
  * Recipe detail view — full recipe with ingredients, directions, nutrition, photos and actions.
  */
 import { LitElement, html, css } from 'lit';
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+
+// ---------------------------------------------------------------------------
+// Minimal Markdown renderer (bold, italic, headers, lists, links, code)
+// ---------------------------------------------------------------------------
+function _escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function _inlineMd(text) {
+  return _escHtml(text)
+    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/_(.+?)_/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+}
+function renderMarkdown(text) {
+  if (!text) return '';
+  const lines = text.split('\n');
+  const out = [];
+  let listTag = null;
+  const closeList = () => { if (listTag) { out.push(`</${listTag}>`); listTag = null; } };
+  for (const line of lines) {
+    const h3 = line.match(/^###\s+(.+)/); if (h3) { closeList(); out.push(`<h3>${_inlineMd(h3[1])}</h3>`); continue; }
+    const h2 = line.match(/^##\s+(.+)/);  if (h2) { closeList(); out.push(`<h2>${_inlineMd(h2[1])}</h2>`); continue; }
+    const h1 = line.match(/^#\s+(.+)/);   if (h1) { closeList(); out.push(`<h1>${_inlineMd(h1[1])}</h1>`); continue; }
+    const ul = line.match(/^[-*]\s+(.+)/); if (ul) { if (listTag !== 'ul') { closeList(); out.push('<ul>'); listTag='ul'; } out.push(`<li>${_inlineMd(ul[1])}</li>`); continue; }
+    const ol = line.match(/^\d+\.\s+(.+)/); if (ol) { if (listTag !== 'ol') { closeList(); out.push('<ol>'); listTag='ol'; } out.push(`<li>${_inlineMd(ol[1])}</li>`); continue; }
+    const hr = line.match(/^---+$/); if (hr) { closeList(); out.push('<hr>'); continue; }
+    closeList();
+    if (line.trim() === '') { out.push('<p class="md-gap"></p>'); } else { out.push(`<p>${_inlineMd(line)}</p>`); }
+  }
+  closeList();
+  return out.join('');
+}
 
 const NUTRITION_FIELDS = [
   { key: 'calories',      label: 'Calories',         unit: 'kcal', bold: true },
@@ -109,6 +145,15 @@ class RmRecipeDetail extends LitElement {
     _dragStepOver:        { type: Number },
     _editImageUploading:  { type: Boolean },
     _slideIdx:            { type: Number },
+    // List picker (tags/courses/categories/collections)
+    allTags:              { type: Array },
+    allCourses:           { type: Array },
+    allCategories:        { type: Array },
+    allCollections:       { type: Array },
+    _tagPickerField:      { type: String },
+    _tagPickerInput:      { type: String },
+    // Inline ingredient editing
+    _editIngEdit:         { type: Object },
   };
 
   constructor() {
@@ -145,6 +190,13 @@ class RmRecipeDetail extends LitElement {
     this._dragStepFrom = -1;
     this._editImageUploading = false;
     this._slideIdx = 0;
+    this.allTags = [];
+    this.allCourses = [];
+    this.allCategories = [];
+    this.allCollections = [];
+    this._tagPickerField = null;
+    this._tagPickerInput = '';
+    this._editIngEdit = null;
     this._slideTimer = null;
     this._slideTouchStartX = null;
     this._wakeLockSentinel = null;
@@ -230,10 +282,10 @@ class RmRecipeDetail extends LitElement {
       servings:      this.recipe.servings || '',
       prep_time:     this.recipe.prep_time || '',
       cook_time:     this.recipe.cook_time || '',
-      tags:          (this.recipe.tags || []).join(', '),
-      courses:       (this.recipe.courses || []).join(', '),
-      categories:    (this.recipe.categories || []).join(', '),
-      collections:   (this.recipe.collections || []).join(', '),
+      tags:          [...(this.recipe.tags || [])],
+      courses:       [...(this.recipe.courses || [])],
+      categories:    [...(this.recipe.categories || [])],
+      collections:   [...(this.recipe.collections || [])],
       notes:         this.recipe.notes || '',
       rating:        this.recipe.rating || 0,
       image_url:     this.recipe.image_url || '',
@@ -261,6 +313,112 @@ class RmRecipeDetail extends LitElement {
 
   _handleEditField(field, value) {
     this._editData = { ...this._editData, [field]: value };
+  }
+
+  // -- List picker (tags / courses / categories / collections) ---------------
+
+  _renderListPicker(field, label, allValues) {
+    const current = this._editData[field] || [];
+    const open = this._tagPickerField === field;
+    const available = (allValues || []).filter(v => !current.includes(v));
+    const inputVal = open ? this._tagPickerInput : '';
+    return html`
+      <div class="edit-field list-picker-field">
+        <label>${label}</label>
+        <div class="list-picker-wrap">
+          <!-- Selected chips -->
+          <div class="list-picker-chips">
+            ${current.map(v => html`
+              <span class="list-chip selected">
+                ${v}
+                <button class="list-chip-remove" @click=${() => this._toggleListValue(field, v)} title="Remove">×</button>
+              </span>
+            `)}
+            <button class="list-chip-add-btn" @click=${() => {
+              this._tagPickerField = open ? null : field;
+              this._tagPickerInput = '';
+            }} title="Add ${label.toLowerCase()}">
+              <ha-icon icon="mdi:plus"></ha-icon>
+            </button>
+          </div>
+          <!-- Picker dropdown -->
+          ${open ? html`
+            <div class="list-picker-dropdown">
+              ${available.length ? html`
+                <div class="list-picker-existing">
+                  ${available.map(v => html`
+                    <span class="list-chip available" @click=${() => { this._toggleListValue(field, v); }}>
+                      ${v}
+                    </span>
+                  `)}
+                </div>
+              ` : ''}
+              <div class="list-picker-new-row">
+                <input class="list-picker-input" type="text" placeholder="New ${label.toLowerCase()}…"
+                  .value=${inputVal}
+                  @input=${e => { this._tagPickerInput = e.target.value; }}
+                  @keydown=${e => {
+                    if (e.key === 'Enter') { e.preventDefault(); this._addListValue(field, this._tagPickerInput); }
+                    if (e.key === 'Escape') { this._tagPickerField = null; }
+                  }}
+                />
+                <button class="list-picker-new-btn" @click=${() => this._addListValue(field, this._tagPickerInput)}
+                  ?disabled=${!this._tagPickerInput.trim()}>
+                  Add
+                </button>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  _toggleListValue(field, value) {
+    const cur = this._editData[field] || [];
+    const updated = cur.includes(value) ? cur.filter(v => v !== value) : [...cur, value];
+    this._editData = { ...this._editData, [field]: updated };
+  }
+
+  _addListValue(field, rawValue) {
+    const value = (rawValue || '').trim();
+    if (!value) return;
+    const cur = this._editData[field] || [];
+    if (!cur.includes(value)) {
+      this._editData = { ...this._editData, [field]: [...cur, value] };
+    }
+    this._tagPickerInput = '';
+    this._tagPickerField = null;
+  }
+
+  // -- Inline ingredient editing --------------------------------------------
+
+  _startEditIngredient(idx) {
+    const ing = (this._editData.ingredients || [])[idx];
+    if (!ing) return;
+    if (ing.is_heading || ing.name?.startsWith('#')) {
+      const name = ing.name?.startsWith('#') ? ing.name.slice(1).trim() : ing.name;
+      this._editIngEdit = { idx, heading: true, name };
+    } else {
+      this._editIngEdit = { idx, heading: false, amount: ing.amount || '', unit: ing.unit || '', name: ing.name || '' };
+    }
+  }
+
+  _saveEditIngredient() {
+    const e = this._editIngEdit;
+    if (!e) return;
+    const ings = [...(this._editData.ingredients || [])];
+    if (e.heading) {
+      ings[e.idx] = { name: `# ${e.name}`, is_heading: true };
+    } else {
+      ings[e.idx] = { amount: e.amount, unit: e.unit, name: e.name };
+    }
+    this._editData = { ...this._editData, ingredients: ings };
+    this._editIngEdit = null;
+  }
+
+  _cancelEditIngredient() {
+    this._editIngEdit = null;
   }
 
   _editAddIngredient() {
@@ -359,7 +517,6 @@ class RmRecipeDetail extends LitElement {
 
   async _saveEdit() {
     const d = this._editData;
-    const splitList = v => v ? v.split(',').map(t => t.trim()).filter(Boolean) : [];
 
     const nutrition = {};
     const nMap = { cal:'calories', fat:'fat', satf:'saturated_fat', chol:'cholesterol',
@@ -380,10 +537,10 @@ class RmRecipeDetail extends LitElement {
       servings:    parseInt(d.servings) || null,
       prep_time:   parseInt(d.prep_time) || null,
       cook_time:   parseInt(d.cook_time) || null,
-      tags:        splitList(d.tags),
-      courses:     splitList(d.courses),
-      categories:  splitList(d.categories),
-      collections: splitList(d.collections),
+      tags:        Array.isArray(d.tags) ? d.tags : [],
+      courses:     Array.isArray(d.courses) ? d.courses : [],
+      categories:  Array.isArray(d.categories) ? d.categories : [],
+      collections: Array.isArray(d.collections) ? d.collections : [],
       notes:        d.notes,
       rating:       d.rating || null,
       photos:       d.photos || [],
@@ -923,7 +1080,7 @@ class RmRecipeDetail extends LitElement {
           <div class="wide-info-card">
             <h1 class="wide-title">${r.name}</h1>
             ${this._renderActionButtons(r)}
-            ${r.description ? html`<p class="wide-desc">${r.description}</p>` : ''}
+            ${r.description ? html`<div class="wide-desc md-content">${unsafeHTML(renderMarkdown(r.description))}</div>` : ''}
             ${this._renderMetaRow(r)}
             ${this._renderChipGroups(r)}
           </div>
@@ -1029,7 +1186,7 @@ class RmRecipeDetail extends LitElement {
             ${r.notes ? html`
               <div class="wide-section-card">
                 <div class="wide-section-title">Notes</div>
-                <p class="notes-text">${r.notes}</p>
+                <div class="notes-text md-content">${unsafeHTML(renderMarkdown(r.notes))}</div>
               </div>
             ` : ''}
           </div>
@@ -1077,7 +1234,7 @@ class RmRecipeDetail extends LitElement {
           <div class="detail-head">
             <h2 class="recipe-title">${r.name}</h2>
             ${this._renderActionButtons(r)}
-            ${r.description ? html`<p class="detail-desc">${r.description}</p>` : ''}
+            ${r.description ? html`<div class="detail-desc md-content">${unsafeHTML(renderMarkdown(r.description))}</div>` : ''}
 
             <div class="meta-row">
               ${r.prep_time ? html`
@@ -1312,7 +1469,7 @@ class RmRecipeDetail extends LitElement {
   _renderNotes(r) {
     return html`
       ${r.notes
-        ? html`<p class="notes-text">${r.notes}</p>`
+        ? html`<div class="notes-text md-content">${unsafeHTML(renderMarkdown(r.notes))}</div>`
         : html`<p class="empty-tab">No notes.</p>`}
     `;
   }
@@ -1617,45 +1774,85 @@ class RmRecipeDetail extends LitElement {
               </div>
             </div>
 
-            ${this._renderField('Tags (comma-separated)', 'tags', 'text')}
-            ${this._renderField('Courses (comma-separated)', 'courses', 'text')}
-            ${this._renderField('Categories (comma-separated)', 'categories', 'text')}
-            ${this._renderField('Collections (comma-separated)', 'collections', 'text')}
+            ${this._renderListPicker('tags', 'Tags', this.allTags)}
+            ${this._renderListPicker('courses', 'Courses', this.allCourses)}
+            ${this._renderListPicker('categories', 'Categories', this.allCategories)}
+            ${this._renderListPicker('collections', 'Collections', this.allCollections)}
             ${this._renderField('Notes', 'notes', 'textarea')}
 
             <!-- Ingredients editor -->
             <div class="edit-section-label">Ingredients (${(d.ingredients || []).length})</div>
             ${(d.ingredients || []).length ? html`
               <ul class="edit-ing-list">
-                ${(d.ingredients || []).map((ing, i) => html`
-                  <li
-                    draggable="true"
-                    class="${ing.is_heading || ing.name?.startsWith('#') ? 'edit-ing-heading' : ''} ${this._dragIngOver === i ? 'drag-over' : ''}"
-                    @dragstart=${e => { this._dragIngFrom = i; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)); }}
-                    @dragover=${e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (this._dragIngOver !== i) this._dragIngOver = i; }}
-                    @dragleave=${() => { if (this._dragIngOver === i) this._dragIngOver = -1; }}
-                    @drop=${e => { e.preventDefault(); this._editDropIngredient(this._dragIngFrom, i); }}
-                    @dragend=${() => { this._dragIngOver = -1; this._dragIngFrom = -1; }}
-                  >
-                    <ha-icon icon="mdi:drag-vertical" class="drag-handle"></ha-icon>
-                    <span class="edit-ing-text">
-                      ${ing.is_heading || ing.name?.startsWith('#')
-                        ? html`<strong>${ing.name?.startsWith('#') ? ing.name.slice(1).trim() : ing.name}</strong>`
-                        : html`${ing.amount ? `${ing.amount}${ing.unit ? ' ' + ing.unit : ''} ` : ''}${ing.name}`}
-                    </span>
-                    <div class="edit-reorder-btns">
-                      <button class="edit-move-btn" ?disabled=${i === 0} @click=${() => this._editMoveIngredient(i, -1)} title="Move up">
-                        <ha-icon icon="mdi:chevron-up"></ha-icon>
+                ${(d.ingredients || []).map((ing, i) => {
+                  const isEditing = this._editIngEdit?.idx === i;
+                  const isHeading = ing.is_heading || ing.name?.startsWith('#');
+                  if (isEditing) {
+                    const ee = this._editIngEdit;
+                    return html`
+                      <li class="edit-ing-inline-edit ${isHeading ? 'edit-ing-heading' : ''}">
+                        ${ee.heading ? html`
+                          <input class="ing-inline-input ing-inline-name" type="text" placeholder="Section header"
+                            .value=${ee.name}
+                            @input=${e => { this._editIngEdit = { ...ee, name: e.target.value }; }}
+                            @keydown=${e => { if (e.key === 'Enter') this._saveEditIngredient(); if (e.key === 'Escape') this._cancelEditIngredient(); }}
+                          />
+                        ` : html`
+                          <input class="ing-inline-input ing-inline-amt" type="text" placeholder="Amt"
+                            .value=${ee.amount}
+                            @input=${e => { this._editIngEdit = { ...ee, amount: e.target.value }; }}
+                            @keydown=${e => { if (e.key === 'Enter') this._saveEditIngredient(); if (e.key === 'Escape') this._cancelEditIngredient(); }}
+                          />
+                          <input class="ing-inline-input ing-inline-unit" type="text" placeholder="Unit"
+                            .value=${ee.unit}
+                            @input=${e => { this._editIngEdit = { ...ee, unit: e.target.value }; }}
+                            @keydown=${e => { if (e.key === 'Enter') this._saveEditIngredient(); if (e.key === 'Escape') this._cancelEditIngredient(); }}
+                          />
+                          <input class="ing-inline-input ing-inline-name" type="text" placeholder="Ingredient"
+                            .value=${ee.name}
+                            @input=${e => { this._editIngEdit = { ...ee, name: e.target.value }; }}
+                            @keydown=${e => { if (e.key === 'Enter') this._saveEditIngredient(); if (e.key === 'Escape') this._cancelEditIngredient(); }}
+                          />
+                        `}
+                        <button class="ing-inline-save" @click=${this._saveEditIngredient} title="Save">
+                          <ha-icon icon="mdi:check"></ha-icon>
+                        </button>
+                        <button class="ing-inline-cancel" @click=${this._cancelEditIngredient} title="Cancel">
+                          <ha-icon icon="mdi:close"></ha-icon>
+                        </button>
+                      </li>
+                    `;
+                  }
+                  return html`
+                    <li
+                      draggable="true"
+                      class="${isHeading ? 'edit-ing-heading' : ''} ${this._dragIngOver === i ? 'drag-over' : ''}"
+                      @dragstart=${e => { this._dragIngFrom = i; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)); }}
+                      @dragover=${e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (this._dragIngOver !== i) this._dragIngOver = i; }}
+                      @dragleave=${() => { if (this._dragIngOver === i) this._dragIngOver = -1; }}
+                      @drop=${e => { e.preventDefault(); this._editDropIngredient(this._dragIngFrom, i); }}
+                      @dragend=${() => { this._dragIngOver = -1; this._dragIngFrom = -1; }}
+                    >
+                      <ha-icon icon="mdi:drag-vertical" class="drag-handle"></ha-icon>
+                      <span class="edit-ing-text" @click=${() => this._startEditIngredient(i)} title="Click to edit">
+                        ${isHeading
+                          ? html`<strong>${ing.name?.startsWith('#') ? ing.name.slice(1).trim() : ing.name}</strong>`
+                          : html`${ing.amount ? `${ing.amount}${ing.unit ? ' ' + ing.unit : ''} ` : ''}${ing.name}`}
+                      </span>
+                      <div class="edit-reorder-btns">
+                        <button class="edit-move-btn" ?disabled=${i === 0} @click=${() => this._editMoveIngredient(i, -1)} title="Move up">
+                          <ha-icon icon="mdi:chevron-up"></ha-icon>
+                        </button>
+                        <button class="edit-move-btn" ?disabled=${i === (d.ingredients.length - 1)} @click=${() => this._editMoveIngredient(i, 1)} title="Move down">
+                          <ha-icon icon="mdi:chevron-down"></ha-icon>
+                        </button>
+                      </div>
+                      <button class="edit-remove-btn" @click=${() => this._editRemoveIngredient(i)}>
+                        <ha-icon icon="mdi:close"></ha-icon>
                       </button>
-                      <button class="edit-move-btn" ?disabled=${i === (d.ingredients.length - 1)} @click=${() => this._editMoveIngredient(i, 1)} title="Move down">
-                        <ha-icon icon="mdi:chevron-down"></ha-icon>
-                      </button>
-                    </div>
-                    <button class="edit-remove-btn" @click=${() => this._editRemoveIngredient(i)}>
-                      <ha-icon icon="mdi:close"></ha-icon>
-                    </button>
-                  </li>
-                `)}
+                    </li>
+                  `;
+                })}
               </ul>
             ` : ''}
             <div class="edit-add-row">
@@ -2255,7 +2452,7 @@ class RmRecipeDetail extends LitElement {
     .time-chip:hover { background: var(--rm-accent, #ff6b35); color: #fff; }
 
     /* Notes */
-    .notes-text { font-size: 14px; color: var(--rm-text, #e5e5ea); line-height: 1.6; white-space: pre-wrap; }
+    .notes-text { font-size: 14px; color: var(--rm-text, #e5e5ea); line-height: 1.6; }
     .empty-tab {
       display: flex;
       flex-direction: column;
@@ -2857,6 +3054,90 @@ class RmRecipeDetail extends LitElement {
       text-decoration: line-through;
       text-decoration-color: var(--rm-border);
     }
+
+    /* ── Markdown content ─────────────────────────────── */
+    .md-content { font-size: 14px; line-height: 1.65; }
+    .md-content p { margin: 0 0 6px; }
+    .md-content p.md-gap { margin: 0 0 10px; }
+    .md-content h1 { font-size: 18px; font-weight: 700; margin: 10px 0 4px; }
+    .md-content h2 { font-size: 16px; font-weight: 700; margin: 8px 0 4px; }
+    .md-content h3 { font-size: 14px; font-weight: 700; margin: 6px 0 3px; }
+    .md-content ul, .md-content ol { padding-left: 20px; margin: 4px 0 8px; }
+    .md-content li { margin: 2px 0; }
+    .md-content strong { font-weight: 700; }
+    .md-content em { font-style: italic; }
+    .md-content code { font-family: monospace; font-size: 12px; background: var(--rm-bg-elevated); padding: 1px 4px; border-radius: 3px; }
+    .md-content a { color: var(--rm-accent); text-decoration: none; }
+    .md-content a:hover { text-decoration: underline; }
+    .md-content hr { border: none; border-top: 1px solid var(--rm-border); margin: 8px 0; }
+
+    /* ── List picker (tags / courses / categories / collections) ─── */
+    .list-picker-field { position: relative; }
+    .list-picker-wrap { display: flex; flex-direction: column; gap: 6px; }
+    .list-picker-chips { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; min-height: 28px; }
+    .list-chip {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 3px 8px; border-radius: 14px; font-size: 12px;
+      border: 1px solid var(--rm-border); background: var(--rm-bg-elevated);
+      color: var(--rm-text); cursor: default; transition: all 0.12s;
+    }
+    .list-chip.selected { background: var(--rm-accent-soft); border-color: var(--rm-accent); color: var(--rm-accent); }
+    .list-chip.available { cursor: pointer; color: var(--rm-text-muted); }
+    .list-chip.available:hover { border-color: var(--rm-accent); color: var(--rm-accent); background: var(--rm-accent-soft); }
+    .list-chip-remove {
+      background: none; border: none; padding: 0 0 0 2px; cursor: pointer;
+      color: inherit; font-size: 14px; line-height: 1; opacity: 0.7;
+    }
+    .list-chip-remove:hover { opacity: 1; }
+    .list-chip-add-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px; border-radius: 50%; border: 1px dashed var(--rm-border);
+      background: none; cursor: pointer; color: var(--rm-text-muted); transition: all 0.12s;
+    }
+    .list-chip-add-btn:hover { border-color: var(--rm-accent); color: var(--rm-accent); }
+    .list-chip-add-btn ha-icon { --mdc-icon-size: 14px; }
+    .list-picker-dropdown {
+      background: var(--rm-bg-elevated); border: 1px solid var(--rm-border);
+      border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    }
+    .list-picker-existing { display: flex; flex-wrap: wrap; gap: 5px; }
+    .list-picker-new-row { display: flex; gap: 6px; }
+    .list-picker-input {
+      flex: 1; background: var(--rm-bg-surface, var(--rm-bg)); border: 1px solid var(--rm-border);
+      border-radius: 7px; color: var(--rm-text); padding: 5px 9px; font-size: 13px;
+      font-family: inherit; min-width: 0;
+    }
+    .list-picker-input:focus { outline: none; border-color: var(--rm-accent); }
+    .list-picker-new-btn {
+      padding: 5px 12px; border-radius: 7px; border: 1px solid var(--rm-accent);
+      background: var(--rm-accent); color: #fff; cursor: pointer; font-size: 13px; font-family: inherit;
+    }
+    .list-picker-new-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* ── Inline ingredient edit ──────────────────────── */
+    .edit-ing-text { cursor: pointer; flex: 1; }
+    .edit-ing-text:hover { color: var(--rm-accent); }
+    .edit-ing-inline-edit {
+      display: flex; align-items: center; gap: 4px; padding: 4px 0; list-style: none;
+    }
+    .ing-inline-input {
+      background: var(--rm-bg-elevated); border: 1px solid var(--rm-accent);
+      border-radius: 6px; color: var(--rm-text); padding: 4px 6px; font-size: 13px;
+      font-family: inherit; min-width: 0;
+    }
+    .ing-inline-input:focus { outline: none; }
+    .ing-inline-amt { width: 52px; flex: 0 0 52px; }
+    .ing-inline-unit { width: 60px; flex: 0 0 60px; }
+    .ing-inline-name { flex: 1; }
+    .ing-inline-save, .ing-inline-cancel {
+      width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--rm-border);
+      background: none; cursor: pointer; color: var(--rm-text-muted);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .ing-inline-save { border-color: var(--rm-accent); color: var(--rm-accent); }
+    .ing-inline-save:hover { background: var(--rm-accent); color: #fff; }
+    .ing-inline-save ha-icon, .ing-inline-cancel ha-icon { --mdc-icon-size: 13px; }
   `;
 }
 

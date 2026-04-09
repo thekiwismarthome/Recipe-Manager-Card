@@ -1163,6 +1163,10 @@ class RecipeManagerCard extends LitElement {
               .wide=${this._wide}
               .shoppingLists=${this._shoppingLists}
               .slmAvailable=${this._slmAvailable}
+              .allTags=${this._tags || []}
+              .allCourses=${[...new Set(this._recipes.flatMap(r => r.courses || []))].sort()}
+              .allCategories=${[...new Set(this._recipes.flatMap(r => r.categories || []))].sort()}
+              .allCollections=${[...new Set(this._recipes.flatMap(r => r.collections || []))].sort()}
               @rm-back=${this._handleBack}
               @rm-toggle-favourite=${this._handleToggleFavourite}
               @rm-delete-recipe=${this._handleDeleteRecipe}
