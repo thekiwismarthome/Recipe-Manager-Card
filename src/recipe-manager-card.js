@@ -190,7 +190,8 @@ function loadTimers() {
 
 function saveTimers(timers) {
   try {
-    const toSave = timers.map(t => ({ ...t, savedAt: Date.now() }));
+    // Global timers live in HA — only persist local ones to localStorage
+    const toSave = timers.filter(t => !t.global).map(t => ({ ...t, savedAt: Date.now() }));
     localStorage.setItem(TIMERS_KEY, JSON.stringify(toSave));
   } catch { /* ignore */ }
 }
@@ -278,6 +279,8 @@ class RecipeManagerCard extends LitElement {
     _presetMinsInput: { type: String },
     _alarmAddInput: { type: String },
     _plannerFromRecipe: { type: Object },
+    _globalMode: { type: Boolean },
+    _quickTimerLabel: { type: String },
   };
 
   constructor() {
@@ -313,6 +316,8 @@ class RecipeManagerCard extends LitElement {
     this._presetMinsInput = '';
     this._alarmAddInput = '';
     this._plannerFromRecipe = null;
+    this._globalMode = false;
+    this._quickTimerLabel = '';
     this._alarmLoopActive = false;
     this._alarmInterval = null;
     this._alarmTimeout = null;
@@ -408,11 +413,42 @@ class RecipeManagerCard extends LitElement {
     this._loading = true;
     this._loadLocalShopping();
     try {
-      await Promise.all([this._loadRecipes(), this._loadTags(), this._loadShoppingLists()]);
+      await Promise.all([this._loadRecipes(), this._loadTags(), this._loadShoppingLists(), this._loadGlobalTimers()]);
       await this._subscribe();
     } catch (e) {
       this._error = e.message || 'Failed to load recipes';
     } finally { this._loading = false; }
+  }
+
+  async _loadGlobalTimers() {
+    try {
+      const { timers } = await this._api.getGlobalTimers();
+      const now = Date.now() / 1000;
+      // Remove any stale global timers from _timers (e.g. from a previous session), then add fresh ones
+      this._timers = [
+        ...this._timers.filter(t => !t.global),
+        ...(timers || []).map(t => this._globalTimerToLocal(t, now)),
+      ];
+    } catch { /* global timers unavailable */ }
+  }
+
+  _globalTimerToLocal(t, now = Date.now() / 1000) {
+    const remaining = t.running
+      ? Math.max(0, t.duration - (now - t.start_time))
+      : (t.paused_remaining ?? t.duration);
+    return {
+      id: t.id,
+      label: t.label,
+      total: t.duration,
+      remaining: Math.round(remaining),
+      running: t.running && remaining > 0,
+      alarming: t.running && remaining <= 0,
+      presetId: t.preset_id || null,
+      global: true,
+      duration: t.duration,
+      start_time: t.start_time,
+      paused_remaining: t.paused_remaining,
+    };
   }
 
   _loadLocalShopping() {
@@ -452,12 +488,29 @@ class RecipeManagerCard extends LitElement {
     try {
       this._unsubscribe = await this._api.subscribe(async msg => {
         const t = msg.event_type ?? msg.event;
+        const d = msg.data ?? {};
         if (/recipe_(added|updated|deleted)/.test(t)) {
           await Promise.all([this._loadRecipes(), this._loadTags()]);
-          // Keep the open recipe in sync with the freshly loaded data
           if (this._selectedRecipe) {
             this._selectedRecipe = this._recipes.find(r => r.id === this._selectedRecipe.id)
               ?? this._selectedRecipe;
+          }
+        } else if (t === 'recipe_manager_global_timer_added') {
+          // Only add if not already present (this device may have added it optimistically)
+          if (!this._timers.find(x => x.id === d.id)) {
+            this._timers = [...this._timers, this._globalTimerToLocal(d)];
+          }
+        } else if (t === 'recipe_manager_global_timer_updated') {
+          this._timers = this._timers.map(x =>
+            x.id === d.id ? this._globalTimerToLocal(d) : x
+          );
+        } else if (t === 'recipe_manager_global_timer_deleted') {
+          this._timers = this._timers.filter(x => x.id !== d.timer_id);
+          // Clear alarm if it was for this timer
+          if (this._timerAlarm?.id === d.timer_id) {
+            this._stopAlarmLoop();
+            this._timerAlarm = this._timerAlarmQueue.length ? this._timerAlarmQueue.shift() : null;
+            if (this._timerAlarm) this._startAlarmLoop(this._settings.timerSound ?? 'beep', this._settings.timerSoundFile);
           }
         }
       });
@@ -503,18 +556,21 @@ class RecipeManagerCard extends LitElement {
     if (!this._timers.length) return;
     let changed = false;
     const newAlarms = [];
+    const now = Date.now() / 1000;
     const updated = this._timers.map(t => {
-      if (!t.running || t.remaining <= 0) return t;
-      const newRemaining = t.remaining - 1;
+      if (t.alarming || !t.running) return t;
+      // Global timers: compute remaining from wall-clock start_time for accuracy
+      const newRemaining = t.global
+        ? Math.max(0, t.duration - (now - t.start_time))
+        : t.remaining - 1;
       changed = true;
       if (newRemaining <= 0) {
         if (t.presetId) {
-          // alarm handled in-tile, no popup
           return { ...t, remaining: 0, running: false, alarming: true };
         }
         newAlarms.push({ id: t.id, label: t.label });
       }
-      return { ...t, remaining: newRemaining, running: newRemaining > 0 };
+      return { ...t, remaining: Math.round(newRemaining), running: newRemaining > 0 };
     });
     if (changed) {
       this._timers = updated;
@@ -531,11 +587,32 @@ class RecipeManagerCard extends LitElement {
     }
   }
 
-  _startTimer(seconds, label, presetId = null) {
+  async _startTimer(seconds, label, presetId = null, global = false) {
+    const resolvedLabel = label || `${Math.floor(seconds / 60)} min timer`;
+    if (global && this._api) {
+      try {
+        const now = Date.now() / 1000;
+        const { timer } = await this._api.addGlobalTimer({
+          label: resolvedLabel,
+          duration: seconds,
+          start_time: now,
+          running: true,
+          paused_remaining: null,
+          ...(presetId ? { preset_id: presetId } : {}),
+        });
+        const local = this._globalTimerToLocal(timer, now);
+        // Add immediately; subscription event will be a no-op (deduped by id)
+        this._timers = [...this._timers, local];
+        saveTimers(this._timers);
+        return;
+      } catch (e) {
+        console.warn('Global timer failed, falling back to local:', e);
+      }
+    }
     const id = Date.now().toString(36);
     this._timers = [...this._timers, {
       id,
-      label: label || `${Math.floor(seconds / 60)} min timer`,
+      label: resolvedLabel,
       total: seconds,
       remaining: seconds,
       running: true,
@@ -545,18 +622,40 @@ class RecipeManagerCard extends LitElement {
   }
 
   _stopTimer(id) {
-    this._timers = this._timers.filter(t => t.id !== id);
+    const t = this._timers.find(x => x.id === id);
+    this._timers = this._timers.filter(x => x.id !== id);
     saveTimers(this._timers);
+    if (t?.global && this._api) {
+      this._api.deleteGlobalTimer(id).catch(() => {});
+    }
   }
 
   _pauseTimer(id) {
-    this._timers = this._timers.map(t => t.id === id ? { ...t, running: !t.running } : t);
+    const t = this._timers.find(x => x.id === id);
+    const nowPaused = t ? t.running : false;
+    this._timers = this._timers.map(x => x.id === id ? { ...x, running: !x.running } : x);
     saveTimers(this._timers);
+    if (t?.global && this._api) {
+      if (nowPaused) {
+        // Pausing: send current remaining as paused_remaining
+        const cur = this._timers.find(x => x.id === id);
+        this._api.updateGlobalTimer(id, { running: false, paused_remaining: cur?.remaining ?? 0 }).catch(() => {});
+      } else {
+        // Resuming: set new start_time so remaining is computed correctly
+        const cur = this._timers.find(x => x.id === id);
+        const newStart = Date.now() / 1000 - (t.duration - (cur?.remaining ?? 0));
+        this._timers = this._timers.map(x =>
+          x.id === id ? { ...x, start_time: newStart, duration: t.duration, running: true } : x
+        );
+        this._api.updateGlobalTimer(id, { running: true, start_time: newStart, paused_remaining: null }).catch(() => {});
+      }
+    }
   }
 
   _addTimeToTimer(id, seconds) {
-    this._timers = this._timers.map(t =>
-      t.id === id ? { ...t, remaining: t.remaining + seconds, total: t.total + seconds, running: true, alarming: false } : t
+    const t = this._timers.find(x => x.id === id);
+    this._timers = this._timers.map(x =>
+      x.id === id ? { ...x, remaining: x.remaining + seconds, total: x.total + seconds, running: true, alarming: false } : x
     );
     if (this._timerAlarm?.id === id) {
       this._stopAlarmLoop();
@@ -566,6 +665,16 @@ class RecipeManagerCard extends LitElement {
       this._timerAlarmQueue = this._timerAlarmQueue.filter(a => a.id !== id);
     }
     saveTimers(this._timers);
+    if (t?.global && this._api) {
+      // Shift start_time back so remaining is extended
+      const cur = this._timers.find(x => x.id === id);
+      const newStart = Date.now() / 1000 - (t.duration - (cur?.remaining ?? 0));
+      const newDuration = t.duration + seconds;
+      this._timers = this._timers.map(x =>
+        x.id === id ? { ...x, start_time: newStart, duration: newDuration } : x
+      );
+      this._api.updateGlobalTimer(id, { running: true, start_time: newStart }).catch(() => {});
+    }
   }
 
   _dismissAlarm() {
@@ -630,7 +739,7 @@ class RecipeManagerCard extends LitElement {
 
   _handleStartTimer(e) {
     const { seconds, label } = e.detail;
-    this._startTimer(seconds, label);
+    this._startTimer(seconds, label, null, this._globalMode);
   }
 
   // -- Event handlers -------------------------------------------------------
@@ -1094,6 +1203,7 @@ class RecipeManagerCard extends LitElement {
                   <button class="preset-remove" @click=${() => this._stopTimer(t.id)} title="Remove">
                     <ha-icon icon="mdi:close"></ha-icon>
                   </button>
+                  ${t.global ? html`<ha-icon class="timer-global-badge" icon="mdi:earth" title="Global timer"></ha-icon>` : ''}
                   <span class="timer-card-name">${t.label}</span>
                   <div class="preset-arc-wrap">
                     <svg viewBox="0 0 100 100">
@@ -1131,35 +1241,70 @@ class RecipeManagerCard extends LitElement {
         <!-- Spacer pushes add+presets to bottom -->
         <div style="flex:1"></div>
 
-        <!-- Add preset (compact, just above presets) -->
+        <!-- Add timer section -->
         <div class="timer-add-section">
-          <div class="timer-add-row">
-            <input type="text" class="timer-input" placeholder="Preset name"
-              .value=${this._presetNameInput}
-              @input=${e => { this._presetNameInput = e.target.value; }}
-              @keydown=${e => { if (e.key === 'Enter') this._addPresetTimer(); }}
-            />
-            <input type="number" class="timer-input timer-mins-input" placeholder="min" min="0.5" step="0.5"
-              .value=${this._presetMinsInput}
-              @input=${e => { this._presetMinsInput = e.target.value; }}
-              @keydown=${e => { if (e.key === 'Enter') this._addPresetTimer(); }}
-            />
-            <button class="action-btn primary" ?disabled=${!hasPreset} @click=${this._addPresetTimer}>+ Preset</button>
-            <input type="number" class="timer-input timer-mins-input" placeholder="quick min" min="0.5" step="0.5"
-              .value=${this._customTimerInput}
-              @input=${e => { this._customTimerInput = e.target.value; }}
-              @keydown=${e => {
-                if (e.key === 'Enter' && hasCustom) {
-                  this._startTimer(Math.round(parseFloat(this._customTimerInput) * 60), `${this._customTimerInput} min`);
+          <div class="timer-add-header">
+            <span class="timer-add-title">Add Timer</span>
+            <label class="timer-global-toggle ${this._globalMode ? 'active' : ''}" title="Sync timer across all devices via Home Assistant">
+              <input type="checkbox" .checked=${this._globalMode}
+                @change=${e => { this._globalMode = e.target.checked; }}
+              />
+              <ha-icon icon="mdi:earth"></ha-icon>
+              Global
+            </label>
+          </div>
+
+          <div class="timer-add-group">
+            <div class="timer-add-group-label">Quick start</div>
+            <div class="timer-add-row">
+              <input type="text" class="timer-input" placeholder="Label (optional)"
+                .value=${this._quickTimerLabel}
+                @input=${e => { this._quickTimerLabel = e.target.value; }}
+                @keydown=${e => {
+                  if (e.key === 'Enter' && hasCustom) {
+                    this._startTimer(Math.round(parseFloat(this._customTimerInput) * 60), this._quickTimerLabel.trim() || null, null, this._globalMode);
+                    this._customTimerInput = '';
+                    this._quickTimerLabel = '';
+                  }
+                }}
+              />
+              <input type="number" class="timer-input timer-mins-input" placeholder="min" min="0.5" step="0.5"
+                .value=${this._customTimerInput}
+                @input=${e => { this._customTimerInput = e.target.value; }}
+                @keydown=${e => {
+                  if (e.key === 'Enter' && hasCustom) {
+                    this._startTimer(Math.round(parseFloat(this._customTimerInput) * 60), this._quickTimerLabel.trim() || null, null, this._globalMode);
+                    this._customTimerInput = '';
+                    this._quickTimerLabel = '';
+                  }
+                }}
+              />
+              <button class="action-btn primary" ?disabled=${!hasCustom}
+                @click=${() => {
+                  this._startTimer(Math.round(parseFloat(this._customTimerInput) * 60), this._quickTimerLabel.trim() || null, null, this._globalMode);
                   this._customTimerInput = '';
-                }
-              }}
-            />
-            <button class="action-btn primary" ?disabled=${!hasCustom}
-              @click=${() => {
-                this._startTimer(Math.round(parseFloat(this._customTimerInput) * 60), `${this._customTimerInput} min`);
-                this._customTimerInput = '';
-              }}>Start</button>
+                  this._quickTimerLabel = '';
+                }}>
+                <ha-icon icon="mdi:play" style="--mdc-icon-size:14px"></ha-icon> Start
+              </button>
+            </div>
+          </div>
+
+          <div class="timer-add-group">
+            <div class="timer-add-group-label">Save preset</div>
+            <div class="timer-add-row">
+              <input type="text" class="timer-input" placeholder="Preset name"
+                .value=${this._presetNameInput}
+                @input=${e => { this._presetNameInput = e.target.value; }}
+                @keydown=${e => { if (e.key === 'Enter') this._addPresetTimer(); }}
+              />
+              <input type="number" class="timer-input timer-mins-input" placeholder="min" min="0.5" step="0.5"
+                .value=${this._presetMinsInput}
+                @input=${e => { this._presetMinsInput = e.target.value; }}
+                @keydown=${e => { if (e.key === 'Enter') this._addPresetTimer(); }}
+              />
+              <button class="action-btn" ?disabled=${!hasPreset} @click=${this._addPresetTimer}>+ Preset</button>
+            </div>
           </div>
         </div>
 
@@ -1804,25 +1949,75 @@ class RecipeManagerCard extends LitElement {
     .timer-card:hover .preset-remove { opacity: 1; }
     .preset-remove ha-icon { --mdc-icon-size: 13px; }
 
-    /* Compact add-section: single row, just above presets */
+    /* Timer add section */
     .timer-add-section {
       border-top: 1px solid var(--rm-border);
-      padding-top: 10px;
+      padding-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
-    .timer-add-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .timer-add-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .timer-add-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--rm-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .timer-global-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--rm-border);
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--rm-text-muted);
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .timer-global-toggle input { display: none; }
+    .timer-global-toggle ha-icon { --mdc-icon-size: 14px; }
+    .timer-global-toggle.active {
+      border-color: var(--rm-accent);
+      color: var(--rm-accent);
+      background: var(--rm-accent-soft);
+    }
+    .timer-add-group { display: flex; flex-direction: column; gap: 5px; }
+    .timer-add-group-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--rm-text-muted);
+      opacity: 0.7;
+    }
+    .timer-add-row { display: flex; gap: 6px; align-items: center; }
     .timer-input {
       flex: 1;
       background: var(--rm-bg-elevated);
       border: 1px solid var(--rm-border);
       border-radius: 8px;
       color: var(--rm-text);
-      padding: 5px 8px;
-      font-size: 12px;
+      padding: 6px 9px;
+      font-size: 13px;
       font-family: inherit;
-      min-width: 60px;
+      min-width: 0;
     }
-    .timer-mins-input { max-width: 70px; flex: 0 0 70px; }
+    .timer-mins-input { max-width: 72px; flex: 0 0 72px; }
     .timer-input:focus { outline: none; border-color: var(--rm-accent); }
+    .timer-global-badge {
+      position: absolute;
+      top: 4px;
+      right: 22px;
+      --mdc-icon-size: 11px;
+      color: var(--rm-accent);
+      opacity: 0.75;
+    }
 
     .action-btn {
       background: var(--rm-bg-elevated);

@@ -253,6 +253,24 @@ export class RecipeManagerAPI {
     return this.hass.callWS({ type: 'shopping_list_manager/products/search', query, limit });
   }
 
+  // -- Global Timers --------------------------------------------------------
+
+  async getGlobalTimers() {
+    return this.hass.callWS({ type: 'recipe_manager/global_timers/get' });
+  }
+
+  async addGlobalTimer(data) {
+    return this.hass.callWS({ type: 'recipe_manager/global_timers/add', ...data });
+  }
+
+  async updateGlobalTimer(timerId, data) {
+    return this.hass.callWS({ type: 'recipe_manager/global_timers/update', timer_id: timerId, ...data });
+  }
+
+  async deleteGlobalTimer(timerId) {
+    return this.hass.callWS({ type: 'recipe_manager/global_timers/delete', timer_id: timerId });
+  }
+
   // -- Import ---------------------------------------------------------------
 
   /**
