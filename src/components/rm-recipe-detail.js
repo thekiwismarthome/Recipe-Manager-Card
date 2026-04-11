@@ -154,7 +154,6 @@ class RmRecipeDetail extends LitElement {
     _tagPickerInput:      { type: String },
     // Inline ingredient editing
     _editIngEdit:         { type: Object },
-    _voiceIngredient:     { type: Boolean },
   };
 
   constructor() {
@@ -198,7 +197,6 @@ class RmRecipeDetail extends LitElement {
     this._tagPickerField = null;
     this._tagPickerInput = '';
     this._editIngEdit = null;
-    this._voiceIngredient = false;
     this._slideTimer = null;
     this._slideTouchStartX = null;
     this._wakeLockSentinel = null;
@@ -443,23 +441,6 @@ class RmRecipeDetail extends LitElement {
     this._editIngInput = '';
   }
 
-  _startVoiceIngredient() {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) return;
-    const rec = new SR();
-    rec.lang = 'en-US';
-    rec.interimResults = false;
-    rec.maxAlternatives = 1;
-    this._voiceIngredient = true;
-    rec.onresult = e => {
-      this._editIngInput = e.results[0][0].transcript.trim();
-      this._voiceIngredient = false;
-      this._editAddIngredient();
-    };
-    rec.onerror = () => { this._voiceIngredient = false; };
-    rec.onend   = () => { this._voiceIngredient = false; };
-    rec.start();
-  }
 
   _editRemoveIngredient(idx) {
     this._editData = { ...this._editData, ingredients: (this._editData.ingredients || []).filter((_, i) => i !== idx) };
@@ -1884,14 +1865,6 @@ class RmRecipeDetail extends LitElement {
                 placeholder='e.g. "2 cups flour" or "# Section Header"'
               />
               <button class="edit-add-btn" @click=${this._editAddIngredient}>Add</button>
-              ${(window.SpeechRecognition || window.webkitSpeechRecognition) ? html`
-                <button class="edit-mic-btn ${this._voiceIngredient ? 'listening' : ''}"
-                  @click=${this._startVoiceIngredient}
-                  title="Add ingredient by voice"
-                  ?disabled=${this._voiceIngredient}>
-                  <ha-icon icon="${this._voiceIngredient ? 'mdi:microphone' : 'mdi:microphone-outline'}"></ha-icon>
-                </button>
-              ` : ''}
             </div>
 
             <!-- Instructions editor -->
@@ -3167,24 +3140,6 @@ class RmRecipeDetail extends LitElement {
     .ing-inline-save:hover { background: var(--rm-accent); color: #fff; }
     .ing-inline-save ha-icon, .ing-inline-cancel ha-icon { --mdc-icon-size: 13px; }
 
-    /* Voice ingredient mic button */
-    .edit-mic-btn {
-      width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
-      border: 1px solid var(--rm-border); background: none; cursor: pointer;
-      color: var(--rm-text-muted);
-      display: flex; align-items: center; justify-content: center; transition: all 0.15s;
-    }
-    .edit-mic-btn ha-icon { --mdc-icon-size: 18px; }
-    .edit-mic-btn:hover { border-color: var(--rm-accent); color: var(--rm-accent); }
-    .edit-mic-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .edit-mic-btn.listening {
-      border-color: #ef4444; color: #ef4444; background: rgba(239,68,68,0.1);
-      animation: mic-pulse 1s ease-in-out infinite;
-    }
-    @keyframes mic-pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
-      50%       { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
-    }
   `;
 }
 

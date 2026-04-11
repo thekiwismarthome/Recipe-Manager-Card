@@ -200,16 +200,6 @@ function saveTimers(timers) {
 // Timer helpers
 // ---------------------------------------------------------------------------
 
-function parseVoiceTime(text) {
-  const t = text.toLowerCase();
-  let total = 0;
-  const h = t.match(/(\d+)\s*(?:hour|hr)s?/);    if (h) total += parseInt(h[1]) * 3600;
-  const m = t.match(/(\d+)\s*(?:minute|min)s?/); if (m) total += parseInt(m[1]) * 60;
-  const s = t.match(/(\d+)\s*(?:second|sec)s?/); if (s) total += parseInt(s[1]);
-  // Bare number with no unit → treat as minutes ("timer 5")
-  if (!total) { const bare = t.match(/^(?:.*?for\s+)?(\d+)(?:\s+minutes?)?$/); if (bare) total = parseInt(bare[1]) * 60; }
-  return total;
-}
 
 function formatTimerDisplay(seconds) {
   const h = Math.floor(seconds / 3600);
@@ -292,8 +282,6 @@ class RecipeManagerCard extends LitElement {
     _plannerFromRecipe: { type: Object },
     _globalMode: { type: Boolean },
     _quickTimerLabel: { type: String },
-    _voiceTimer: { type: Boolean },
-    _voiceAlarm: { type: Boolean },
   };
 
   constructor() {
@@ -331,9 +319,6 @@ class RecipeManagerCard extends LitElement {
     this._plannerFromRecipe = null;
     this._globalMode = false;
     this._quickTimerLabel = '';
-    this._voiceTimer = false;
-    this._voiceAlarm = false;
-    this._voiceAlarmRec = null;
     this._alarmLoopActive = false;
     this._alarmInterval = null;
     this._alarmTimeout = null;
@@ -388,7 +373,6 @@ class RecipeManagerCard extends LitElement {
     if (this._timerTick) { clearInterval(this._timerTick); this._timerTick = null; }
     if (this._timerAlarm) { this._stopAlarmLoop(); this._timerAlarm = null; }
     this._timerAlarmQueue = [];
-    this._stopVoiceAlarmListen();
     saveTimers(this._timers);
   }
 
@@ -609,7 +593,7 @@ class RecipeManagerCard extends LitElement {
     if (global && this._api) {
       try {
         const now = Date.now() / 1000;
-        const { timer } = await this._api.addGlobalTimer({
+        await this._api.addGlobalTimer({
           label: resolvedLabel,
           duration: seconds,
           start_time: now,
@@ -617,10 +601,8 @@ class RecipeManagerCard extends LitElement {
           paused_remaining: null,
           ...(presetId ? { preset_id: presetId } : {}),
         });
-        const local = this._globalTimerToLocal(timer, now);
-        // Add immediately; subscription event will be a no-op (deduped by id)
-        this._timers = [...this._timers, local];
-        saveTimers(this._timers);
+        // Don't add locally — the subscription event arrives on all devices
+        // (including this one) and adds it there, avoiding duplicates.
         return;
       } catch (e) {
         console.warn('Global timer failed, falling back to local:', e);
@@ -695,7 +677,6 @@ class RecipeManagerCard extends LitElement {
   }
 
   _dismissAlarm() {
-    this._stopVoiceAlarmListen();
     if (this._timerAlarm) {
       this._stopAlarmLoop();
       this._stopTimer(this._timerAlarm.id);
@@ -722,7 +703,6 @@ class RecipeManagerCard extends LitElement {
 
   _startAlarmLoop(type, fileUrl) {
     this._stopAlarmLoop();
-    this._startVoiceAlarmListen();
     if (type === 'none') return;
     if (type === 'file' && fileUrl) {
       this._alarmLoopActive = true;
@@ -754,66 +734,6 @@ class RecipeManagerCard extends LitElement {
       this._alarmAudio.onerror = null;
       this._alarmAudio = null;
     }
-  }
-
-  // -- Voice features -------------------------------------------------------
-
-  _startVoiceAlarmListen() {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR || this._voiceAlarmRec) return;
-    const rec = new SR();
-    rec.lang = 'en-US';
-    rec.continuous = true;
-    rec.interimResults = false;
-    this._voiceAlarmRec = rec;
-    rec.onresult = e => {
-      const t = e.results[e.results.length - 1][0].transcript.toLowerCase().trim();
-      if (t.includes('stop') || t.includes('dismiss') || t.includes('cancel')) {
-        this._dismissAlarm();
-      }
-    };
-    rec.onerror = () => { this._voiceAlarmRec = null; this._voiceAlarm = false; };
-    rec.onend   = () => {
-      // Restart if the alarm is still active (continuous mode can drop silently)
-      if (this._timerAlarm && this._voiceAlarmRec) {
-        try { rec.start(); } catch { /* ignore */ }
-      } else {
-        this._voiceAlarmRec = null;
-        this._voiceAlarm = false;
-      }
-    };
-    this._voiceAlarm = true;
-    rec.start();
-  }
-
-  _stopVoiceAlarmListen() {
-    if (this._voiceAlarmRec) {
-      try { this._voiceAlarmRec.stop(); } catch { /* ignore */ }
-      this._voiceAlarmRec = null;
-    }
-    this._voiceAlarm = false;
-  }
-
-  _startVoiceTimer() {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) return;
-    const rec = new SR();
-    rec.lang = 'en-US';
-    rec.interimResults = false;
-    rec.maxAlternatives = 1;
-    this._voiceTimer = true;
-    rec.onresult = e => {
-      const transcript = e.results[0][0].transcript.trim();
-      const seconds = parseVoiceTime(transcript);
-      this._voiceTimer = false;
-      if (seconds > 0) {
-        this._startTimer(seconds, transcript, null, this._globalMode);
-        if (this._view !== 'timers') { this._timersPrevView = this._view; this._view = 'timers'; }
-      }
-    };
-    rec.onerror = () => { this._voiceTimer = false; };
-    rec.onend   = () => { this._voiceTimer = false; };
-    rec.start();
   }
 
   _handleStartTimer(e) {
@@ -1370,14 +1290,6 @@ class RecipeManagerCard extends LitElement {
                 }}>
                 <ha-icon icon="mdi:play" style="--mdc-icon-size:14px"></ha-icon> Start
               </button>
-              ${(window.SpeechRecognition || window.webkitSpeechRecognition) ? html`
-                <button class="action-btn timer-voice-btn ${this._voiceTimer ? 'listening' : ''}"
-                  @click=${() => this._startVoiceTimer()}
-                  title="Start timer by voice (e.g. '5 minutes 30 seconds')"
-                  ?disabled=${this._voiceTimer}>
-                  <ha-icon icon="${this._voiceTimer ? 'mdi:microphone' : 'mdi:microphone-outline'}"></ha-icon>
-                </button>
-              ` : ''}
             </div>
           </div>
 
@@ -1500,12 +1412,6 @@ class RecipeManagerCard extends LitElement {
                 }}>+min</button>
             </div>
             <button class="alarm-btn stop" @click=${this._dismissAlarm}>Stop</button>
-            ${this._voiceAlarm ? html`
-              <div class="alarm-voice-hint">
-                <ha-icon icon="mdi:microphone" class="alarm-mic-icon"></ha-icon>
-                Say "stop" to dismiss
-              </div>
-            ` : ''}
           </div>
         </div>
       </div>
@@ -2394,31 +2300,6 @@ class RecipeManagerCard extends LitElement {
       padding: 2px 6px;
     }
 
-    /* Voice timer button */
-    .timer-voice-btn {
-      padding: 0; width: 36px; height: 36px; border-radius: 50%;
-      justify-content: center; flex-shrink: 0;
-    }
-    .timer-voice-btn ha-icon { --mdc-icon-size: 18px; }
-    .timer-voice-btn.listening {
-      border-color: #ef4444 !important; color: #ef4444 !important;
-      background: rgba(239,68,68,0.1) !important;
-      animation: voice-pulse 1s ease-in-out infinite;
-    }
-    @keyframes voice-pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
-      50%       { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
-    }
-
-    /* Voice alarm hint */
-    .alarm-voice-hint {
-      display: flex; align-items: center; gap: 5px; justify-content: center;
-      font-size: 11px; color: var(--rm-text-muted); margin-top: 6px;
-    }
-    .alarm-mic-icon {
-      --mdc-icon-size: 13px; color: #ef4444;
-      animation: voice-pulse 1s ease-in-out infinite;
-    }
   `;
 }
 
