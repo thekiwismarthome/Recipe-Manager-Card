@@ -1079,6 +1079,7 @@ class RecipeManagerCard extends LitElement {
     // ── Full-screen views (replace everything, use directional slide) ──────
     if (this._view === 'settings') return html`
       <rm-settings-view
+        .hass=${this.hass}
         .settings=${s}
         @rm-settings-change=${this._handleSettingsChange}
       ></rm-settings-view>

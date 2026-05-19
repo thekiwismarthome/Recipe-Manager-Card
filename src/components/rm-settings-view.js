@@ -3,17 +3,38 @@
  * Tabs: Appearance (theme, dark, font, grid, nav) | Advanced (sound, wake lock, units) | Sync | Help
  */
 import { LitElement, html, css } from 'lit';
+import { CARD_VERSION } from 'virtual:card-version';
 
 class RmSettingsView extends LitElement {
   static properties = {
+    hass:       { type: Object },
     settings:   { type: Object },
     _activeTab: { type: String },
+    _rmVersion: { type: String },
   };
 
   constructor() {
     super();
     this.settings = {};
     this._activeTab = 'appearance';
+    this._rmVersion = '…';
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    if (this.hass) this._fetchVersion();
+  }
+
+  updated(changedProps) {
+    if (changedProps.has('hass') && this.hass && this._rmVersion === '…') {
+      this._fetchVersion();
+    }
+  }
+
+  _fetchVersion() {
+    this.hass.callWS({ type: 'recipe_manager/get_info' })
+      .then(r => { this._rmVersion = r.version ?? '—'; })
+      .catch(() => { this._rmVersion = '—'; });
   }
 
   _update(patch) {
@@ -270,6 +291,20 @@ class RmSettingsView extends LitElement {
                 @click=${() => this._update({ slideshowInterval: n })}>${n === 0 ? 'Off' : `${n}s`}</button>
             `)}
           </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">About</div>
+
+        <div class="setting-row">
+          <span class="setting-name">Recipe Manager</span>
+          <span class="muted-note">Integration v${this._rmVersion}</span>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-name">RM Card</span>
+          <span class="muted-note">Card v${CARD_VERSION}</span>
         </div>
       </div>
     `;
