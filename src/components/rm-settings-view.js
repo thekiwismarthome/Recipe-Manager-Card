@@ -7,34 +7,34 @@ import { CARD_VERSION } from 'virtual:card-version';
 
 class RmSettingsView extends LitElement {
   static properties = {
-    hass:       { type: Object },
-    settings:   { type: Object },
-    _activeTab: { type: String },
-    _rmVersion: { type: String },
+    hass:        { type: Object },
+    settings:    { type: Object },
+    _activeTab:  { type: String },
+    _rmVersion:  { type: String },
+    _rmcVersion: { type: String },
   };
 
   constructor() {
     super();
     this.settings = {};
     this._activeTab = 'appearance';
-    this._rmVersion = '…';
-  }
-
-  connectedCallback() {
-    super.connectedCallback();
-    if (this.hass) this._fetchVersion();
+    this._rmVersion  = '…';
+    this._rmcVersion = '…';
   }
 
   updated(changedProps) {
     if (changedProps.has('hass') && this.hass && this._rmVersion === '…') {
-      this._fetchVersion();
+      Promise.all([
+        this.hass.callWS({ type: 'hacs/repository/info', repository_id: 'thekiwismarthome/recipe-manager' }),
+        this.hass.callWS({ type: 'hacs/repository/info', repository_id: 'thekiwismarthome/recipe-manager-card' }),
+      ]).then(([rm, rmc]) => {
+        this._rmVersion  = rm.installed_version  ?? '—';
+        this._rmcVersion = rmc.installed_version ?? CARD_VERSION;
+      }).catch(() => {
+        this._rmVersion  = '—';
+        this._rmcVersion = CARD_VERSION;
+      });
     }
-  }
-
-  _fetchVersion() {
-    this.hass.callWS({ type: 'recipe_manager/get_info' })
-      .then(r => { this._rmVersion = r.version ?? '—'; })
-      .catch(() => { this._rmVersion = '—'; });
   }
 
   _update(patch) {
@@ -304,7 +304,7 @@ class RmSettingsView extends LitElement {
 
         <div class="setting-row">
           <span class="setting-name">RM Card</span>
-          <span class="muted-note">Card v${CARD_VERSION}</span>
+          <span class="muted-note">Card v${this._rmcVersion}</span>
         </div>
       </div>
     `;
