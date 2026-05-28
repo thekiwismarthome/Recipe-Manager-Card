@@ -24,16 +24,17 @@ class RmSettingsView extends LitElement {
 
   updated(changedProps) {
     if (changedProps.has('hass') && this.hass && this._rmVersion === '…') {
-      Promise.all([
-        this.hass.callWS({ type: 'hacs/repository/info', repository_id: 'thekiwismarthome/recipe-manager' }),
-        this.hass.callWS({ type: 'hacs/repository/info', repository_id: 'thekiwismarthome/recipe-manager-card' }),
-      ]).then(([rm, rmc]) => {
-        this._rmVersion  = rm.installed_version  ?? '—';
-        this._rmcVersion = rmc.installed_version ?? CARD_VERSION;
-      }).catch(() => {
-        this._rmVersion  = '—';
-        this._rmcVersion = CARD_VERSION;
-      });
+      this.hass.callWS({ type: 'hacs/repositories/list' })
+        .then(repos => {
+          const rm  = repos.find(r => r.full_name === 'thekiwismarthome/recipe-manager');
+          const rmc = repos.find(r => r.full_name === 'thekiwismarthome/recipe-manager-card');
+          this._rmVersion  = rm?.installed_version  ?? '—';
+          this._rmcVersion = rmc?.installed_version ?? CARD_VERSION;
+        })
+        .catch(() => {
+          this._rmVersion  = '—';
+          this._rmcVersion = CARD_VERSION;
+        });
     }
   }
 
