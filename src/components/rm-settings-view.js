@@ -24,18 +24,25 @@ class RmSettingsView extends LitElement {
 
   updated(changedProps) {
     if (changedProps.has('hass') && this.hass && this._rmVersion === '…') {
-      this.hass.callWS({ type: 'hacs/repositories/list' })
-        .then(repos => {
-          const rm  = repos.find(r => r.full_name === 'thekiwismarthome/recipe-manager');
-          const rmc = repos.find(r => r.full_name === 'thekiwismarthome/recipe-manager-card');
-          this._rmVersion  = rm?.installed_version  ?? '—';
-          this._rmcVersion = rmc?.installed_version ?? CARD_VERSION;
-        })
-        .catch(() => {
-          this._rmVersion  = '—';
-          this._rmcVersion = CARD_VERSION;
-        });
+      this._fetchVersionsFromHacs();
     }
+  }
+
+  _fetchVersionsFromHacs() {
+    if (!this.hass) return;
+    this._rmVersion  = '…';
+    this._rmcVersion = '…';
+    this.hass.callWS({ type: 'hacs/repositories/list' })
+      .then(repos => {
+        const rm  = repos.find(r => r.full_name.toLowerCase() === 'thekiwismarthome/recipe-manager');
+        const rmc = repos.find(r => r.full_name.toLowerCase() === 'thekiwismarthome/recipe-manager-card');
+        this._rmVersion  = rm?.installed_version  ?? '—';
+        this._rmcVersion = rmc?.installed_version ?? CARD_VERSION;
+      })
+      .catch(() => {
+        this._rmVersion  = '—';
+        this._rmcVersion = CARD_VERSION;
+      });
   }
 
   _update(patch) {
@@ -69,7 +76,7 @@ class RmSettingsView extends LitElement {
           ${this._activeTab === 'appearance' ? this._renderAppearance(s) : ''}
           ${this._activeTab === 'advanced'   ? this._renderAdvanced(s)   : ''}
           ${this._activeTab === 'sync'       ? this._renderPlaceholder('Sync', 'mdi:cloud-sync-outline', 'Cloud sync and backup options — coming soon.') : ''}
-          ${this._activeTab === 'help'       ? this._renderPlaceholder('Help', 'mdi:help-circle-outline', 'Documentation and support — coming soon.') : ''}
+          ${this._activeTab === 'help'       ? this._renderHelp()   : ''}
         </div>
       </div>
     `;
@@ -295,19 +302,6 @@ class RmSettingsView extends LitElement {
         </div>
       </div>
 
-      <div class="section">
-        <div class="section-label">About</div>
-
-        <div class="setting-row">
-          <span class="setting-name">Recipe Manager</span>
-          <span class="muted-note">Integration v${this._rmVersion}</span>
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-name">RM Card</span>
-          <span class="muted-note">Card v${this._rmcVersion}</span>
-        </div>
-      </div>
     `;
   }
 
@@ -358,6 +352,62 @@ class RmSettingsView extends LitElement {
     } catch (e) { console.warn('Audio test failed:', e); }
   }
 
+
+  _renderHelp() {
+    return html`
+      <div class="section">
+        <div class="section-label">FAQ &amp; Support</div>
+
+        <a class="help-link" href="https://github.com/thekiwismarthome/recipe-manager/wiki" target="_blank">
+          <ha-icon icon="mdi:help-circle-outline"></ha-icon>
+          <div class="help-link-content">
+            <span class="setting-name">FAQ</span>
+            <span class="setting-hint">Frequently asked questions</span>
+          </div>
+          <ha-icon icon="mdi:open-in-new" class="help-link-ext"></ha-icon>
+        </a>
+
+        <a class="help-link" href="https://github.com/thekiwismarthome/recipe-manager/issues" target="_blank">
+          <ha-icon icon="mdi:bug-outline"></ha-icon>
+          <div class="help-link-content">
+            <span class="setting-name">Report a Problem</span>
+            <span class="setting-hint">Submit an issue on GitHub</span>
+          </div>
+          <ha-icon icon="mdi:open-in-new" class="help-link-ext"></ha-icon>
+        </a>
+
+        <a class="help-link" href="https://github.com/thekiwismarthome/recipe-manager" target="_blank">
+          <ha-icon icon="mdi:github"></ha-icon>
+          <div class="help-link-content">
+            <span class="setting-name">GitHub Repository</span>
+            <span class="setting-hint">View source code</span>
+          </div>
+          <ha-icon icon="mdi:open-in-new" class="help-link-ext"></ha-icon>
+        </a>
+      </div>
+
+      <div class="section">
+        <div class="section-label">About</div>
+
+        <div class="setting-row">
+          <span class="setting-name">Recipe Manager</span>
+          <span class="muted-note">Integration version ${this._rmVersion}</span>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-name">RM Card</span>
+          <span class="muted-note">Card version ${this._rmcVersion}</span>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-name">Refresh versions</span>
+          <button class="seg-btn" @click=${() => this._fetchVersionsFromHacs()}>
+            <ha-icon icon="mdi:refresh"></ha-icon>
+          </button>
+        </div>
+      </div>
+    `;
+  }
 
   _renderPlaceholder(title, icon, message) {
     return html`
@@ -418,6 +468,20 @@ class RmSettingsView extends LitElement {
     .setting-hint { font-size: 12px; color: var(--rm-text-muted, #a08060); }
 
     .muted-note { font-size: 13px; color: var(--rm-text-muted, #a08060); }
+
+    .help-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--rm-border, rgba(0,0,0,0.06));
+      text-decoration: none;
+      color: inherit;
+    }
+    .help-link:last-of-type { border-bottom: none; }
+    .help-link ha-icon { color: var(--rm-accent, #a0522d); flex-shrink: 0; }
+    .help-link-content { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+    .help-link-ext { --mdc-icon-size: 16px; opacity: 0.4; }
 
     .theme-select {
       background: var(--rm-bg-surface, #fff); color: var(--rm-text, #2d2016);
