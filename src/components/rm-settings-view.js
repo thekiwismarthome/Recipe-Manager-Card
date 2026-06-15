@@ -7,25 +7,48 @@ import { CARD_VERSION } from 'virtual:card-version';
 
 class RmSettingsView extends LitElement {
   static properties = {
-    hass:        { type: Object },
-    settings:    { type: Object },
-    _activeTab:  { type: String },
-    _rmVersion:  { type: String },
-    _rmcVersion: { type: String },
+    hass:          { type: Object },
+    settings:      { type: Object },
+    _activeTab:    { type: String },
+    _rmVersion:    { type: String },
+    _rmcVersion:   { type: String },
+    _backupState:  { type: String },
   };
 
   constructor() {
     super();
     this.settings = {};
-    this._activeTab = 'appearance';
-    this._rmVersion  = '…';
-    this._rmcVersion = '…';
+    this._activeTab   = 'appearance';
+    this._rmVersion   = '…';
+    this._rmcVersion  = '…';
+    this._backupState = null;
   }
 
   updated(changedProps) {
     if (changedProps.has('hass') && this.hass && this._rmVersion === '…') {
       this._fetchVersionsFromHacs();
     }
+  }
+
+  async _backup() {
+    if (this._backupState === 'loading') return;
+    this._backupState = 'loading';
+    try {
+      const data = await this.hass.callWS({ type: 'recipe_manager/backup' });
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `recipe-manager-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      this._backupState = 'done';
+    } catch (err) {
+      console.error('[RM] Backup failed:', err);
+      this._backupState = 'error';
+    }
+    setTimeout(() => { this._backupState = null; }, 3000);
   }
 
   _fetchVersionsFromHacs() {
@@ -75,7 +98,7 @@ class RmSettingsView extends LitElement {
         <div class="settings-body">
           ${this._activeTab === 'appearance' ? this._renderAppearance(s) : ''}
           ${this._activeTab === 'advanced'   ? this._renderAdvanced(s)   : ''}
-          ${this._activeTab === 'sync'       ? this._renderPlaceholder('Sync', 'mdi:cloud-sync-outline', 'Cloud sync and backup options — coming soon.') : ''}
+          ${this._activeTab === 'sync'       ? this._renderSync()    : ''}
           ${this._activeTab === 'help'       ? this._renderHelp()   : ''}
         </div>
       </div>
@@ -353,6 +376,31 @@ class RmSettingsView extends LitElement {
   }
 
 
+  _renderSync() {
+    const btnLabel = this._backupState === 'loading' ? 'Backing up…'
+                   : this._backupState === 'done'    ? 'Downloaded ✓'
+                   : this._backupState === 'error'   ? 'Failed ✗'
+                   : 'Download backup';
+
+    return html`
+      <div class="section">
+        <div class="section-label">Backup</div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-name">Export recipes</span>
+            <span class="setting-hint">Download all recipes and meal plans as a JSON file</span>
+          </div>
+          <button
+            class="seg-btn backup-btn ${this._backupState || ''}"
+            ?disabled=${this._backupState === 'loading'}
+            @click=${() => this._backup()}
+          >${btnLabel}</button>
+        </div>
+      </div>
+    `;
+  }
+
   _renderHelp() {
     return html`
       <div class="section">
@@ -468,6 +516,11 @@ class RmSettingsView extends LitElement {
     .setting-hint { font-size: 12px; color: var(--rm-text-muted, #a08060); }
 
     .muted-note { font-size: 13px; color: var(--rm-text-muted, #a08060); }
+
+    .backup-btn { min-width: 140px; white-space: nowrap; }
+    .backup-btn.done    { background: var(--rm-success, #4caf50); color: #fff; }
+    .backup-btn.error   { background: var(--rm-danger,  #e53935); color: #fff; }
+    .backup-btn.loading { opacity: 0.7; cursor: wait; }
 
     .help-link {
       display: flex;
