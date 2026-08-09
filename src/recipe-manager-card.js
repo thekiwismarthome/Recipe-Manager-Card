@@ -4,7 +4,7 @@
 import { LitElement, html, css } from 'lit';
 import { msg, str } from '@lit/localize';
 import { RecipeManagerAPI } from './services/api.js';
-import { setActiveLocale } from './services/localize.js';
+import { setActiveLocale, allLocales } from './services/localize.js';
 
 import './components/rm-recipe-grid.js';
 import './components/rm-recipe-detail.js';
@@ -156,6 +156,15 @@ function loadSettings() {
   } catch { return { ...DEFAULT_SETTINGS }; }
 }
 
+// True until the user has an explicit `language` choice saved (either picked
+// manually in Settings, or previously auto-detected from hass.language below).
+function hasExplicitLanguage() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    return !!(raw && Object.prototype.hasOwnProperty.call(JSON.parse(raw), 'language'));
+  } catch { return false; }
+}
+
 function saveSettings(s) {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch { /* ignore */ }
 }
@@ -302,6 +311,7 @@ class RecipeManagerCard extends LitElement {
     this._slmAvailable = false;
     this._localShoppingItems = [];
     this._settings = loadSettings();
+    this._languageAutoDetectPending = !hasExplicitLanguage();
     setActiveLocale(this._settings.language);
     this._wide = false;
     this._sidebarCollapsed = false;
@@ -389,6 +399,14 @@ class RecipeManagerCard extends LitElement {
     if (changedProps.has('hass') && this.hass && !this._api) {
       this._api = new RecipeManagerAPI(this.hass);
       this._init();
+    }
+    if (changedProps.has('hass') && this.hass && this._languageAutoDetectPending) {
+      this._languageAutoDetectPending = false;
+      const detected = (this.hass.language || '').split('-')[0].toLowerCase();
+      const resolved = allLocales.includes(detected) ? detected : this._settings.language;
+      this._settings = { ...this._settings, language: resolved };
+      saveSettings(this._settings);
+      setActiveLocale(resolved);
     }
     if (changedProps.has('hass') && this._api) this._api.hass = this.hass;
     if (changedProps.has('_settings')) this._applyTheme();
