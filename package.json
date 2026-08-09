@@ -9,12 +9,13 @@
     "lint:fix": "eslint src/**/*.js --fix",
     "prebuild": "npm run lint",
     "build": "rollup -c",
-    "postbuild": "cp recipe-manager-card.js ../Recipe-Manager/custom_components/recipe_manager/www/recipe-manager-card.js",
+    "postbuild": "cp recipe-manager-card.js ../Recipe-Manager/custom_components/recipe_manager/www/recipe-manager-card.js && rm -rf ../Recipe-Manager/custom_components/recipe_manager/www/locales ../Recipe-Manager/custom_components/recipe_manager/www/chunks && cp -r locales ../Recipe-Manager/custom_components/recipe_manager/www/locales && ([ -d chunks ] && cp -r chunks ../Recipe-Manager/custom_components/recipe_manager/www/chunks || true)",
     "watch": "rollup -c -w"
   },
   "dependencies": {
     "jszip": "^3.10.1",
-    "lit": "^3.0.0"
+    "lit": "^3.0.0",
+    "@lit/localize": "^0.12.2"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.7",
@@ -24,6 +25,7 @@
     "eslint": "^8.57.0",
     "@babel/eslint-parser": "^7.24.7",
     "eslint-plugin-wc": "^2.1.0",
-    "eslint-plugin-lit-a11y": "^4.1.2"
+    "eslint-plugin-lit-a11y": "^4.1.2",
+    "@lit/localize-tools": "^0.8.2"
   }
 }

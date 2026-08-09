@@ -15,10 +15,20 @@ function injectVersion() {
 }
 
 export default {
-  input: 'src/recipe-manager-card.js',
+  input: {
+    'recipe-manager-card': 'src/recipe-manager-card.js',
+    'locales/de': 'src/locales/de.js',
+    'locales/es': 'src/locales/es.js',
+    'locales/fr': 'src/locales/fr.js',
+    'locales/it': 'src/locales/it.js',
+    'locales/nl': 'src/locales/nl.js',
+    'locales/pt': 'src/locales/pt.js',
+  },
   output: {
-    file: 'recipe-manager-card.js',
+    dir: '.',
     format: 'es',
+    entryFileNames: '[name].js',
+    chunkFileNames: 'chunks/[name]-[hash].js',
   },
   plugins: [
     injectVersion(),

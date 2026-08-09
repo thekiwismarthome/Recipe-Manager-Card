@@ -2,6 +2,7 @@
  * Recipe detail view — full recipe with ingredients, directions, nutrition, photos and actions.
  */
 import { LitElement, html, css } from 'lit';
+import { msg, str } from '@lit/localize';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 
 // ---------------------------------------------------------------------------
@@ -40,15 +41,15 @@ function renderMarkdown(text) {
 }
 
 const NUTRITION_FIELDS = [
-  { key: 'calories',      label: 'Calories',         unit: 'kcal', bold: true },
-  { key: 'fat',           label: 'Total Fat',         unit: 'g' },
-  { key: 'saturated_fat', label: 'Saturated Fat',     unit: 'g', indent: true },
-  { key: 'cholesterol',   label: 'Cholesterol',       unit: 'mg' },
-  { key: 'sodium',        label: 'Sodium',            unit: 'mg' },
-  { key: 'carbohydrates', label: 'Total Carbohydrate',unit: 'g' },
-  { key: 'fiber',         label: 'Dietary Fiber',     unit: 'g', indent: true },
-  { key: 'sugar',         label: 'Total Sugars',      unit: 'g', indent: true },
-  { key: 'protein',       label: 'Protein',           unit: 'g' },
+  { key: 'calories',      label: msg('Calories'),          unit: 'kcal', bold: true },
+  { key: 'fat',           label: msg('Total Fat'),         unit: 'g' },
+  { key: 'saturated_fat', label: msg('Saturated Fat'),     unit: 'g', indent: true },
+  { key: 'cholesterol',   label: msg('Cholesterol'),       unit: 'mg' },
+  { key: 'sodium',        label: msg('Sodium'),            unit: 'mg' },
+  { key: 'carbohydrates', label: msg('Total Carbohydrate'),unit: 'g' },
+  { key: 'fiber',         label: msg('Dietary Fiber'),     unit: 'g', indent: true },
+  { key: 'sugar',         label: msg('Total Sugars'),      unit: 'g', indent: true },
+  { key: 'protein',       label: msg('Protein'),           unit: 'g' },
 ];
 
 // Regex to find time mentions in directions text
@@ -73,15 +74,15 @@ function parseTimeToSeconds(text) {
 
 // Daily Reference Values (FDA / EU)
 const RDA = {
-  calories:      { label: 'Calories',         val: 2000, unit: 'kcal' },
-  fat:           { label: 'Total Fat',         val: 65,   unit: 'g'    },
-  saturated_fat: { label: 'Saturated Fat',     val: 20,   unit: 'g'    },
-  cholesterol:   { label: 'Cholesterol',       val: 300,  unit: 'mg'   },
-  sodium:        { label: 'Sodium',            val: 2300, unit: 'mg'   },
-  carbohydrates: { label: 'Total Carbohydrate',val: 300,  unit: 'g'    },
-  fiber:         { label: 'Dietary Fiber',     val: 28,   unit: 'g'    },
-  sugar:         { label: 'Added Sugars',      val: 50,   unit: 'g'    },
-  protein:       { label: 'Protein',           val: 50,   unit: 'g'    },
+  calories:      { label: msg('Calories'),          val: 2000, unit: 'kcal' },
+  fat:           { label: msg('Total Fat'),         val: 65,   unit: 'g'    },
+  saturated_fat: { label: msg('Saturated Fat'),     val: 20,   unit: 'g'    },
+  cholesterol:   { label: msg('Cholesterol'),       val: 300,  unit: 'mg'   },
+  sodium:        { label: msg('Sodium'),            val: 2300, unit: 'mg'   },
+  carbohydrates: { label: msg('Total Carbohydrate'),val: 300,  unit: 'g'    },
+  fiber:         { label: msg('Dietary Fiber'),     val: 28,   unit: 'g'    },
+  sugar:         { label: msg('Added Sugars'),      val: 50,   unit: 'g'    },
+  protein:       { label: msg('Protein'),           val: 50,   unit: 'g'    },
 };
 
 // Imperial → metric conversion factors
@@ -178,7 +179,7 @@ class RmRecipeDetail extends LitElement {
     this._downloading = false;
     this._photoUrlInput = '';
     this._addingPhotoUrl = false;
-    this._metricMode = false;
+    this._metricMode = this.settings?.unitSystem === 'metric';
     this._wakeActive = false;
     this._completedSteps = new Set();
     this._editIngInput = '';
@@ -243,7 +244,7 @@ class RmRecipeDetail extends LitElement {
         this._showShoppingPicker = false;
         this._checkedIngredients = null;
         this._photoUrlInput = '';
-        this._metricMode = false;
+        this._metricMode = this.settings?.unitSystem === 'metric';
         this._completedSteps = new Set();
       }
       this._slideIdx = 0;
@@ -259,10 +260,10 @@ class RmRecipeDetail extends LitElement {
 
   _formatTime(minutes) {
     if (!minutes) return null;
-    if (minutes < 60) return `${minutes} min`;
+    if (minutes < 60) return msg(str`${minutes} min`);
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
-    return m ? `${h}h ${m}m` : `${h}h`;
+    return m ? msg(str`${h}h ${m}m`) : msg(str`${h}h`);
   }
 
   _scaleAmount(amount) {
@@ -331,13 +332,13 @@ class RmRecipeDetail extends LitElement {
             ${current.map(v => html`
               <span class="list-chip selected">
                 ${v}
-                <button class="list-chip-remove" @click=${() => this._toggleListValue(field, v)} title="Remove">×</button>
+                <button class="list-chip-remove" @click=${() => this._toggleListValue(field, v)} title="${msg('Remove')}">×</button>
               </span>
             `)}
             <button class="list-chip-add-btn" @click=${() => {
               this._tagPickerField = open ? null : field;
               this._tagPickerInput = '';
-            }} title="Add ${label.toLowerCase()}">
+            }} title="${msg(str`Add ${label.toLowerCase()}`)}">
               <ha-icon icon="mdi:plus"></ha-icon>
             </button>
           </div>
@@ -354,7 +355,7 @@ class RmRecipeDetail extends LitElement {
                 </div>
               ` : ''}
               <div class="list-picker-new-row">
-                <input class="list-picker-input" type="text" placeholder="New ${label.toLowerCase()}…"
+                <input class="list-picker-input" type="text" placeholder="${msg(str`New ${label.toLowerCase()}…`)}"
                   .value=${inputVal}
                   @input=${e => { this._tagPickerInput = e.target.value; }}
                   @keydown=${e => {
@@ -364,7 +365,7 @@ class RmRecipeDetail extends LitElement {
                 />
                 <button class="list-picker-new-btn" @click=${() => this._addListValue(field, this._tagPickerInput)}
                   ?disabled=${!this._tagPickerInput.trim()}>
-                  Add
+                  ${msg('Add')}
                 </button>
               </div>
             </div>
@@ -692,7 +693,7 @@ class RmRecipeDetail extends LitElement {
     if (!review) return html``;
     return html`
       <div class="shopping-review-panel">
-        <div class="review-title">Match Items to Products</div>
+        <div class="review-title">${msg('Match Items to Products')}</div>
         <div class="review-list">
           ${review.map((item, idx) => html`
             <div class="review-row">
@@ -709,20 +710,20 @@ class RmRecipeDetail extends LitElement {
                 `)}
                 <button class="review-chip manual ${item.selectedId === null ? 'selected' : ''}"
                   @click=${() => this._selectReviewMatch(idx, null)}>
-                  ${item.selectedId === null ? html`<ha-icon icon="mdi:check"></ha-icon>` : ''}Add manually
+                  ${item.selectedId === null ? html`<ha-icon icon="mdi:check"></ha-icon>` : ''}${msg('Add manually')}
                 </button>
               </div>
             </div>
           `)}
         </div>
         <div class="picker-btns review-btns">
-          <button class="action-btn" @click=${() => { this._shoppingReview = null; }}>Back</button>
+          <button class="action-btn" @click=${() => { this._shoppingReview = null; }}>${msg('Back')}</button>
           <button class="action-btn primary"
             ?disabled=${this._shoppingAdding}
             @click=${this._confirmShoppingReview}>
             ${this._shoppingAdding
               ? html`<ha-circular-progress active size="tiny"></ha-circular-progress>`
-              : `Confirm & Add ${review.length}`}
+              : msg(str`Confirm & Add ${review.length}`)}
           </button>
         </div>
       </div>
@@ -753,7 +754,7 @@ class RmRecipeDetail extends LitElement {
 
   _fireTimer(seconds, label) {
     const recipeName = this.recipe?.name;
-    const fullLabel = recipeName ? `${recipeName} — ${label}` : label;
+    const fullLabel = recipeName ? msg(str`${recipeName} — ${label}`) : label;
     this.dispatchEvent(new CustomEvent('rm-start-timer', {
       detail: { seconds, label: fullLabel },
       bubbles: true,
@@ -889,10 +890,10 @@ class RmRecipeDetail extends LitElement {
           </div>
         `}
         ${multi ? html`
-          <button class="slide-btn slide-prev" @click=${this._prevSlide} title="Previous">
+          <button class="slide-btn slide-prev" @click=${this._prevSlide} title="${msg('Previous')}">
             <ha-icon icon="mdi:chevron-left"></ha-icon>
           </button>
-          <button class="slide-btn slide-next" @click=${this._nextSlide} title="Next">
+          <button class="slide-btn slide-next" @click=${this._nextSlide} title="${msg('Next')}">
             <ha-icon icon="mdi:chevron-right"></ha-icon>
           </button>
           <div class="slide-dots">
@@ -922,18 +923,18 @@ class RmRecipeDetail extends LitElement {
       <div class="chips-area">
         ${courses.length ? html`
           <div class="chip-group-row">
-            <span class="chip chip-label">Course:</span>
-            ${courses.map(t => html`<button class="chip chip-course chip-nav" @click=${() => this._handleChipNav('courses', t)} title="Filter by course: ${t}">${t}</button>`)}
+            <span class="chip chip-label">${msg('Course:')}</span>
+            ${courses.map(t => html`<button class="chip chip-course chip-nav" @click=${() => this._handleChipNav('courses', t)} title="${msg(str`Filter by course: ${t}`)}">${t}</button>`)}
           </div>` : ''}
         ${categories.length ? html`
           <div class="chip-group-row">
-            <span class="chip chip-label">Category:</span>
-            ${categories.map(t => html`<button class="chip chip-category chip-nav" @click=${() => this._handleChipNav('categories', t)} title="Filter by category: ${t}">${t}</button>`)}
+            <span class="chip chip-label">${msg('Category:')}</span>
+            ${categories.map(t => html`<button class="chip chip-category chip-nav" @click=${() => this._handleChipNav('categories', t)} title="${msg(str`Filter by category: ${t}`)}">${t}</button>`)}
           </div>` : ''}
         ${collections.length ? html`
           <div class="chip-group-row">
-            <span class="chip chip-label">Collection:</span>
-            ${collections.map(t => html`<button class="chip chip-collection chip-nav" @click=${() => this._handleChipNav('collections', t)} title="Filter by collection: ${t}">${t}</button>`)}
+            <span class="chip chip-label">${msg('Collection:')}</span>
+            ${collections.map(t => html`<button class="chip chip-collection chip-nav" @click=${() => this._handleChipNav('collections', t)} title="${msg(str`Filter by collection: ${t}`)}">${t}</button>`)}
           </div>` : ''}
       </div>
     `;
@@ -992,23 +993,23 @@ class RmRecipeDetail extends LitElement {
       <div class="action-btns-row">
         <button class="action-icon-btn ${r.is_favourite ? 'fav-active' : ''}"
           @click=${this._handleToggleFav}
-          title="${r.is_favourite ? 'Remove from favourites' : 'Add to favourites'}">
+          title="${r.is_favourite ? msg('Remove from favourites') : msg('Add to favourites')}">
           <span class="btn-icon"><ha-icon icon="${r.is_favourite ? 'mdi:heart' : 'mdi:heart-outline'}"></ha-icon></span>
-          <span>Favourite</span>
+          <span>${msg('Favourite')}</span>
         </button>
-        <button class="action-icon-btn" @click=${this._handleShowPlanner} title="Add to meal plan">
+        <button class="action-icon-btn" @click=${this._handleShowPlanner} title="${msg('Add to meal plan')}">
           <span class="btn-icon"><ha-icon icon="mdi:calendar-plus"></ha-icon></span>
-          <span>Plan</span>
+          <span>${msg('Plan')}</span>
         </button>
         ${r.source_url ? html`
-          <a class="action-icon-btn" href="${r.source_url}" target="_blank" rel="noopener" title="Open source">
+          <a class="action-icon-btn" href="${r.source_url}" target="_blank" rel="noopener" title="${msg('Open source')}">
             <span class="btn-icon"><ha-icon icon="mdi:open-in-new"></ha-icon></span>
-            <span>Source</span>
+            <span>${msg('Source')}</span>
           </a>
         ` : ''}
-        <button class="action-icon-btn" @click=${this._startEdit} title="Edit recipe">
+        <button class="action-icon-btn" @click=${this._startEdit} title="${msg('Edit recipe')}">
           <span class="btn-icon"><ha-icon icon="mdi:pencil-outline"></ha-icon></span>
-          <span>Edit</span>
+          <span>${msg('Edit')}</span>
         </button>
       </div>
     `;
@@ -1039,9 +1040,9 @@ class RmRecipeDetail extends LitElement {
       <div class="wakelock-row">
         <button class="wakelock-btn ${this._wakeActive ? 'active' : ''}"
           @click=${() => this._wakeActive ? this._releaseWakeLock() : this._requestWakeLock()}
-          title="${this._wakeActive ? 'Release screen lock' : 'Keep screen on'}">
+          title="${this._wakeActive ? msg('Release screen lock') : msg('Keep screen on')}">
           <ha-icon icon="${this._wakeActive ? 'mdi:eye' : 'mdi:eye-off-outline'}"></ha-icon>
-          ${this._wakeActive ? 'Screen on' : 'Keep screen on'}
+          ${this._wakeActive ? msg('Screen on') : msg('Keep screen on')}
         </button>
       </div>
     `;
@@ -1101,7 +1102,7 @@ class RmRecipeDetail extends LitElement {
               ` : html`
                 <button class="ing-shop-btn ${picking ? 'active' : ''}"
                   @click=${picking ? () => { this._showShoppingPicker = false; } : this._openShoppingPicker}
-                  title="${picking ? 'Cancel' : 'Add to shopping list'}">
+                  title="${picking ? msg('Cancel') : msg('Add to shopping list')}">
                   <ha-icon icon="${picking ? 'mdi:close' : 'mdi:cart-plus'}"></ha-icon>
                 </button>
               `}
@@ -1113,8 +1114,8 @@ class RmRecipeDetail extends LitElement {
             ` : html`
               <div class="wide-section-card shopping-picker-panel">
                 <div class="picker-select-row">
-                  <button class="picker-sel-btn" @click=${this._selectAllIngredients}>Select All</button>
-                  <button class="picker-sel-btn" @click=${this._clearAllIngredients}>Clear All</button>
+                  <button class="picker-sel-btn" @click=${this._selectAllIngredients}>${msg('Select All')}</button>
+                  <button class="picker-sel-btn" @click=${this._clearAllIngredients}>${msg('Clear All')}</button>
                   ${this.slmAvailable && this.shoppingLists.length ? html`
                     <select class="list-select" .value=${this._selectedListId}
                       @change=${e => { this._selectedListId = e.target.value; }}>
@@ -1125,13 +1126,13 @@ class RmRecipeDetail extends LitElement {
                   ` : ''}
                 </div>
                 <div class="picker-btns">
-                  <button class="action-btn" @click=${() => { this._showShoppingPicker = false; }}>Cancel</button>
+                  <button class="action-btn" @click=${() => { this._showShoppingPicker = false; }}>${msg('Cancel')}</button>
                   <button class="action-btn primary"
                     ?disabled=${this._shoppingAdding || !checkedCount}
                     @click=${this._handleAddToShopping}>
                     ${this._shoppingAdding
                       ? html`<ha-circular-progress active size="tiny"></ha-circular-progress>`
-                      : `Add${checkedCount ? ` (${checkedCount})` : ''}`}
+                      : (checkedCount ? msg(str`Add (${checkedCount})`) : msg('Add'))}
                   </button>
                 </div>
               </div>
@@ -1178,15 +1179,15 @@ class RmRecipeDetail extends LitElement {
                 <div class="wide-section-card wide-step-card ${done ? 'step-done' : ''}">
                   <span class="step-num ${done ? 'done' : ''}"
                     @click=${(e) => { e.stopPropagation(); this._toggleStepComplete(i); }}
-                    title="${done ? 'Mark incomplete' : 'Mark complete'}"
+                    title="${done ? msg('Mark incomplete') : msg('Mark complete')}"
                   >${done ? html`<ha-icon icon="mdi:check"></ha-icon>` : i + 1}</span>
                   <span class="step-text">${this._renderStepWithTimers(step)}</span>
                 </div>
               `;
-            }) : html`<p class="empty-tab">No directions listed.</p>`}
+            }) : html`<p class="empty-tab">${msg('No directions listed.')}</p>`}
             ${r.notes ? html`
               <div class="wide-section-card">
-                <div class="wide-section-title">Notes</div>
+                <div class="wide-section-title">${msg('Notes')}</div>
                 <div class="notes-text md-content">${unsafeHTML(renderMarkdown(r.notes))}</div>
               </div>
             ` : ''}
@@ -1219,11 +1220,11 @@ class RmRecipeDetail extends LitElement {
           `}
           <div class="hero-actions">
             <button class="hero-btn ${r.is_favourite ? 'fav-active' : ''}" @click=${this._handleToggleFav}
-              title="${r.is_favourite ? 'Remove from favourites' : 'Add to favourites'}">
+              title="${r.is_favourite ? msg('Remove from favourites') : msg('Add to favourites')}">
               <ha-icon icon="${r.is_favourite ? 'mdi:heart' : 'mdi:heart-outline'}"></ha-icon>
             </button>
             ${r.source_url ? html`
-              <a class="hero-btn" href="${r.source_url}" target="_blank" rel="noopener" title="Open source">
+              <a class="hero-btn" href="${r.source_url}" target="_blank" rel="noopener" title="${msg('Open source')}">
                 <ha-icon icon="mdi:open-in-new"></ha-icon>
               </a>
             ` : ''}
@@ -1240,25 +1241,25 @@ class RmRecipeDetail extends LitElement {
             <div class="meta-row">
               ${r.prep_time ? html`
                 <div class="meta-item">
-                  <span class="meta-label">Prep</span>
+                  <span class="meta-label">${msg('Prep')}</span>
                   <span class="meta-val">${this._formatTime(r.prep_time)}</span>
                 </div>
               ` : ''}
               ${r.cook_time ? html`
                 <div class="meta-item">
-                  <span class="meta-label">Cook</span>
+                  <span class="meta-label">${msg('Cook')}</span>
                   <span class="meta-val">${this._formatTime(r.cook_time)}</span>
                 </div>
               ` : ''}
               ${totalTime ? html`
                 <div class="meta-item">
-                  <span class="meta-label">Total</span>
+                  <span class="meta-label">${msg('Total')}</span>
                   <span class="meta-val">${this._formatTime(totalTime)}</span>
                 </div>
               ` : ''}
               ${r.servings ? html`
                 <div class="meta-item">
-                  <span class="meta-label">Serves</span>
+                  <span class="meta-label">${msg('Serves')}</span>
                   <span class="meta-val">${r.servings_text || r.servings}</span>
                 </div>
               ` : ''}
@@ -1272,7 +1273,7 @@ class RmRecipeDetail extends LitElement {
 
           <!-- Tabs -->
           <div class="tabs-row">
-            ${[['ingredients','Ingredients'],['directions','Directions'],['notes','Notes'],['nutrition','Nutrition'],['photos','Photos']].map(([val, lbl]) => html`
+            ${[['ingredients',msg('Ingredients')],['directions',msg('Directions')],['notes',msg('Notes')],['nutrition',msg('Nutrition')],['photos',msg('Photos')]].map(([val, lbl]) => html`
               <button
                 class="tab-btn ${this._activeTab === val ? 'active' : ''}"
                 @click=${() => { this._activeTab = val; }}
@@ -1337,7 +1338,7 @@ class RmRecipeDetail extends LitElement {
           <button class="metric-btn ${this._metricMode ? 'active' : ''}"
             @click=${() => { this._metricMode = !this._metricMode; }}>
             <ha-icon icon="mdi:swap-horizontal"></ha-icon>
-            ${this._metricMode ? 'Showing metric' : 'Convert to metric'}
+            ${this._metricMode ? msg('Showing metric') : msg('Convert to metric')}
           </button>
         </div>
       ` : ''}
@@ -1364,21 +1365,21 @@ class RmRecipeDetail extends LitElement {
             `;
           })}
         </ul>
-      ` : html`<p class="empty-tab">No ingredients listed.</p>`}
+      ` : html`<p class="empty-tab">${msg('No ingredients listed.')}</p>`}
 
       <!-- Shopping section (always shown) -->
       <div class="shopping-section">
         ${this._shoppingResult === 'success' ? html`
           <div class="shopping-success">
             <ha-icon icon="mdi:check-circle-outline"></ha-icon>
-            Added to shopping list!
+            ${msg('Added to shopping list!')}
           </div>
         ` : picking && this._shoppingReview ? this._renderShoppingReview()
         : picking ? html`
           <div class="shopping-picker-panel">
             <div class="picker-select-row">
-              <button class="picker-sel-btn" @click=${this._selectAllIngredients}>Select All</button>
-              <button class="picker-sel-btn" @click=${this._clearAllIngredients}>Clear All</button>
+              <button class="picker-sel-btn" @click=${this._selectAllIngredients}>${msg('Select All')}</button>
+              <button class="picker-sel-btn" @click=${this._clearAllIngredients}>${msg('Clear All')}</button>
               ${this.slmAvailable && this.shoppingLists.length ? html`
                 <select class="list-select" .value=${this._selectedListId}
                   @change=${e => { this._selectedListId = e.target.value; }}>
@@ -1387,24 +1388,24 @@ class RmRecipeDetail extends LitElement {
                   `)}
                 </select>
               ` : this.slmAvailable ? html`
-                <span class="shopping-note">No lists found in Shopping List Manager</span>
+                <span class="shopping-note">${msg('No lists found in Shopping List Manager')}</span>
               ` : ''}
             </div>
             <div class="picker-btns">
-              <button class="action-btn" @click=${() => { this._showShoppingPicker = false; }}>Cancel</button>
+              <button class="action-btn" @click=${() => { this._showShoppingPicker = false; }}>${msg('Cancel')}</button>
               <button class="action-btn primary"
                 ?disabled=${this._shoppingAdding || !checkedCount}
                 @click=${this._handleAddToShopping}>
                 ${this._shoppingAdding
                   ? html`<ha-circular-progress active size="tiny"></ha-circular-progress>`
-                  : `Add${checkedCount ? ` (${checkedCount})` : ''}`}
+                  : (checkedCount ? msg(str`Add (${checkedCount})`) : msg('Add'))}
               </button>
             </div>
           </div>
         ` : html`
           <button class="action-btn primary shopping-btn" @click=${this._openShoppingPicker}>
             <ha-icon icon="mdi:cart-plus"></ha-icon>
-            Add to Shopping List
+            ${msg('Add to Shopping List')}
           </button>
         `}
       </div>
@@ -1420,7 +1421,7 @@ class RmRecipeDetail extends LitElement {
 
   _renderDirections(r) {
     if (!r.instructions?.length) {
-      return html`<p class="empty-tab">No directions listed.</p>`;
+      return html`<p class="empty-tab">${msg('No directions listed.')}</p>`;
     }
     return html`
       <ol class="steps-list">
@@ -1430,7 +1431,7 @@ class RmRecipeDetail extends LitElement {
             <li class="step-item ${done ? 'step-done' : ''}">
               <span class="step-num ${done ? 'done' : ''}"
                 @click=${(e) => { e.stopPropagation(); this._toggleStepComplete(i); }}
-                title="${done ? 'Mark incomplete' : 'Mark complete'}"
+                title="${done ? msg('Mark incomplete') : msg('Mark complete')}"
               >${done ? html`<ha-icon icon="mdi:check"></ha-icon>` : i + 1}</span>
               <span class="step-text">${this._renderStepWithTimers(step)}</span>
             </li>
@@ -1453,7 +1454,7 @@ class RmRecipeDetail extends LitElement {
       const timeText = match[0];
       const seconds = parseTimeToSeconds(timeText);
       if (seconds > 0) {
-        parts.push(html`<button class="time-chip" @click=${(e) => { e.stopPropagation(); this._fireTimer(seconds, timeText); }} title="Start timer for ${timeText}">
+        parts.push(html`<button class="time-chip" @click=${(e) => { e.stopPropagation(); this._fireTimer(seconds, timeText); }} title="${msg(str`Start timer for ${timeText}`)}">
           <ha-icon icon="mdi:timer-outline"></ha-icon>${timeText}
         </button>`);
       } else {
@@ -1471,7 +1472,7 @@ class RmRecipeDetail extends LitElement {
     return html`
       ${r.notes
         ? html`<div class="notes-text md-content">${unsafeHTML(renderMarkdown(r.notes))}</div>`
-        : html`<p class="empty-tab">No notes.</p>`}
+        : html`<p class="empty-tab">${msg('No notes.')}</p>`}
     `;
   }
 
@@ -1481,14 +1482,14 @@ class RmRecipeDetail extends LitElement {
     if (!hasAny) {
       return html`
         <div class="empty-tab">
-          <p>No nutrition info. Add it via the edit panel.</p>
+          <p>${msg('No nutrition info. Add it via the edit panel.')}</p>
         </div>
       `;
     }
-    const perServing = r.servings ? `Per serving (${r.servings_text || r.servings})` : 'Per serving';
+    const perServing = r.servings ? msg(str`Per serving (${r.servings_text || r.servings})`) : msg('Per serving');
     return html`
       <div class="nutrition-panel">
-        <div class="nutr-header">Nutrition Facts</div>
+        <div class="nutr-header">${msg('Nutrition Facts')}</div>
         <div class="nutr-sub">${perServing}</div>
         <div class="nutr-divider thick"></div>
         ${NUTRITION_FIELDS.map(f => {
@@ -1522,14 +1523,14 @@ class RmRecipeDetail extends LitElement {
     if (!hasData) {
       return html`
         <div class="nutr-card">
-          <p class="empty-tab" style="margin:0;padding:8px 0;text-align:center">No nutritional information available.</p>
+          <p class="empty-tab" style="margin:0;padding:8px 0;text-align:center">${msg('No nutritional information available.')}</p>
         </div>`;
     }
 
     const MACROS = [
-      { label: 'Carbs',    val: carb, cal: carbCal, color: '#f59e0b' },
-      { label: 'Total fat',val: fat,  cal: fatCal,  color: '#3b82f6' },
-      { label: 'Protein',  val: prot, cal: protCal, color: '#22c55e' },
+      { label: msg('Carbs'),    val: carb, cal: carbCal, color: '#f59e0b' },
+      { label: msg('Total fat'),val: fat,  cal: fatCal,  color: '#3b82f6' },
+      { label: msg('Protein'),  val: prot, cal: protCal, color: '#22c55e' },
     ];
 
     // SVG stroke-dasharray arcs using svg`` template tag (correct SVG namespace)
@@ -1591,7 +1592,7 @@ class RmRecipeDetail extends LitElement {
                 ${displayCal ?? '–'}
               </text>
               <text x="${cx}" y="${cy + 12}" text-anchor="middle"
-                fill="var(--rm-text-secondary)" font-size="9" font-family="inherit">cals</text>
+                fill="var(--rm-text-secondary)" font-size="9" font-family="inherit">${msg('cals')}</text>
             </svg>
           </div>
 
@@ -1611,14 +1612,14 @@ class RmRecipeDetail extends LitElement {
 
         ${r?.servings ? html`
           <div class="nutr-serving-note">
-            Per ${r.servings_text || `${r.servings} serving${r.servings !== 1 ? 's' : ''}`}
+            ${r.servings_text ? msg(str`Per ${r.servings_text}`) : msg(str`Per ${r.servings} serving${r.servings !== 1 ? 's' : ''}`)}
           </div>
         ` : ''}
 
         <!-- Daily RDA collapsible -->
         ${rdaRows.length ? html`
           <button class="nutr-rda-toggle" @click=${() => { this._nutritionExpanded = !this._nutritionExpanded; }}>
-            <span class="nutr-rda-title">Daily RDA Nutrition</span>
+            <span class="nutr-rda-title">${msg('Daily RDA Nutrition')}</span>
             <span class="nutr-rda-count">${rdaRows.length}</span>
             <ha-icon icon="${this._nutritionExpanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}"></ha-icon>
           </button>
@@ -1655,13 +1656,13 @@ class RmRecipeDetail extends LitElement {
           <div class="photos-grid">
             ${allPhotos.map(url => html`
               <div class="photo-item ${url === mainImage ? 'main-photo' : ''}">
-                <img src="${url}" alt="Recipe photo" loading="lazy" />
-                ${url === mainImage ? html`<span class="photo-badge">Main</span>` : html`
-                  <button class="photo-action set-main" @click=${() => this._setMainPhoto(url)} title="Set as main photo">
+                <img src="${url}" alt="${msg('Recipe photo')}" loading="lazy" />
+                ${url === mainImage ? html`<span class="photo-badge">${msg('Main')}</span>` : html`
+                  <button class="photo-action set-main" @click=${() => this._setMainPhoto(url)} title="${msg('Set as main photo')}">
                     <ha-icon icon="mdi:star-outline"></ha-icon>
                   </button>
                 `}
-                <button class="photo-action remove-photo" @click=${() => this._removePhoto(url)} title="Remove photo">
+                <button class="photo-action remove-photo" @click=${() => this._removePhoto(url)} title="${msg('Remove photo')}">
                   <ha-icon icon="mdi:close"></ha-icon>
                 </button>
               </div>
@@ -1670,36 +1671,36 @@ class RmRecipeDetail extends LitElement {
         ` : html`
           <div class="empty-tab">
             <ha-icon icon="mdi:image-off-outline"></ha-icon>
-            <p>No photos yet.</p>
+            <p>${msg('No photos yet.')}</p>
           </div>
         `}
 
         <div class="photo-add-section">
-          <div class="photo-add-label">Add a photo</div>
+          <div class="photo-add-label">${msg('Add a photo')}</div>
           <div class="photo-url-row">
             <input
               type="url"
               class="photo-url-input"
-              placeholder="Paste image URL…"
+              placeholder="${msg('Paste image URL…')}"
               .value=${this._photoUrlInput}
               @input=${e => { this._photoUrlInput = e.target.value; }}
               @keydown=${e => { if (e.key === 'Enter') this._handleAddPhotoUrl(); }}
             />
             <button class="action-btn primary" ?disabled=${!this._photoUrlInput.trim() || this._addingPhotoUrl}
               @click=${this._handleAddPhotoUrl}>
-              Add
+              ${msg('Add')}
             </button>
           </div>
           <div class="camera-btns">
             <label class="camera-btn-split">
               <ha-icon icon="mdi:camera"></ha-icon>
-              <span>Take Photo</span>
+              <span>${msg('Take Photo')}</span>
               <input type="file" accept="image/*" capture="environment" class="camera-input"
                 @change=${this._handleCameraCapture} />
             </label>
             <label class="camera-btn-split">
               <ha-icon icon="mdi:image-multiple-outline"></ha-icon>
-              <span>Choose from Library</span>
+              <span>${msg('Choose from Library')}</span>
               <input type="file" accept="image/*" class="camera-input"
                 @change=${this._handleCameraCapture} />
             </label>
@@ -1715,15 +1716,15 @@ class RmRecipeDetail extends LitElement {
       <div class="edit-overlay" @click=${(e) => { if (e.target === e.currentTarget) this._cancelEdit(); }}>
         <div class="edit-panel">
           <div class="edit-header">
-            <span>Edit Recipe</span>
+            <span>${msg('Edit Recipe')}</span>
             <button class="icon-btn" @click=${this._cancelEdit}><ha-icon icon="mdi:close"></ha-icon></button>
           </div>
           <div class="edit-body">
 
-            ${this._renderField('Name', 'name', 'text')}
+            ${this._renderField(msg('Name'), 'name', 'text')}
 
             <!-- Image section -->
-            <div class="edit-section-label">Image</div>
+            <div class="edit-section-label">${msg('Image')}</div>
             <div class="edit-photo-row">
               ${(() => {
                 const allUrls = [...new Set([
@@ -1734,12 +1735,12 @@ class RmRecipeDetail extends LitElement {
                   ${allUrls.map(url => html`
                     <div class="edit-photo-thumb ${url === d.image_url ? 'selected' : ''}"
                       @click=${() => this._handleEditField('image_url', url)}
-                      title="Set as main image">
+                      title="${msg('Set as main image')}">
                       <img src="${url}" alt="" />
                       ${url === d.image_url ? html`<span class="edit-thumb-badge"><ha-icon icon="mdi:check"></ha-icon></span>` : ''}
                     </div>
                   `)}
-                  <label class="edit-photo-add ${this._editImageUploading ? 'loading' : ''}" title="Upload photo">
+                  <label class="edit-photo-add ${this._editImageUploading ? 'loading' : ''}" title="${msg('Upload photo')}">
                     <input type="file" accept="image/*" style="display:none"
                       @change=${e => { const f = e.target.files?.[0]; if (f) this._editUploadImage(f); e.target.value = ''; }} />
                     <ha-icon icon="${this._editImageUploading ? 'mdi:loading' : 'mdi:plus'}"></ha-icon>
@@ -1748,24 +1749,24 @@ class RmRecipeDetail extends LitElement {
               })()}
             </div>
             <div class="edit-field">
-              <label>Or paste image URL</label>
+              <label>${msg('Or paste image URL')}</label>
               <input type="url" .value=${d.image_url ?? ''}
                 @input=${e => this._handleEditField('image_url', e.target.value)}
                 placeholder="https://…" />
             </div>
 
-            ${this._renderField('Description', 'description', 'textarea')}
-            ${this._renderField('Source URL', 'source_url', 'url')}
+            ${this._renderField(msg('Description'), 'description', 'textarea')}
+            ${this._renderField(msg('Source URL'), 'source_url', 'url')}
 
             <div class="edit-row-3">
-              ${this._renderField('Prep (min)', 'prep_time', 'number')}
-              ${this._renderField('Cook (min)', 'cook_time', 'number')}
-              ${this._renderField('Servings', 'servings', 'number')}
+              ${this._renderField(msg('Prep (min)'), 'prep_time', 'number')}
+              ${this._renderField(msg('Cook (min)'), 'cook_time', 'number')}
+              ${this._renderField(msg('Servings'), 'servings', 'number')}
             </div>
 
             <!-- Star rating picker -->
             <div class="edit-field">
-              <label>Rating</label>
+              <label>${msg('Rating')}</label>
               <div class="edit-stars">
                 ${[1,2,3,4,5].map(n => html`
                   <span class="edit-star ${n <= (d.rating || 0) ? 'filled' : ''}"
@@ -1775,14 +1776,14 @@ class RmRecipeDetail extends LitElement {
               </div>
             </div>
 
-            ${this._renderListPicker('tags', 'Tags', this.allTags)}
-            ${this._renderListPicker('courses', 'Courses', this.allCourses)}
-            ${this._renderListPicker('categories', 'Categories', this.allCategories)}
-            ${this._renderListPicker('collections', 'Collections', this.allCollections)}
-            ${this._renderField('Notes', 'notes', 'textarea')}
+            ${this._renderListPicker('tags', msg('Tags'), this.allTags)}
+            ${this._renderListPicker('courses', msg('Courses'), this.allCourses)}
+            ${this._renderListPicker('categories', msg('Categories'), this.allCategories)}
+            ${this._renderListPicker('collections', msg('Collections'), this.allCollections)}
+            ${this._renderField(msg('Notes'), 'notes', 'textarea')}
 
             <!-- Ingredients editor -->
-            <div class="edit-section-label">Ingredients (${(d.ingredients || []).length})</div>
+            <div class="edit-section-label">${msg(str`Ingredients (${(d.ingredients || []).length})`)}</div>
             ${(d.ingredients || []).length ? html`
               <ul class="edit-ing-list">
                 ${(d.ingredients || []).map((ing, i) => {
@@ -1793,32 +1794,32 @@ class RmRecipeDetail extends LitElement {
                     return html`
                       <li class="edit-ing-inline-edit ${isHeading ? 'edit-ing-heading' : ''}">
                         ${ee.heading ? html`
-                          <input class="ing-inline-input ing-inline-name" type="text" placeholder="Section header"
+                          <input class="ing-inline-input ing-inline-name" type="text" placeholder="${msg('Section header')}"
                             .value=${ee.name}
                             @input=${e => { this._editIngEdit = { ...ee, name: e.target.value }; }}
                             @keydown=${e => { if (e.key === 'Enter') this._saveEditIngredient(); if (e.key === 'Escape') this._cancelEditIngredient(); }}
                           />
                         ` : html`
-                          <input class="ing-inline-input ing-inline-amt" type="text" placeholder="Amt"
+                          <input class="ing-inline-input ing-inline-amt" type="text" placeholder="${msg('Amt')}"
                             .value=${ee.amount}
                             @input=${e => { this._editIngEdit = { ...ee, amount: e.target.value }; }}
                             @keydown=${e => { if (e.key === 'Enter') this._saveEditIngredient(); if (e.key === 'Escape') this._cancelEditIngredient(); }}
                           />
-                          <input class="ing-inline-input ing-inline-unit" type="text" placeholder="Unit"
+                          <input class="ing-inline-input ing-inline-unit" type="text" placeholder="${msg('Unit')}"
                             .value=${ee.unit}
                             @input=${e => { this._editIngEdit = { ...ee, unit: e.target.value }; }}
                             @keydown=${e => { if (e.key === 'Enter') this._saveEditIngredient(); if (e.key === 'Escape') this._cancelEditIngredient(); }}
                           />
-                          <input class="ing-inline-input ing-inline-name" type="text" placeholder="Ingredient"
+                          <input class="ing-inline-input ing-inline-name" type="text" placeholder="${msg('Ingredient')}"
                             .value=${ee.name}
                             @input=${e => { this._editIngEdit = { ...ee, name: e.target.value }; }}
                             @keydown=${e => { if (e.key === 'Enter') this._saveEditIngredient(); if (e.key === 'Escape') this._cancelEditIngredient(); }}
                           />
                         `}
-                        <button class="ing-inline-save" @click=${this._saveEditIngredient} title="Save">
+                        <button class="ing-inline-save" @click=${this._saveEditIngredient} title="${msg('Save')}">
                           <ha-icon icon="mdi:check"></ha-icon>
                         </button>
-                        <button class="ing-inline-cancel" @click=${this._cancelEditIngredient} title="Cancel">
+                        <button class="ing-inline-cancel" @click=${this._cancelEditIngredient} title="${msg('Cancel')}">
                           <ha-icon icon="mdi:close"></ha-icon>
                         </button>
                       </li>
@@ -1835,16 +1836,16 @@ class RmRecipeDetail extends LitElement {
                       @dragend=${() => { this._dragIngOver = -1; this._dragIngFrom = -1; }}
                     >
                       <ha-icon icon="mdi:drag-vertical" class="drag-handle"></ha-icon>
-                      <span class="edit-ing-text" @click=${() => this._startEditIngredient(i)} title="Click to edit">
+                      <span class="edit-ing-text" @click=${() => this._startEditIngredient(i)} title="${msg('Click to edit')}">
                         ${isHeading
                           ? html`<strong>${ing.name?.startsWith('#') ? ing.name.slice(1).trim() : ing.name}</strong>`
                           : html`${ing.amount ? `${ing.amount}${ing.unit ? ' ' + ing.unit : ''} ` : ''}${ing.name}`}
                       </span>
                       <div class="edit-reorder-btns">
-                        <button class="edit-move-btn" ?disabled=${i === 0} @click=${() => this._editMoveIngredient(i, -1)} title="Move up">
+                        <button class="edit-move-btn" ?disabled=${i === 0} @click=${() => this._editMoveIngredient(i, -1)} title="${msg('Move up')}">
                           <ha-icon icon="mdi:chevron-up"></ha-icon>
                         </button>
-                        <button class="edit-move-btn" ?disabled=${i === (d.ingredients.length - 1)} @click=${() => this._editMoveIngredient(i, 1)} title="Move down">
+                        <button class="edit-move-btn" ?disabled=${i === (d.ingredients.length - 1)} @click=${() => this._editMoveIngredient(i, 1)} title="${msg('Move down')}">
                           <ha-icon icon="mdi:chevron-down"></ha-icon>
                         </button>
                       </div>
@@ -1862,13 +1863,13 @@ class RmRecipeDetail extends LitElement {
                 .value=${this._editIngInput}
                 @input=${e => { this._editIngInput = e.target.value; }}
                 @keydown=${e => { if (e.key === 'Enter') this._editAddIngredient(); }}
-                placeholder='e.g. "2 cups flour" or "# Section Header"'
+                placeholder="${msg('e.g. "2 cups flour" or "# Section Header"')}"
               />
-              <button class="edit-add-btn" @click=${this._editAddIngredient}>Add</button>
+              <button class="edit-add-btn" @click=${this._editAddIngredient}>${msg('Add')}</button>
             </div>
 
             <!-- Instructions editor -->
-            <div class="edit-section-label">Directions (${(d.instructions || []).length} steps)</div>
+            <div class="edit-section-label">${msg(str`Directions (${(d.instructions || []).length} steps)`)}</div>
             ${(d.instructions || []).length ? html`
               <ol class="edit-steps-list">
                 ${(d.instructions || []).map((step, i) => html`
@@ -1884,10 +1885,10 @@ class RmRecipeDetail extends LitElement {
                     <ha-icon icon="mdi:drag-vertical" class="drag-handle"></ha-icon>
                     <span class="edit-ing-text">${step}</span>
                     <div class="edit-reorder-btns">
-                      <button class="edit-move-btn" ?disabled=${i === 0} @click=${() => this._editMoveStep(i, -1)} title="Move up">
+                      <button class="edit-move-btn" ?disabled=${i === 0} @click=${() => this._editMoveStep(i, -1)} title="${msg('Move up')}">
                         <ha-icon icon="mdi:chevron-up"></ha-icon>
                       </button>
-                      <button class="edit-move-btn" ?disabled=${i === (d.instructions.length - 1)} @click=${() => this._editMoveStep(i, 1)} title="Move down">
+                      <button class="edit-move-btn" ?disabled=${i === (d.instructions.length - 1)} @click=${() => this._editMoveStep(i, 1)} title="${msg('Move down')}">
                         <ha-icon icon="mdi:chevron-down"></ha-icon>
                       </button>
                     </div>
@@ -1910,42 +1911,42 @@ class RmRecipeDetail extends LitElement {
                     this._editStepInput = '';
                   }
                 }}
-                placeholder="Type a step, press Enter to add…"
+                placeholder="${msg('Type a step, press Enter to add…')}"
               ></textarea>
               <button class="edit-add-btn" @click=${() => {
                 this._editAddStep(this._editStepInput);
                 this._editStepInput = '';
-              }}>Add</button>
+              }}>${msg('Add')}</button>
             </div>
 
             <!-- Nutrition section -->
-            <div class="edit-section-label">Nutrition Facts (per serving)</div>
+            <div class="edit-section-label">${msg('Nutrition Facts (per serving)')}</div>
             <div class="edit-row-3">
-              ${this._renderField('Calories (kcal)', 'cal', 'number')}
-              ${this._renderField('Protein (g)', 'prot', 'number')}
-              ${this._renderField('Fat (g)', 'fat', 'number')}
+              ${this._renderField(msg('Calories (kcal)'), 'cal', 'number')}
+              ${this._renderField(msg('Protein (g)'), 'prot', 'number')}
+              ${this._renderField(msg('Fat (g)'), 'fat', 'number')}
             </div>
             <div class="edit-row-3">
-              ${this._renderField('Saturated Fat (g)', 'satf', 'number')}
-              ${this._renderField('Carbs (g)', 'carb', 'number')}
-              ${this._renderField('Fiber (g)', 'fib', 'number')}
+              ${this._renderField(msg('Saturated Fat (g)'), 'satf', 'number')}
+              ${this._renderField(msg('Carbs (g)'), 'carb', 'number')}
+              ${this._renderField(msg('Fiber (g)'), 'fib', 'number')}
             </div>
             <div class="edit-row-3">
-              ${this._renderField('Sugar (g)', 'sug', 'number')}
-              ${this._renderField('Sodium (mg)', 'sod', 'number')}
-              ${this._renderField('Cholesterol (mg)', 'chol', 'number')}
+              ${this._renderField(msg('Sugar (g)'), 'sug', 'number')}
+              ${this._renderField(msg('Sodium (mg)'), 'sod', 'number')}
+              ${this._renderField(msg('Cholesterol (mg)'), 'chol', 'number')}
             </div>
 
           </div>
           <div class="edit-footer">
             <button class="action-btn danger-outline" @click=${this._handleDeleteRecipe}
-              title="${this._confirmDelete ? 'Click again to confirm delete' : 'Delete recipe'}">
+              title="${this._confirmDelete ? msg('Click again to confirm delete') : msg('Delete recipe')}">
               <ha-icon icon="${this._confirmDelete ? 'mdi:alert' : 'mdi:trash-can-outline'}"></ha-icon>
-              ${this._confirmDelete ? 'Confirm?' : 'Delete'}
+              ${this._confirmDelete ? msg('Confirm?') : msg('Delete')}
             </button>
             <div class="edit-footer-right">
-              <button class="action-btn" @click=${this._cancelEdit}>Cancel</button>
-              <button class="action-btn primary" @click=${this._saveEdit}>Save</button>
+              <button class="action-btn" @click=${this._cancelEdit}>${msg('Cancel')}</button>
+              <button class="action-btn primary" @click=${this._saveEdit}>${msg('Save')}</button>
             </div>
           </div>
         </div>

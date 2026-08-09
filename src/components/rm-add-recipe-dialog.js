@@ -2,6 +2,7 @@
  * Add Recipe dialog — URL scrape or manual entry.
  */
 import { LitElement, html, css } from 'lit';
+import { msg, str } from '@lit/localize';
 import JSZip from 'jszip';
 
 class RmAddRecipeDialog extends LitElement {
@@ -109,10 +110,10 @@ class RmAddRecipeDialog extends LitElement {
         };
         this._mode = 'manual';
       } else {
-        this._scrapeError = result?.error || 'Could not extract recipe from this URL.';
+        this._scrapeError = result?.error || msg('Could not extract recipe from this URL.');
       }
     } catch (err) {
-      this._scrapeError = err.message || 'Scraping failed.';
+      this._scrapeError = err.message || msg('Scraping failed.');
     } finally {
       this._scraping = false;
     }
@@ -135,14 +136,14 @@ class RmAddRecipeDialog extends LitElement {
       try {
         zip = await JSZip.loadAsync(this._importFile);
       } catch (zipErr) {
-        throw new Error(`Could not open ZIP file: ${zipErr.message}`);
+        throw new Error(msg(str`Could not open ZIP file: ${zipErr.message}`));
       }
 
       const htmlEntry = Object.values(zip.files).find(
         f => !f.dir && f.name.endsWith('.html'),
       );
       if (!htmlEntry) {
-        throw new Error('No HTML file found inside the ZIP — is this a valid Recipe Keeper export?');
+        throw new Error(msg('No HTML file found inside the ZIP — is this a valid Recipe Keeper export?'));
       }
       const htmlContent = await htmlEntry.async('text');
       console.log(`[Recipe Keeper Import] HTML extracted (${htmlContent.length} chars), sending to backend`);
@@ -184,7 +185,7 @@ class RmAddRecipeDialog extends LitElement {
       }
     } catch (err) {
       console.error('[Recipe Keeper Import] Failed:', err);
-      this._importError = err.message || String(err) || 'Import failed.';
+      this._importError = err.message || String(err) || msg('Import failed.');
     } finally {
       this._importing = false;
     }
@@ -308,13 +309,13 @@ class RmAddRecipeDialog extends LitElement {
       <div class="dialog-header">
         <div class="mode-toggle">
           <button class="mode-btn ${this._mode === 'url' ? 'active' : ''}" @click=${() => { this._mode = 'url'; }}>
-            <ha-icon icon="mdi:link-variant"></ha-icon> From URL
+            <ha-icon icon="mdi:link-variant"></ha-icon> ${msg('From URL')}
           </button>
           <button class="mode-btn ${this._mode === 'manual' ? 'active' : ''}" @click=${() => { this._mode = 'manual'; }}>
-            <ha-icon icon="mdi:pencil-outline"></ha-icon> Manual
+            <ha-icon icon="mdi:pencil-outline"></ha-icon> ${msg('Manual')}
           </button>
           <button class="mode-btn ${this._mode === 'import' ? 'active' : ''}" @click=${() => { this._mode = 'import'; }}>
-            <ha-icon icon="mdi:import"></ha-icon> Import
+            <ha-icon icon="mdi:import"></ha-icon> ${msg('Import')}
           </button>
         </div>
         ${!this.inlineMode ? html`<button class="icon-btn" @click=${this._close}><ha-icon icon="mdi:close"></ha-icon></button>` : ''}
@@ -328,7 +329,7 @@ class RmAddRecipeDialog extends LitElement {
 
       ${this._mode === 'manual' ? html`
         <div class="dialog-footer">
-          <button class="action-btn" @click=${this._close}>Cancel</button>
+          <button class="action-btn" @click=${this._close}>${msg('Cancel')}</button>
           <button
             class="action-btn primary"
             ?disabled=${!this._form.name.trim() || this._saving}
@@ -337,7 +338,7 @@ class RmAddRecipeDialog extends LitElement {
             ${this._saving
               ? html`<ha-circular-progress active size="tiny"></ha-circular-progress>`
               : html`<ha-icon icon="mdi:content-save-outline"></ha-icon>`}
-            Save Recipe
+            ${msg('Save Recipe')}
           </button>
         </div>
       ` : ''}
@@ -361,17 +362,17 @@ class RmAddRecipeDialog extends LitElement {
         <div class="import-info">
           <ha-icon icon="mdi:information-outline"></ha-icon>
           <div>
-            <strong>Recipe Keeper import</strong><br/>
-            Export your recipes from the Recipe Keeper app
+            <strong>${msg('Recipe Keeper import')}</strong><br/>
+            ${msg(html`Export your recipes from the Recipe Keeper app
             (<em>Menu → Export → Recipe Keeper File</em>), then select the
             exported <code>.zip</code> file below. Recipe photos will be saved
-            locally if available.
+            locally if available.`)}
           </div>
         </div>
 
         <label class="file-label">
           <ha-icon icon="mdi:file-import-outline"></ha-icon>
-          ${this._importFile ? this._importFile.name : 'Choose .zip file…'}
+          ${this._importFile ? this._importFile.name : msg('Choose .zip file…')}
           <input
             type="file"
             accept=".zip,application/zip"
@@ -386,22 +387,22 @@ class RmAddRecipeDialog extends LitElement {
             ?checked=${this._importDownloadImages}
             @change=${e => { this._importDownloadImages = e.target.checked; }}
           />
-          Save recipe photos locally
+          ${msg('Save recipe photos locally')}
         </label>
 
         ${this._importResult ? html`
           <div class="import-result ${this._importResult.failed > 0 ? 'partial' : 'success'}">
             <ha-icon icon="${this._importResult.failed > 0 ? 'mdi:alert-circle-outline' : 'mdi:check-circle-outline'}"></ha-icon>
             <div>
-              <strong>${this._importResult.imported} recipe${this._importResult.imported !== 1 ? 's' : ''} imported</strong>
-              ${this._importResult.imagesSaved > 0 ? html` with ${this._importResult.imagesSaved} photo${this._importResult.imagesSaved !== 1 ? 's' : ''}` : ''}
-              ${this._importResult.failed > 0 ? html`<br/><small>${this._importResult.failed} failed — check HA logs for details</small>` : ''}
+              <strong>${msg(str`${this._importResult.imported} recipe${this._importResult.imported !== 1 ? 's' : ''} imported`)}</strong>
+              ${this._importResult.imagesSaved > 0 ? html` ${msg(str`with ${this._importResult.imagesSaved} photo${this._importResult.imagesSaved !== 1 ? 's' : ''}`)}` : ''}
+              ${this._importResult.failed > 0 ? html`<br/><small>${msg(str`${this._importResult.failed} failed — check HA logs for details`)}</small>` : ''}
             </div>
           </div>
         ` : this._importError ? html`
           <div class="import-result error">
             <ha-icon icon="mdi:alert-circle-outline"></ha-icon>
-            <div><strong>Import failed</strong><br/><small>${this._importError}</small></div>
+            <div><strong>${msg('Import failed')}</strong><br/><small>${this._importError}</small></div>
           </div>
         ` : ''}
 
@@ -411,8 +412,8 @@ class RmAddRecipeDialog extends LitElement {
           @click=${this._handleImport}
         >
           ${this._importing
-            ? html`<ha-circular-progress active size="tiny"></ha-circular-progress> Importing…`
-            : html`<ha-icon icon="mdi:import"></ha-icon> Import Recipes`}
+            ? html`<ha-circular-progress active size="tiny"></ha-circular-progress> ${msg('Importing…')}`
+            : html`<ha-icon icon="mdi:import"></ha-icon> ${msg('Import Recipes')}`}
         </button>
       </div>
     `;
@@ -423,7 +424,7 @@ class RmAddRecipeDialog extends LitElement {
       <div class="url-mode">
         <div class="url-hint">
           <ha-icon icon="mdi:information-outline"></ha-icon>
-          Paste a recipe URL to automatically extract the recipe details.
+          ${msg('Paste a recipe URL to automatically extract the recipe details.')}
         </div>
         <div class="url-row">
           <input
@@ -442,7 +443,7 @@ class RmAddRecipeDialog extends LitElement {
             ${this._scraping
               ? html`<ha-circular-progress active size="tiny"></ha-circular-progress>`
               : html`<ha-icon icon="mdi:download-outline"></ha-icon>`}
-            Fetch
+            ${msg('Fetch')}
           </button>
         </div>
         ${this._scrapeError ? html`
@@ -451,7 +452,7 @@ class RmAddRecipeDialog extends LitElement {
             ${this._scrapeError}
           </div>
           <button class="action-btn" @click=${() => { this._mode = 'manual'; this._form = { ...this._emptyForm(), source_url: this._url }; }}>
-            Enter manually instead
+            ${msg('Enter manually instead')}
           </button>
         ` : ''}
       </div>
@@ -467,30 +468,30 @@ class RmAddRecipeDialog extends LitElement {
 
         <!-- Name -->
         <div class="field">
-          <label>Recipe Name *</label>
+          <label>${msg('Recipe Name *')}</label>
           <input type="text" .value=${f.name}
             @input=${e => this._setField('name', e.target.value)}
-            placeholder="e.g. Spaghetti Bolognese" />
+            placeholder="${msg('e.g. Spaghetti Bolognese')}" />
         </div>
 
         <!-- Description -->
         <div class="field">
-          <label>Description</label>
+          <label>${msg('Description')}</label>
           <textarea rows="2" .value=${f.description}
             @input=${e => this._setField('description', e.target.value)}
-            placeholder="Short description…"></textarea>
+            placeholder="${msg('Short description…')}"></textarea>
         </div>
 
         <!-- Source URL + Image URL -->
         <div class="field-row">
           <div class="field">
-            <label>Source URL</label>
+            <label>${msg('Source URL')}</label>
             <input type="url" .value=${f.source_url}
               @input=${e => this._setField('source_url', e.target.value)}
               placeholder="https://…" />
           </div>
           <div class="field">
-            <label>Image URL</label>
+            <label>${msg('Image URL')}</label>
             <input type="url" .value=${f.image_url}
               @input=${e => this._setField('image_url', e.target.value)}
               placeholder="https://…/image.jpg" />
@@ -500,17 +501,17 @@ class RmAddRecipeDialog extends LitElement {
         <!-- Times + servings -->
         <div class="field-row-3">
           <div class="field">
-            <label>Prep (min)</label>
+            <label>${msg('Prep (min)')}</label>
             <input type="number" .value=${String(f.prep_time)}
               @input=${e => this._setField('prep_time', e.target.value)} placeholder="15" min="0" />
           </div>
           <div class="field">
-            <label>Cook (min)</label>
+            <label>${msg('Cook (min)')}</label>
             <input type="number" .value=${String(f.cook_time)}
               @input=${e => this._setField('cook_time', e.target.value)} placeholder="30" min="0" />
           </div>
           <div class="field">
-            <label>Servings</label>
+            <label>${msg('Servings')}</label>
             <input type="number" .value=${String(f.servings)}
               @input=${e => this._setField('servings', e.target.value)} placeholder="4" min="1" />
           </div>
@@ -518,7 +519,7 @@ class RmAddRecipeDialog extends LitElement {
 
         <!-- Rating -->
         <div class="field">
-          <label>Rating</label>
+          <label>${msg('Rating')}</label>
           <div class="star-row"
             @mouseleave=${() => { this._ratingHover = 0; }}>
             ${[1,2,3,4,5].map(n => html`
@@ -528,43 +529,43 @@ class RmAddRecipeDialog extends LitElement {
                 @click=${() => this._setField('rating', f.rating === n ? 0 : n)}
               >★</span>
             `)}
-            ${f.rating ? html`<button class="clear-rating" @click=${() => this._setField('rating', 0)}>Clear</button>` : ''}
+            ${f.rating ? html`<button class="clear-rating" @click=${() => this._setField('rating', 0)}>${msg('Clear')}</button>` : ''}
           </div>
         </div>
 
         <!-- Categorisation row -->
         <div class="field">
-          <label>Tags (comma-separated)</label>
+          <label>${msg('Tags (comma-separated)')}</label>
           <input type="text" .value=${f.tags}
             @input=${e => this._setField('tags', e.target.value)}
-            placeholder="quick, weeknight, family" />
+            placeholder="${msg('quick, weeknight, family')}" />
         </div>
 
         <div class="field">
-          <label>Courses (comma-separated)</label>
+          <label>${msg('Courses (comma-separated)')}</label>
           <input type="text" .value=${f.courses}
             @input=${e => this._setField('courses', e.target.value)}
-            placeholder="Dinner, Main Course" />
+            placeholder="${msg('Dinner, Main Course')}" />
         </div>
 
         <div class="field-row">
           <div class="field">
-            <label>Categories (comma-separated)</label>
+            <label>${msg('Categories (comma-separated)')}</label>
             <input type="text" .value=${f.categories}
               @input=${e => this._setField('categories', e.target.value)}
-              placeholder="Italian, Gluten Free" />
+              placeholder="${msg('Italian, Gluten Free')}" />
           </div>
           <div class="field">
-            <label>Collections (comma-separated)</label>
+            <label>${msg('Collections (comma-separated)')}</label>
             <input type="text" .value=${f.collections}
               @input=${e => this._setField('collections', e.target.value)}
-              placeholder="30 Minutes, Summer" />
+              placeholder="${msg('30 Minutes, Summer')}" />
           </div>
         </div>
 
         <!-- Ingredients -->
         <div class="field">
-          <label>Ingredients (${f.ingredients.length})</label>
+          <label>${msg(str`Ingredients (${f.ingredients.length})`)}</label>
           ${f.ingredients.length ? html`
             <ul class="ing-list">
               ${f.ingredients.map((ing, i) => html`
@@ -587,24 +588,24 @@ class RmAddRecipeDialog extends LitElement {
               .value=${this._ingredientInput}
               @input=${e => { this._ingredientInput = e.target.value; }}
               @keydown=${e => { if (e.key === 'Enter') this._addIngredient(); }}
-              placeholder='e.g. "2 cups flour", "salt", or "# Section"'
+              placeholder='${msg('e.g. "2 cups flour", "salt", or "# Section"')}'
             />
-            <button class="action-btn sm" @click=${this._addIngredient}>Add</button>
+            <button class="action-btn sm" @click=${this._addIngredient}>${msg('Add')}</button>
           </div>
           <div class="bulk-hint">
-            Tip: Use <code>#Section Name</code> to add a section header. Or paste multiple lines at once:
+            ${msg(html`Tip: Use <code>#Section Name</code> to add a section header. Or paste multiple lines at once:`)}
             <button class="action-btn sm bulk-btn" @click=${() => {
-              const text = prompt('Paste ingredients (one per line, use # for headers):');
+              const text = prompt(msg('Paste ingredients (one per line, use # for headers):'));
               if (text) this._addIngredientsBulk(text);
             }}>
-              <ha-icon icon="mdi:text-box-multiple-outline"></ha-icon> Bulk paste
+              <ha-icon icon="mdi:text-box-multiple-outline"></ha-icon> ${msg('Bulk paste')}
             </button>
           </div>
         </div>
 
         <!-- Directions -->
         <div class="field">
-          <label>Directions (${f.instructions.length} steps)</label>
+          <label>${msg(str`Directions (${f.instructions.length} steps)`)}</label>
           ${f.instructions.length ? html`
             <ol class="steps-edit">
               ${f.instructions.map((step, i) => html`
@@ -621,73 +622,73 @@ class RmAddRecipeDialog extends LitElement {
             <textarea
               rows="2"
               @keydown=${e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this._addStep(e.target.value); e.target.value = ''; } }}
-              placeholder="Type a step, press Enter to add…"
+              placeholder="${msg('Type a step, press Enter to add…')}"
             ></textarea>
             <button class="action-btn sm" @click=${e => {
               const ta = e.target.closest('.add-row').querySelector('textarea');
               this._addStep(ta.value);
               ta.value = '';
-            }}>Add</button>
+            }}>${msg('Add')}</button>
           </div>
         </div>
 
         <!-- Notes -->
         <div class="field">
-          <label>Notes</label>
+          <label>${msg('Notes')}</label>
           <textarea rows="2" .value=${f.notes}
             @input=${e => this._setField('notes', e.target.value)}
-            placeholder="Variations, tips…"></textarea>
+            placeholder="${msg('Variations, tips…')}"></textarea>
         </div>
 
         <!-- Nutrition -->
-        <div class="section-divider">Nutrition Facts (per serving — optional)</div>
+        <div class="section-divider">${msg('Nutrition Facts (per serving — optional)')}</div>
         <div class="field-row-3">
           <div class="field">
-            <label>Calories (kcal)</label>
+            <label>${msg('Calories (kcal)')}</label>
             <input type="number" .value=${String(f.cal)}
               @input=${e => this._setField('cal', e.target.value)} placeholder="0" min="0" />
           </div>
           <div class="field">
-            <label>Protein (g)</label>
+            <label>${msg('Protein (g)')}</label>
             <input type="number" .value=${String(f.prot)}
               @input=${e => this._setField('prot', e.target.value)} placeholder="0" min="0" />
           </div>
           <div class="field">
-            <label>Fat (g)</label>
+            <label>${msg('Fat (g)')}</label>
             <input type="number" .value=${String(f.fat)}
               @input=${e => this._setField('fat', e.target.value)} placeholder="0" min="0" />
           </div>
         </div>
         <div class="field-row-3">
           <div class="field">
-            <label>Saturated Fat (g)</label>
+            <label>${msg('Saturated Fat (g)')}</label>
             <input type="number" .value=${String(f.satf)}
               @input=${e => this._setField('satf', e.target.value)} placeholder="0" min="0" />
           </div>
           <div class="field">
-            <label>Carbohydrates (g)</label>
+            <label>${msg('Carbohydrates (g)')}</label>
             <input type="number" .value=${String(f.carb)}
               @input=${e => this._setField('carb', e.target.value)} placeholder="0" min="0" />
           </div>
           <div class="field">
-            <label>Dietary Fiber (g)</label>
+            <label>${msg('Dietary Fiber (g)')}</label>
             <input type="number" .value=${String(f.fib)}
               @input=${e => this._setField('fib', e.target.value)} placeholder="0" min="0" />
           </div>
         </div>
         <div class="field-row-3">
           <div class="field">
-            <label>Sugars (g)</label>
+            <label>${msg('Sugars (g)')}</label>
             <input type="number" .value=${String(f.sug)}
               @input=${e => this._setField('sug', e.target.value)} placeholder="0" min="0" />
           </div>
           <div class="field">
-            <label>Sodium (mg)</label>
+            <label>${msg('Sodium (mg)')}</label>
             <input type="number" .value=${String(f.sod)}
               @input=${e => this._setField('sod', e.target.value)} placeholder="0" min="0" />
           </div>
           <div class="field">
-            <label>Cholesterol (mg)</label>
+            <label>${msg('Cholesterol (mg)')}</label>
             <input type="number" .value=${String(f.chol)}
               @input=${e => this._setField('chol', e.target.value)} placeholder="0" min="0" />
           </div>

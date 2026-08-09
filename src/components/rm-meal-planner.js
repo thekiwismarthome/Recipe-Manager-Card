@@ -2,14 +2,15 @@
  * Weekly meal planner view.
  */
 import { LitElement, html, css } from 'lit';
+import { msg, str } from '@lit/localize';
 
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
-const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 class RmMealPlanner extends LitElement {
   static properties = {
     api: { type: Object },
     recipes: { type: Array },
+    settings: { type: Object },
     fromRecipe: { type: Object },    // recipe to return to (set when navigated from recipe detail)
     _weekStart: { type: String },    // ISO date string YYYY-MM-DD (Monday)
     _plan: { type: Array },          // MealPlanEntry[]
@@ -24,6 +25,7 @@ class RmMealPlanner extends LitElement {
     super();
     this.api = null;
     this.recipes = [];
+    this.settings = {};
     this.fromRecipe = null;
     this._plan = [];
     this._loading = false;
@@ -65,7 +67,12 @@ class RmMealPlanner extends LitElement {
 
   _formatMonthYear(isoDate) {
     const d = new Date(isoDate + 'T00:00:00Z');
-    return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    return d.toLocaleDateString(this.settings?.language || 'en', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  }
+
+  _formatDayName(isoDate) {
+    const d = new Date(isoDate + 'T00:00:00Z');
+    return d.toLocaleDateString(this.settings?.language || 'en', { weekday: 'short', timeZone: 'UTC' });
   }
 
   _prevWeek() {
@@ -135,6 +142,16 @@ class RmMealPlanner extends LitElement {
     }));
   }
 
+  _mealTypeLabel(mealType) {
+    switch (mealType) {
+      case 'breakfast': return msg('Breakfast');
+      case 'lunch': return msg('Lunch');
+      case 'dinner': return msg('Dinner');
+      case 'snack': return msg('Snack');
+      default: return mealType;
+    }
+  }
+
   get _pickerFiltered() {
     const q = this._pickerSearch.trim().toLowerCase();
     if (!q) return this.recipes;
@@ -154,7 +171,7 @@ class RmMealPlanner extends LitElement {
           <div class="back-to-recipe">
             <button class="back-recipe-btn" @click=${() => this.dispatchEvent(new CustomEvent('rm-back-to-recipe', { bubbles: true, composed: true }))}>
               <ha-icon icon="mdi:arrow-left"></ha-icon>
-              <span>Back to ${this.fromRecipe.name}</span>
+              <span>${msg(str`Back to ${this.fromRecipe.name}`)}</span>
             </button>
           </div>
         ` : ''}
@@ -165,8 +182,8 @@ class RmMealPlanner extends LitElement {
           </button>
           <div class="week-label">
             <span class="week-month">${this._formatMonthYear(this._weekStart)}</span>
-            ${this._isCurrentWeek() ? html`<span class="today-badge">This week</span>` : html`
-              <button class="text-link" @click=${() => { this._weekStart = this._getMondayISO(new Date()); }}>Today</button>
+            ${this._isCurrentWeek() ? html`<span class="today-badge">${msg('This week')}</span>` : html`
+              <button class="text-link" @click=${() => { this._weekStart = this._getMondayISO(new Date()); }}>${msg('Today')}</button>
             `}
           </div>
           <button class="nav-btn" @click=${this._nextWeek}>
@@ -176,9 +193,9 @@ class RmMealPlanner extends LitElement {
 
         <!-- Day headers -->
         <div class="day-headers">
-          ${days.map((date, i) => html`
+          ${days.map(date => html`
             <div class="day-header ${date === today ? 'today' : ''}">
-              <span class="day-name">${DAY_NAMES[i]}</span>
+              <span class="day-name">${this._formatDayName(date)}</span>
               <span class="day-num">${this._formatDisplayDate(date)}</span>
             </div>
           `)}
@@ -191,7 +208,7 @@ class RmMealPlanner extends LitElement {
           ` : html`
             ${MEAL_TYPES.map(mealType => html`
               <div class="meal-row">
-                <div class="meal-label">${mealType.charAt(0).toUpperCase() + mealType.slice(1)}</div>
+                <div class="meal-label">${this._mealTypeLabel(mealType)}</div>
                 <div class="meal-cells">
                   ${days.map(date => {
                     const entries = this._getEntriesForSlot(date, mealType);
@@ -206,7 +223,7 @@ class RmMealPlanner extends LitElement {
                               ` : html`
                                 <div class="entry-thumb entry-placeholder"><ha-icon icon="mdi:food"></ha-icon></div>
                               `}
-                              <span class="entry-name">${recipe?.name ?? 'Unknown'}</span>
+                              <span class="entry-name">${recipe?.name ?? msg('Unknown')}</span>
                               ${entry.servings && entry.servings !== 1 ? html`
                                 <span class="entry-servings">×${entry.servings}</span>
                               ` : ''}
@@ -235,7 +252,7 @@ class RmMealPlanner extends LitElement {
             <div class="clear-row">
               <button class="text-danger-btn" @click=${this._handleClearWeek}>
                 <ha-icon icon="mdi:calendar-remove-outline"></ha-icon>
-                Clear this week
+                ${msg('Clear this week')}
               </button>
             </div>
           ` : ''}
@@ -253,11 +270,11 @@ class RmMealPlanner extends LitElement {
       <div class="picker-overlay" @click=${(e) => { if (e.target === e.currentTarget) this._showPicker = false; }}>
         <div class="picker-panel">
           <div class="picker-header">
-            <span>Add to ${target.mealType}</span>
+            <span>${msg(str`Add to ${this._mealTypeLabel(target.mealType)}`)}</span>
             <button class="icon-btn" @click=${() => { this._showPicker = false; }}><ha-icon icon="mdi:close"></ha-icon></button>
           </div>
           <div class="picker-servings-row">
-            <span class="picker-label">Servings:</span>
+            <span class="picker-label">${msg('Servings:')}</span>
             <div class="servings-ctrl">
               <button class="scaler-btn" @click=${() => { if (this._pickerServings > 1) this._pickerServings--; }}>
                 <ha-icon icon="mdi:minus"></ha-icon>
@@ -273,14 +290,14 @@ class RmMealPlanner extends LitElement {
             <input
               type="text"
               class="picker-search"
-              placeholder="Search recipes…"
+              placeholder="${msg('Search recipes…')}"
               .value=${this._pickerSearch}
               @input=${e => { this._pickerSearch = e.target.value; }}
             />
           </div>
           <div class="picker-list">
             ${this._pickerFiltered.length === 0 ? html`
-              <div class="picker-empty">No recipes found</div>
+              <div class="picker-empty">${msg('No recipes found')}</div>
             ` : this._pickerFiltered.map(recipe => html`
               <div class="picker-item" @click=${() => this._handlePickRecipe(recipe)}>
                 ${recipe.image_url ? html`

@@ -5,6 +5,7 @@
  * Falls back to a simple local list when SLM is not installed.
  */
 import { LitElement, html, css } from 'lit';
+import { msg } from '@lit/localize';
 
 class RmShoppingView extends LitElement {
   static properties = {
@@ -153,16 +154,16 @@ class RmShoppingView extends LitElement {
 
     return html`
       <div class="sv-header">
-        <span class="sv-list-name">My Shopping List</span>
+        <span class="sv-list-name">${msg('My Shopping List')}</span>
         <div class="sv-actions">
           ${hasChecked ? html`
             <button class="sv-btn danger" @click=${this._clearLocalChecked}>
               <ha-icon icon="mdi:delete-sweep-outline"></ha-icon>
-              <span>Clear checked</span>
+              <span>${msg('Clear checked')}</span>
             </button>
           ` : ''}
           ${this.localItems.length ? html`
-            <button class="sv-btn" @click=${this._clearAllLocal} title="Clear all">
+            <button class="sv-btn" @click=${this._clearAllLocal} title=${msg('Clear all')}>
               <ha-icon icon="mdi:delete-outline"></ha-icon>
             </button>
           ` : ''}
@@ -172,22 +173,22 @@ class RmShoppingView extends LitElement {
       <div class="sv-install-banner">
         <ha-icon icon="mdi:information-outline"></ha-icon>
         <div class="sv-install-text">
-          <strong>Get more features with Shopping List Manager</strong>
-          <span>Install the Shopping List Manager HACS integration for shared lists, categories, and sync.</span>
+          <strong>${msg('Get more features with Shopping List Manager')}</strong>
+          <span>${msg('Install the Shopping List Manager HACS integration for shared lists, categories, and sync.')}</span>
         </div>
       </div>
 
       ${this.localItems.length === 0 ? html`
         <div class="sv-empty">
           <ha-icon icon="mdi:cart-outline"></ha-icon>
-          <p>Your shopping list is empty.</p>
-          <p class="sv-hint">Add ingredients from any recipe to get started.</p>
+          <p>${msg('Your shopping list is empty.')}</p>
+          <p class="sv-hint">${msg('Add ingredients from any recipe to get started.')}</p>
         </div>
       ` : html`
         <div class="sv-items">
           ${unchecked.map(item => this._renderLocalRow(item))}
           ${checked.length ? html`
-            <div class="sv-divider-label">Checked</div>
+            <div class="sv-divider-label">${msg('Checked')}</div>
             ${checked.map(item => this._renderLocalRow(item))}
           ` : ''}
         </div>

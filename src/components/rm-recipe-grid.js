@@ -3,6 +3,7 @@
  * In wide (tablet/desktop) mode the search bar is hidden (it lives in the sidebar).
  */
 import { LitElement, html, css } from 'lit';
+import { msg, str } from '@lit/localize';
 
 class RmRecipeGrid extends LitElement {
   static properties = {
@@ -245,7 +246,7 @@ class RmRecipeGrid extends LitElement {
           <button
             class="fav-btn ${recipe.is_favourite ? 'active' : ''}"
             @click=${(e) => this._handleToggleFavourite(e, recipe)}
-            title="${recipe.is_favourite ? 'Remove from favourites' : 'Add to favourites'}"
+            title="${recipe.is_favourite ? msg('Remove from favourites') : msg('Add to favourites')}"
           >
             <ha-icon icon="${recipe.is_favourite ? 'mdi:heart' : 'mdi:heart-outline'}"></ha-icon>
           </button>
@@ -278,17 +279,17 @@ class RmRecipeGrid extends LitElement {
   _renderRatingMenu() {
     return html`
       <div class="rating-menu" @click=${e => e.stopPropagation()}>
-        <div class="rating-menu-section">Filter by rating</div>
+        <div class="rating-menu-section">${msg('Filter by rating')}</div>
         ${[0,1,2,3,4,5].map(n => html`
           <button class="rating-menu-item ${this._starFilter === n ? 'active' : ''}"
             @click=${() => { this._starFilter = n; this._showRatingMenu = false; }}>
-            ${n === 0 ? 'All ratings' : html`${'★'.repeat(n)}${'☆'.repeat(5-n)} ${n}+`}
+            ${n === 0 ? msg('All ratings') : msg(str`${'★'.repeat(n)}${'☆'.repeat(5-n)} ${n}+`)}
           </button>
         `)}
-        <div class="rating-menu-section" style="margin-top:6px">Sort</div>
+        <div class="rating-menu-section" style="margin-top:6px">${msg('Sort')}</div>
         <button class="rating-menu-item ${this._sortByRating ? 'active' : ''}"
           @click=${() => { this._sortByRating = !this._sortByRating; this._showRatingMenu = false; }}>
-          ${this._sortByRating ? '✓ ' : ''}Sort by rating
+          ${msg(str`${this._sortByRating ? '✓ ' : ''}Sort by rating`)}
         </button>
       </div>
     `;
@@ -312,7 +313,7 @@ class RmRecipeGrid extends LitElement {
               <input
                 type="text"
                 class="search-input"
-                placeholder="Search recipes…"
+                placeholder="${msg('Search recipes…')}"
                 .value=${this.searchQuery}
                 @input=${this._handleSearchInput}
               />
@@ -330,12 +331,12 @@ class RmRecipeGrid extends LitElement {
           <div class="filter-tabs-row">
             <div class="filter-tabs">
               ${[
-                ['all',         'mdi:view-grid',           'All',         null],
-                ['courses',     'mdi:silverware-fork-knife','Courses',    '_selectedCourses'],
-                ['categories',  'mdi:tag-multiple-outline', 'Categories', '_selectedCategories'],
-                ['collections', 'mdi:folder-multiple-outline', 'Collections', '_selectedCollections'],
-                ['favourites',  'mdi:heart-outline',        'Favourites', null],
-                ['recent',      'mdi:history',              'Recent',     null],
+                ['all',         'mdi:view-grid',           msg('All'),         null],
+                ['courses',     'mdi:silverware-fork-knife',msg('Courses'),    '_selectedCourses'],
+                ['categories',  'mdi:tag-multiple-outline', msg('Categories'), '_selectedCategories'],
+                ['collections', 'mdi:folder-multiple-outline', msg('Collections'), '_selectedCollections'],
+                ['favourites',  'mdi:heart-outline',        msg('Favourites'), null],
+                ['recent',      'mdi:history',              msg('Recent'),     null],
               ].map(([mode, icon, label, badgeKey]) => html`
                 <button
                   class="filter-tab ${this._filterMode === mode ? 'active' : ''}"
@@ -359,7 +360,7 @@ class RmRecipeGrid extends LitElement {
               <button
                 class="rating-filter-btn ${hasActiveFilter ? 'active' : ''}"
                 @click=${(e) => { e.stopPropagation(); this._showRatingMenu = !this._showRatingMenu; }}
-                title="Filter/sort by rating"
+                title="${msg('Filter/sort by rating')}"
               >
                 <ha-icon icon="mdi:filter-menu-outline"></ha-icon>
                 ${hasActiveFilter ? html`<span class="rating-filter-badge"></span>` : ''}
@@ -373,7 +374,7 @@ class RmRecipeGrid extends LitElement {
         ${this.hideSidebar && this._filterMode === 'courses' && this._allCourses.length ? html`
           <div class="sub-filter-row">
             <button class="sub-chip ${!this._selectedCourses.size ? 'active' : ''}"
-              @click=${() => { this._selectedCourses = new Set(); }}>All</button>
+              @click=${() => { this._selectedCourses = new Set(); }}>${msg('All')}</button>
             ${this._allCourses.map(c => html`
               <button
                 class="sub-chip ${this._selectedCourses.has(c) ? 'active' : ''}"
@@ -385,7 +386,7 @@ class RmRecipeGrid extends LitElement {
         ${this.hideSidebar && this._filterMode === 'categories' && this._allCategories.length ? html`
           <div class="sub-filter-row">
             <button class="sub-chip ${!this._selectedCategories.size ? 'active' : ''}"
-              @click=${() => { this._selectedCategories = new Set(); }}>All</button>
+              @click=${() => { this._selectedCategories = new Set(); }}>${msg('All')}</button>
             ${this._allCategories.map(c => html`
               <button
                 class="sub-chip ${this._selectedCategories.has(c) ? 'active' : ''}"
@@ -397,7 +398,7 @@ class RmRecipeGrid extends LitElement {
         ${this.hideSidebar && this._filterMode === 'collections' && this._allCollections.length ? html`
           <div class="sub-filter-row">
             <button class="sub-chip ${!this._selectedCollections.size ? 'active' : ''}"
-              @click=${() => { this._selectedCollections = new Set(); }}>All</button>
+              @click=${() => { this._selectedCollections = new Set(); }}>${msg('All')}</button>
             ${this._allCollections.map(c => html`
               <button
                 class="sub-chip ${this._selectedCollections.has(c) ? 'active' : ''}"
@@ -422,10 +423,10 @@ class RmRecipeGrid extends LitElement {
         <!-- Active filter hint -->
         ${hasActiveFilter ? html`
           <div class="active-filter-bar">
-            ${this._starFilter > 0 ? html`<span>⭐ ${this._starFilter}+ stars</span>` : ''}
-            ${this._sortByRating ? html`<span>Sorted by rating</span>` : ''}
+            ${this._starFilter > 0 ? html`<span>${msg(str`⭐ ${this._starFilter}+ stars`)}</span>` : ''}
+            ${this._sortByRating ? html`<span>${msg('Sorted by rating')}</span>` : ''}
             <button class="clear-filter-btn" @click=${() => { this._starFilter = 0; this._sortByRating = false; }}>
-              <ha-icon icon="mdi:close"></ha-icon> Clear
+              <ha-icon icon="mdi:close"></ha-icon> ${msg('Clear')}
             </button>
           </div>
         ` : ''}
@@ -436,22 +437,22 @@ class RmRecipeGrid extends LitElement {
             <div class="empty-state">
               <ha-icon icon="mdi:pot-steam-outline"></ha-icon>
               <p>${this.searchQuery || this.activeTag
-                ? 'No matching recipes'
+                ? msg('No matching recipes')
                 : this._starFilter > 0
-                  ? `No recipes with ${this._starFilter}+ stars`
+                  ? msg(str`No recipes with ${this._starFilter}+ stars`)
                   : this._filterMode === 'favourites'
-                    ? 'No favourites yet — heart a recipe!'
+                    ? msg('No favourites yet — heart a recipe!')
                     : this._filterMode === 'recent'
-                      ? 'No recently viewed recipes yet.'
-                      : 'No recipes yet — add one!'}</p>
+                      ? msg('No recently viewed recipes yet.')
+                      : msg('No recipes yet — add one!')}</p>
             </div>
           ` : html`
             ${showFavSection && favourites.length ? html`
-              <div class="section-label">Favourites</div>
+              <div class="section-label">${msg('Favourites')}</div>
               <div class="recipe-grid" style=${gridStyle}>
                 ${favourites.map(r => this._renderRecipeCard(r))}
               </div>
-              ${mainList.length ? html`<div class="section-label">All Recipes</div>` : ''}
+              ${mainList.length ? html`<div class="section-label">${msg('All Recipes')}</div>` : ''}
             ` : ''}
 
             <div class="recipe-grid" style=${gridStyle}>
