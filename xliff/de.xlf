@@ -1,0 +1,1054 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2">
+<file target-language="de" source-language="en" original="lit-localize-inputs" datatype="plaintext">
+<body>
+<trans-unit id="sddf90a7110035129">
+  <source>Could not extract recipe from this URL.</source>
+<target>Das Rezept konnte nicht von dieser URL extrahiert werden.</target></trans-unit>
+<trans-unit id="s1f3bd7022bb5cb2f">
+  <source>Scraping failed.</source>
+<target>Abruf fehlgeschlagen.</target></trans-unit>
+<trans-unit id="s6eb0113ec2f58804">
+  <source>Could not open ZIP file: <x id="0" equiv-text="${zipErr.message}" /></source>
+<target>ZIP-Datei konnte nicht geöffnet werden:<x id="0" equiv-text="${zipErr.message}" /></target></trans-unit>
+<trans-unit id="sbd4f00eb8325d8ab">
+  <source>No HTML file found inside the ZIP — is this a valid Recipe Keeper export?</source>
+<target>Keine HTML-Datei in der ZIP-Datei gefunden — ist dies ein gültiger Recipe-Keeper-Export?</target></trans-unit>
+<trans-unit id="s04276373b0793a0d">
+  <source>Import failed.</source>
+<target>Import fehlgeschlagen.</target></trans-unit>
+<trans-unit id="s253ee83729f802a8">
+  <source>From URL</source>
+<target>Von URL</target></trans-unit>
+<trans-unit id="s956c5a9fb7ee0b23">
+  <source>Manual</source>
+<target>Manuell</target></trans-unit>
+<trans-unit id="s3914cb410fca44d4">
+  <source>Import</source>
+<target>Importieren</target></trans-unit>
+<trans-unit id="s0ab116a5e6f25716">
+  <source>Save Recipe</source>
+<target>Rezept speichern</target></trans-unit>
+<trans-unit id="sadef1b8fdf53b714">
+  <source>Recipe Keeper import</source>
+<target>Recipe-Keeper-Import</target></trans-unit>
+<trans-unit id="h2524401dbaa32c2b">
+  <source>Export your recipes from the Recipe Keeper app
+            (<x id="0" equiv-text="&lt;em&gt;" />Menu → Export → Recipe Keeper File<x id="1" equiv-text="&lt;/em&gt;" />), then select the
+            exported <x id="2" equiv-text="&lt;code&gt;" />.zip<x id="3" equiv-text="&lt;/code&gt;" /> file below. Recipe photos will be saved
+            locally if available.</source>
+<target>Exportieren Sie Ihre Rezepte aus der Recipe-Keeper-App (<x id="0" equiv-text="&lt;em&gt;" />Menü → Exportieren → Recipe-Keeper-Datei<x id="1" equiv-text="&lt;/em&gt;" />) und wählen Sie dann unten die exportierte<x id="2" equiv-text="&lt;code&gt;" />.zip<x id="3" equiv-text="&lt;/code&gt;" />-Datei aus. Rezeptfotos werden, falls verfügbar, lokal gespeichert.</target></trans-unit>
+<trans-unit id="sd4009850f9c531e1">
+  <source>Choose .zip file…</source>
+<target>ZIP-Datei auswählen…</target></trans-unit>
+<trans-unit id="s7490f2b2ded8abe3">
+  <source>Save recipe photos locally</source>
+<target>Rezeptfotos lokal speichern</target></trans-unit>
+<trans-unit id="scf023cd4556297e3">
+  <source><x id="0" equiv-text="${this._importResult.imported}" /> recipe<x id="1" equiv-text="${this._importResult.imported !== 1 ? 's' : ''}" /> imported</source>
+<target><x id="0" equiv-text="${this._importResult.imported}" />Rezept<x id="1" equiv-text="${this._importResult.imported !== 1 ? 's' : ''}" />importiert</target></trans-unit>
+<trans-unit id="sfdc8508b5a2d671f">
+  <source>with <x id="0" equiv-text="${this._importResult.imagesSaved}" /> photo<x id="1" equiv-text="${this._importResult.imagesSaved !== 1 ? 's' : ''}" /></source>
+<target>mit<x id="0" equiv-text="${this._importResult.imagesSaved}" />Foto<x id="1" equiv-text="${this._importResult.imagesSaved !== 1 ? 's' : ''}" /></target></trans-unit>
+<trans-unit id="s210325e7d8ea04c1">
+  <source><x id="0" equiv-text="${this._importResult.failed}" /> failed — check HA logs for details</source>
+<target><x id="0" equiv-text="${this._importResult.failed}" />fehlgeschlagen — Details siehe HA-Protokolle</target></trans-unit>
+<trans-unit id="se7925be404867511">
+  <source>Import failed</source>
+<target>Import fehlgeschlagen</target></trans-unit>
+<trans-unit id="s99d05b52dd4b3346">
+  <source>Importing…</source>
+<target>Wird importiert…</target></trans-unit>
+<trans-unit id="saa715b292ec8d14b">
+  <source>Import Recipes</source>
+<target>Rezepte importieren</target></trans-unit>
+<trans-unit id="sd875feec826523ae">
+  <source>Paste a recipe URL to automatically extract the recipe details.</source>
+<target>Fügen Sie eine Rezept-URL ein, um die Rezeptdetails automatisch zu extrahieren.</target></trans-unit>
+<trans-unit id="s12b427464794ca03">
+  <source>Fetch</source>
+<target>Abrufen</target></trans-unit>
+<trans-unit id="s8e0c116ff246f3fc">
+  <source>Enter manually instead</source>
+<target>Stattdessen manuell eingeben</target></trans-unit>
+<trans-unit id="s26615772986bc110">
+  <source>Recipe Name *</source>
+<target>Rezeptname *</target></trans-unit>
+<trans-unit id="s1f1a4a2fa138b546">
+  <source>e.g. Spaghetti Bolognese</source>
+<target>z. B. Spaghetti Bolognese</target></trans-unit>
+<trans-unit id="se8d1d04fbb3e847f">
+  <source>Short description…</source>
+<target>Kurze Beschreibung…</target></trans-unit>
+<trans-unit id="se09e3dc382fe557f">
+  <source>Image URL</source>
+<target>Bild-URL</target></trans-unit>
+<trans-unit id="sacde98700eb9e170">
+  <source>Tags (comma-separated)</source>
+<target>Tags (durch Komma getrennt)</target></trans-unit>
+<trans-unit id="sd8c35351d45b446a">
+  <source>quick, weeknight, family</source>
+<target>schnell, Wochentag, Familie</target></trans-unit>
+<trans-unit id="scf62d80aa79075f5">
+  <source>Courses (comma-separated)</source>
+<target>Gänge (durch Komma getrennt)</target></trans-unit>
+<trans-unit id="sc94fede870e1d521">
+  <source>Dinner, Main Course</source>
+<target>Abendessen, Hauptgericht</target></trans-unit>
+<trans-unit id="s08d9a3a610035201">
+  <source>Categories (comma-separated)</source>
+<target>Kategorien (durch Komma getrennt)</target></trans-unit>
+<trans-unit id="s5e3202dbf4c8e8d4">
+  <source>Italian, Gluten Free</source>
+<target>Italienisch, Glutenfrei</target></trans-unit>
+<trans-unit id="s98ba4831e912361e">
+  <source>Collections (comma-separated)</source>
+<target>Sammlungen (durch Komma getrennt)</target></trans-unit>
+<trans-unit id="sa9dd16bea4a5cce2">
+  <source>30 Minutes, Summer</source>
+<target>30 Minuten, Sommer</target></trans-unit>
+<trans-unit id="se5b5e7a372d13fdb">
+  <source>e.g. "2 cups flour", "salt", or "# Section"</source>
+<target>z. B. „2 Tassen Mehl", „Salz" oder „# Abschnitt"</target></trans-unit>
+<trans-unit id="h3518038de78dd829">
+  <source>Tip: Use <x id="0" equiv-text="&lt;code&gt;" />#Section Name<x id="1" equiv-text="&lt;/code&gt;" /> to add a section header. Or paste multiple lines at once:</source>
+<target>Tipp: Verwenden Sie<x id="0" equiv-text="&lt;code&gt;" />#Abschnittsname<x id="1" equiv-text="&lt;/code&gt;" />, um eine Abschnittsüberschrift hinzuzufügen. Oder fügen Sie mehrere Zeilen gleichzeitig ein:</target></trans-unit>
+<trans-unit id="s2a6b0c01d26e7ce1">
+  <source>Paste ingredients (one per line, use # for headers):</source>
+<target>Zutaten einfügen (eine pro Zeile, # für Überschriften verwenden):</target></trans-unit>
+<trans-unit id="s9958a12f019ef1ba">
+  <source>Bulk paste</source>
+<target>Massenweise einfügen</target></trans-unit>
+<trans-unit id="sf9e00faffe18e561">
+  <source>Variations, tips…</source>
+<target>Variationen, Tipps…</target></trans-unit>
+<trans-unit id="sd9cee22d262f21e0">
+  <source>Nutrition Facts (per serving — optional)</source>
+<target>Nährwertangaben (pro Portion — optional)</target></trans-unit>
+<trans-unit id="sfdca302f59a1ecfe">
+  <source>Carbohydrates (g)</source>
+<target>Kohlenhydrate (g)</target></trans-unit>
+<trans-unit id="sce6a56f7d2fdefb5">
+  <source>Dietary Fiber (g)</source>
+<target>Ballaststoffe (g)</target></trans-unit>
+<trans-unit id="sb0e43be9c668c33a">
+  <source>Sugars (g)</source>
+<target>Zucker (g)</target></trans-unit>
+<trans-unit id="s2c6c774b530d7426">
+  <source>Breakfast</source>
+<target>Frühstück</target></trans-unit>
+<trans-unit id="sb007f09e8a9e9ebf">
+  <source>Lunch</source>
+<target>Mittagessen</target></trans-unit>
+<trans-unit id="s1c270e703190d69d">
+  <source>Dinner</source>
+<target>Abendessen</target></trans-unit>
+<trans-unit id="s6f513fc05a80f46d">
+  <source>Snack</source>
+<target>Snack</target></trans-unit>
+<trans-unit id="se5784a16a6799dad">
+  <source>Back to <x id="0" equiv-text="${this.fromRecipe.name}" /></source>
+<target>Zurück zu<x id="0" equiv-text="${this.fromRecipe.name}" /></target></trans-unit>
+<trans-unit id="s1a7d1a91f4212c93">
+  <source>This week</source>
+<target>Diese Woche</target></trans-unit>
+<trans-unit id="s63d040e37887f17e">
+  <source>Today</source>
+<target>Heute</target></trans-unit>
+<trans-unit id="sc592307ea80f16b9">
+  <source>Unknown</source>
+<target>Unbekannt</target></trans-unit>
+<trans-unit id="s589641982079b4d6">
+  <source>Clear this week</source>
+<target>Diese Woche leeren</target></trans-unit>
+<trans-unit id="s820b6333ec24ea43">
+  <source>Add to <x id="0" equiv-text="${this._mealTypeLabel(target.mealType)}" /></source>
+<target>Zu<x id="0" equiv-text="${this._mealTypeLabel(target.mealType)}" />hinzufügen</target></trans-unit>
+<trans-unit id="sc0b25c91cbb377f2">
+  <source>Servings:</source>
+<target>Portionen:</target></trans-unit>
+<trans-unit id="s170dc2fa0a4bdce9">
+  <source>No recipes found</source>
+<target>Keine Rezepte gefunden</target></trans-unit>
+<trans-unit id="se8e1938ba7dafac1">
+  <source>Calories</source>
+<target>Kalorien</target></trans-unit>
+<trans-unit id="s8b9e7e9f19f292a6">
+  <source>Total Fat</source>
+<target>Fett gesamt</target></trans-unit>
+<trans-unit id="sb1eb28c34791cfa7">
+  <source>Saturated Fat</source>
+<target>Gesättigte Fettsäuren</target></trans-unit>
+<trans-unit id="sd1eb69e7334d6cf7">
+  <source>Cholesterol</source>
+<target>Cholesterin</target></trans-unit>
+<trans-unit id="s624af2c4ec9f1ae6">
+  <source>Sodium</source>
+<target>Natrium</target></trans-unit>
+<trans-unit id="sa06e74a81e1a89bf">
+  <source>Total Carbohydrate</source>
+<target>Kohlenhydrate gesamt</target></trans-unit>
+<trans-unit id="sb5d2469e4792f9ed">
+  <source>Dietary Fiber</source>
+<target>Ballaststoffe</target></trans-unit>
+<trans-unit id="s2f88a06dd472142c">
+  <source>Total Sugars</source>
+<target>Zucker gesamt</target></trans-unit>
+<trans-unit id="s94666bc4392af2e0">
+  <source>Protein</source>
+<target>Eiweiß</target></trans-unit>
+<trans-unit id="sf4327babafe301c4">
+  <source>Added Sugars</source>
+<target>Zugesetzter Zucker</target></trans-unit>
+<trans-unit id="s44add38a493e53a5">
+  <source><x id="0" equiv-text="${minutes}" /> min</source>
+<target><x id="0" equiv-text="${minutes}" />Min.</target></trans-unit>
+<trans-unit id="se70d5bb737ef7810">
+  <source><x id="0" equiv-text="${h}" />h <x id="1" equiv-text="${m}" />m</source>
+<target><x id="0" equiv-text="${h}" />Std.<x id="1" equiv-text="${m}" />Min.</target></trans-unit>
+<trans-unit id="s087d3407b52accab">
+  <source><x id="0" equiv-text="${h}" />h</source>
+<target><x id="0" equiv-text="${h}" />Std.</target></trans-unit>
+<trans-unit id="sea4f08110bb8f15d">
+  <source>Remove</source>
+<target>Entfernen</target></trans-unit>
+<trans-unit id="se7a2360e38fc5886">
+  <source>Add <x id="0" equiv-text="${label.toLowerCase()}" /></source>
+<target><x id="0" equiv-text="${label.toLowerCase()}" />hinzufügen</target></trans-unit>
+<trans-unit id="s2fa18f7f24863393">
+  <source>New <x id="0" equiv-text="${label.toLowerCase()}" />…</source>
+<target>Neu:<x id="0" equiv-text="${label.toLowerCase()}" />…</target></trans-unit>
+<trans-unit id="sf9aee319a006c9b4">
+  <source>Add</source>
+<target>Hinzufügen</target></trans-unit>
+<trans-unit id="s67aba6ad118dba65">
+  <source>Match Items to Products</source>
+<target>Artikel Produkten zuordnen</target></trans-unit>
+<trans-unit id="s384c264b2bf8d291">
+  <source>Add manually</source>
+<target>Manuell hinzufügen</target></trans-unit>
+<trans-unit id="sc16e00a7a8b2fde2">
+  <source>Back</source>
+<target>Zurück</target></trans-unit>
+<trans-unit id="s1b09ae206ea2b854">
+  <source>Confirm &amp; Add <x id="0" equiv-text="${review.length}" /></source>
+<target>Bestätigen &amp;<x id="0" equiv-text="${review.length}" />hinzufügen</target></trans-unit>
+<trans-unit id="s635ab3ed75a4b7d3">
+  <source><x id="0" equiv-text="${recipeName}" /> — <x id="1" equiv-text="${label}" /></source>
+<target><x id="0" equiv-text="${recipeName}" />—<x id="1" equiv-text="${label}" /></target></trans-unit>
+<trans-unit id="sf3ff78cc329d3528">
+  <source>Previous</source>
+<target>Zurück</target></trans-unit>
+<trans-unit id="s0fbf6dc6a1966408">
+  <source>Next</source>
+<target>Weiter</target></trans-unit>
+<trans-unit id="s13fd1b892766e9c6">
+  <source>Course:</source>
+<target>Gang:</target></trans-unit>
+<trans-unit id="seb60c649bc75165f">
+  <source>Filter by course: <x id="0" equiv-text="${t}" /></source>
+<target>Nach Gang filtern:<x id="0" equiv-text="${t}" /></target></trans-unit>
+<trans-unit id="s7c040c7071e65671">
+  <source>Category:</source>
+<target>Kategorie:</target></trans-unit>
+<trans-unit id="sb66ef26810503350">
+  <source>Filter by category: <x id="0" equiv-text="${t}" /></source>
+<target>Nach Kategorie filtern:<x id="0" equiv-text="${t}" /></target></trans-unit>
+<trans-unit id="s3f5359ecd7d0e8b1">
+  <source>Collection:</source>
+<target>Sammlung:</target></trans-unit>
+<trans-unit id="sdb6ef976115543ac">
+  <source>Filter by collection: <x id="0" equiv-text="${t}" /></source>
+<target>Nach Sammlung filtern:<x id="0" equiv-text="${t}" /></target></trans-unit>
+<trans-unit id="scf8e7ff24f98b064">
+  <source>Favourite</source>
+<target>Favorit</target></trans-unit>
+<trans-unit id="s694fd5b0745a5237">
+  <source>Add to meal plan</source>
+<target>Zum Essensplan hinzufügen</target></trans-unit>
+<trans-unit id="scd104d19b5a0ef92">
+  <source>Plan</source>
+<target>Plan</target></trans-unit>
+<trans-unit id="s8e72ee7311b1c7ce">
+  <source>Open source</source>
+<target>Quelle öffnen</target></trans-unit>
+<trans-unit id="s5f43af3669b1e098">
+  <source>Source</source>
+<target>Quelle</target></trans-unit>
+<trans-unit id="scef2f7495e78cbbd">
+  <source>Edit recipe</source>
+<target>Rezept bearbeiten</target></trans-unit>
+<trans-unit id="s64ef2a6c2dd1d3d1">
+  <source>Edit</source>
+<target>Bearbeiten</target></trans-unit>
+<trans-unit id="s3d6cbf08d01df2bd">
+  <source>Release screen lock</source>
+<target>Bildschirmsperre freigeben</target></trans-unit>
+<trans-unit id="sd1d7f4d700db4a2d">
+  <source>Keep screen on</source>
+<target>Bildschirm eingeschaltet lassen</target></trans-unit>
+<trans-unit id="sa33ac6f5a972ca9e">
+  <source>Screen on</source>
+<target>Bildschirm an</target></trans-unit>
+<trans-unit id="s2ceb11be2290bb1b">
+  <source>Cancel</source>
+<target>Abbrechen</target></trans-unit>
+<trans-unit id="s3e3e43a5ed405c31">
+  <source>Add to shopping list</source>
+<target>Zur Einkaufsliste hinzufügen</target></trans-unit>
+<trans-unit id="sbaace8219b5f4612">
+  <source>Select All</source>
+<target>Alle auswählen</target></trans-unit>
+<trans-unit id="s76d1628d0e8b9245">
+  <source>Clear All</source>
+<target>Alle löschen</target></trans-unit>
+<trans-unit id="s76402dc74efa459d">
+  <source>Add (<x id="0" equiv-text="${checkedCount}" />)</source>
+<target>Hinzufügen (<x id="0" equiv-text="${checkedCount}" />)</target></trans-unit>
+<trans-unit id="s92824558c363c56c">
+  <source>Mark incomplete</source>
+<target>Als unvollständig markieren</target></trans-unit>
+<trans-unit id="s9eca57331a26ecb7">
+  <source>Mark complete</source>
+<target>Als erledigt markieren</target></trans-unit>
+<trans-unit id="s74099fdce770d165">
+  <source>No directions listed.</source>
+<target>Keine Zubereitungsschritte aufgeführt.</target></trans-unit>
+<trans-unit id="s005053d82b712e0a">
+  <source>Notes</source>
+<target>Notizen</target></trans-unit>
+<trans-unit id="safec851a36976022">
+  <source>Prep</source>
+<target>Vorbereitung</target></trans-unit>
+<trans-unit id="s36540e9d1aca1a29">
+  <source>Cook</source>
+<target>Kochen</target></trans-unit>
+<trans-unit id="sed8ec5e3c64fa25d">
+  <source>Total</source>
+<target>Gesamt</target></trans-unit>
+<trans-unit id="s5afcab918bbb9365">
+  <source>Serves</source>
+<target>Portionen</target></trans-unit>
+<trans-unit id="s3834f179af71ce47">
+  <source>Ingredients</source>
+<target>Zutaten</target></trans-unit>
+<trans-unit id="s39211f8cdcd58d9b">
+  <source>Directions</source>
+<target>Zubereitung</target></trans-unit>
+<trans-unit id="sa0c8a48d927c0b77">
+  <source>Nutrition</source>
+<target>Nährwerte</target></trans-unit>
+<trans-unit id="s291aac5ed9761710">
+  <source>Photos</source>
+<target>Fotos</target></trans-unit>
+<trans-unit id="se0eef5dc296aa0b0">
+  <source>Showing metric</source>
+<target>Metrisch angezeigt</target></trans-unit>
+<trans-unit id="sea34bde45746e8ff">
+  <source>Convert to metric</source>
+<target>In metrisch umrechnen</target></trans-unit>
+<trans-unit id="sd5ecdcf7c9f7f72f">
+  <source>No ingredients listed.</source>
+<target>Keine Zutaten aufgeführt.</target></trans-unit>
+<trans-unit id="s7ca517f9acd0c131">
+  <source>Added to shopping list!</source>
+<target>Zur Einkaufsliste hinzugefügt!</target></trans-unit>
+<trans-unit id="s3fc88456583330f5">
+  <source>No lists found in Shopping List Manager</source>
+<target>Keine Listen im Shopping List Manager gefunden</target></trans-unit>
+<trans-unit id="s789490a93e1b9a71">
+  <source>Add to Shopping List</source>
+<target>Zur Einkaufsliste hinzufügen</target></trans-unit>
+<trans-unit id="se0130f927b1c72d3">
+  <source>Start timer for <x id="0" equiv-text="${timeText}" /></source>
+<target>Timer starten für<x id="0" equiv-text="${timeText}" /></target></trans-unit>
+<trans-unit id="s7445550f2bfb2f2f">
+  <source>No notes.</source>
+<target>Keine Notizen.</target></trans-unit>
+<trans-unit id="s6ee0b13732db1187">
+  <source>No nutrition info. Add it via the edit panel.</source>
+<target>Keine Nährwertangaben. Über das Bearbeitungsfenster hinzufügen.</target></trans-unit>
+<trans-unit id="s4bf6b833e6c9d411">
+  <source>Per serving (<x id="0" equiv-text="${r.servings_text || r.servings}" />)</source>
+<target>Pro Portion (<x id="0" equiv-text="${r.servings_text || r.servings}" />)</target></trans-unit>
+<trans-unit id="sed96bf1c8bbd5850">
+  <source>Per serving</source>
+<target>Pro Portion</target></trans-unit>
+<trans-unit id="s647d8b0c91c16c54">
+  <source>Nutrition Facts</source>
+<target>Nährwertangaben</target></trans-unit>
+<trans-unit id="s2847f7aba4532b50">
+  <source>No nutritional information available.</source>
+<target>Keine Nährwertangaben verfügbar.</target></trans-unit>
+<trans-unit id="s6f568ba17b85afde">
+  <source>Carbs</source>
+<target>Kohlenhydrate</target></trans-unit>
+<trans-unit id="s75955e9e7c398646">
+  <source>Total fat</source>
+<target>Fett gesamt</target></trans-unit>
+<trans-unit id="sb5167390e83b98c4">
+  <source>cals</source>
+<target>kcal</target></trans-unit>
+<trans-unit id="s0b7b2feae3459936">
+  <source>Per <x id="0" equiv-text="${r.servings_text}" /></source>
+<target>Pro<x id="0" equiv-text="${r.servings_text}" /></target></trans-unit>
+<trans-unit id="sf8053976d96c5cc0">
+  <source>Per <x id="0" equiv-text="${r.servings}" /> serving<x id="1" equiv-text="${r.servings !== 1 ? 's' : ''}" /></source>
+<target>Pro<x id="0" equiv-text="${r.servings}" />Portion<x id="1" equiv-text="${r.servings !== 1 ? 's' : ''}" /></target></trans-unit>
+<trans-unit id="sf647a577e8aceb0f">
+  <source>Daily RDA Nutrition</source>
+<target>Täglicher Nährstoffbedarf (RDA)</target></trans-unit>
+<trans-unit id="s6874bacd3e6fc73b">
+  <source>Recipe photo</source>
+<target>Rezeptfoto</target></trans-unit>
+<trans-unit id="s49e763aed00877a8">
+  <source>Main</source>
+<target>Haupt</target></trans-unit>
+<trans-unit id="s00763d910308e80e">
+  <source>Set as main photo</source>
+<target>Als Hauptfoto festlegen</target></trans-unit>
+<trans-unit id="sf0d65a0cc28085d1">
+  <source>Remove photo</source>
+<target>Foto entfernen</target></trans-unit>
+<trans-unit id="s1b09285713e449a9">
+  <source>No photos yet.</source>
+<target>Noch keine Fotos.</target></trans-unit>
+<trans-unit id="sd7cccc4bc63913c3">
+  <source>Add a photo</source>
+<target>Foto hinzufügen</target></trans-unit>
+<trans-unit id="s4566f0afcaf4955a">
+  <source>Paste image URL…</source>
+<target>Bild-URL einfügen…</target></trans-unit>
+<trans-unit id="s00cbafa7679196ea">
+  <source>Take Photo</source>
+<target>Foto aufnehmen</target></trans-unit>
+<trans-unit id="s911da38f7cffdc6b">
+  <source>Choose from Library</source>
+<target>Aus Bibliothek auswählen</target></trans-unit>
+<trans-unit id="se68a2435843d65dd">
+  <source>Edit Recipe</source>
+<target>Rezept bearbeiten</target></trans-unit>
+<trans-unit id="sef49aec68fd1dc66">
+  <source>Name</source>
+<target>Name</target></trans-unit>
+<trans-unit id="s3d93f9ea0c5a13fa">
+  <source>Image</source>
+<target>Bild</target></trans-unit>
+<trans-unit id="saab18ab6527ca12b">
+  <source>Set as main image</source>
+<target>Als Hauptbild festlegen</target></trans-unit>
+<trans-unit id="s8ac5bc762d3c0fa8">
+  <source>Upload photo</source>
+<target>Foto hochladen</target></trans-unit>
+<trans-unit id="s56651b5d1f3a6d47">
+  <source>Or paste image URL</source>
+<target>Oder Bild-URL einfügen</target></trans-unit>
+<trans-unit id="s63d894b1ddb06289">
+  <source>Description</source>
+<target>Beschreibung</target></trans-unit>
+<trans-unit id="sa39e9b837556f159">
+  <source>Source URL</source>
+<target>Quell-URL</target></trans-unit>
+<trans-unit id="sdc4766e404699775">
+  <source>Prep (min)</source>
+<target>Vorbereitung (Min.)</target></trans-unit>
+<trans-unit id="s618f36af6f22b72e">
+  <source>Cook (min)</source>
+<target>Kochzeit (Min.)</target></trans-unit>
+<trans-unit id="s5732264e04967b7c">
+  <source>Servings</source>
+<target>Portionen</target></trans-unit>
+<trans-unit id="s36e1bfd2d899a7b0">
+  <source>Rating</source>
+<target>Bewertung</target></trans-unit>
+<trans-unit id="s03aa3cfb08dff960">
+  <source>Tags</source>
+<target>Tags</target></trans-unit>
+<trans-unit id="s6c90d2e30c73a526">
+  <source>Ingredients (<x id="0" equiv-text="${(d.ingredients || []).length}" />)</source>
+<target>Zutaten (<x id="0" equiv-text="${(d.ingredients || []).length}" />)</target></trans-unit>
+<trans-unit id="sc68b98f98e6b2d61">
+  <source>Section header</source>
+<target>Abschnittsüberschrift</target></trans-unit>
+<trans-unit id="sf996c9199ff20ba5">
+  <source>Amt</source>
+<target>Menge</target></trans-unit>
+<trans-unit id="s8f26e0f086cc2787">
+  <source>Unit</source>
+<target>Einheit</target></trans-unit>
+<trans-unit id="s3b96861449f76f6e">
+  <source>Ingredient</source>
+<target>Zutat</target></trans-unit>
+<trans-unit id="s33f85f24c0f5f008">
+  <source>Save</source>
+<target>Speichern</target></trans-unit>
+<trans-unit id="s5dfd80e4749404c0">
+  <source>Click to edit</source>
+<target>Zum Bearbeiten klicken</target></trans-unit>
+<trans-unit id="s4ea0f21fc2a338a1">
+  <source>Move up</source>
+<target>Nach oben verschieben</target></trans-unit>
+<trans-unit id="sb233557012dcb328">
+  <source>Move down</source>
+<target>Nach unten verschieben</target></trans-unit>
+<trans-unit id="s193f0289dc117362">
+  <source>e.g. "2 cups flour" or "# Section Header"</source>
+<target>z. B. „2 Tassen Mehl" oder „# Abschnittsüberschrift"</target></trans-unit>
+<trans-unit id="s547704c18ebeb20f">
+  <source>Directions (<x id="0" equiv-text="${(d.instructions || []).length}" /> steps)</source>
+<target>Zubereitung (<x id="0" equiv-text="${(d.instructions || []).length}" />Schritte)</target></trans-unit>
+<trans-unit id="se494e1ac59c138c1">
+  <source>Type a step, press Enter to add…</source>
+<target>Schritt eingeben, Enter drücken zum Hinzufügen…</target></trans-unit>
+<trans-unit id="sb599107a6fcf5f7e">
+  <source>Nutrition Facts (per serving)</source>
+<target>Nährwertangaben (pro Portion)</target></trans-unit>
+<trans-unit id="s057f34cae8760fc9">
+  <source>Calories (kcal)</source>
+<target>Kalorien (kcal)</target></trans-unit>
+<trans-unit id="sceeb969172089f0c">
+  <source>Protein (g)</source>
+<target>Eiweiß (g)</target></trans-unit>
+<trans-unit id="s5d929ef49579ac18">
+  <source>Fat (g)</source>
+<target>Fett (g)</target></trans-unit>
+<trans-unit id="s6905934978c079db">
+  <source>Saturated Fat (g)</source>
+<target>Gesättigte Fettsäuren (g)</target></trans-unit>
+<trans-unit id="se38181ea5c294d3e">
+  <source>Carbs (g)</source>
+<target>Kohlenhydrate (g)</target></trans-unit>
+<trans-unit id="s64a1816d1865d321">
+  <source>Fiber (g)</source>
+<target>Ballaststoffe (g)</target></trans-unit>
+<trans-unit id="s8badfa2b3ba2142d">
+  <source>Sugar (g)</source>
+<target>Zucker (g)</target></trans-unit>
+<trans-unit id="se23ce4ff32da0129">
+  <source>Sodium (mg)</source>
+<target>Natrium (mg)</target></trans-unit>
+<trans-unit id="s32e39e4226552ad6">
+  <source>Cholesterol (mg)</source>
+<target>Cholesterin (mg)</target></trans-unit>
+<trans-unit id="sb94a1c405b579307">
+  <source>Click again to confirm delete</source>
+<target>Erneut klicken, um Löschen zu bestätigen</target></trans-unit>
+<trans-unit id="s70fe6e3704ca54fc">
+  <source>Delete recipe</source>
+<target>Rezept löschen</target></trans-unit>
+<trans-unit id="s559ac27231799e90">
+  <source>Confirm?</source>
+<target>Bestätigen?</target></trans-unit>
+<trans-unit id="sdc673e73b5c13aea">
+  <source>Delete</source>
+<target>Löschen</target></trans-unit>
+<trans-unit id="s2bad40d7a2e8d391">
+  <source>Remove from favourites</source>
+<target>Aus Favoriten entfernen</target></trans-unit>
+<trans-unit id="s130c8419b754322b">
+  <source>Add to favourites</source>
+<target>Zu Favoriten hinzufügen</target></trans-unit>
+<trans-unit id="sce6ae30b489ec7e9">
+  <source>Filter by rating</source>
+<target>Nach Bewertung filtern</target></trans-unit>
+<trans-unit id="scb42b9d863cbbe6e">
+  <source>All ratings</source>
+<target>Alle Bewertungen</target></trans-unit>
+<trans-unit id="sa5c51f79672308e0">
+  <source><x id="0" equiv-text="${'★'.repeat(n)}${'☆'.repeat(5 - n)} ${n}" />+</source>
+<target><x id="0" equiv-text="${'★'.repeat(n)}${'☆'.repeat(5 - n)} ${n}" />+</target></trans-unit>
+<trans-unit id="s8a7bee24f1eeaff1">
+  <source>Sort</source>
+<target>Sortieren</target></trans-unit>
+<trans-unit id="s270c64ae6a97d9f7">
+  <source><x id="0" equiv-text="${this._sortByRating ? '✓ ' : ''}" />Sort by rating</source>
+<target><x id="0" equiv-text="${this._sortByRating ? '✓ ' : ''}" />Nach Bewertung sortieren</target></trans-unit>
+<trans-unit id="sccd01eb4561a207c">
+  <source>Search recipes…</source>
+<target>Rezepte suchen…</target></trans-unit>
+<trans-unit id="sf993bb199fefbe04">
+  <source>All</source>
+<target>Alle</target></trans-unit>
+<trans-unit id="s13fd6489276765d1">
+  <source>Courses</source>
+<target>Gänge</target></trans-unit>
+<trans-unit id="s2cc7cd11d9b856cd">
+  <source>Categories</source>
+<target>Kategorien</target></trans-unit>
+<trans-unit id="s3f5390ecd7d14626">
+  <source>Collections</source>
+<target>Sammlungen</target></trans-unit>
+<trans-unit id="s47d37fbd40733715">
+  <source>Favourites</source>
+<target>Favoriten</target></trans-unit>
+<trans-unit id="sbce70cbdb856635e">
+  <source>Recent</source>
+<target>Zuletzt angesehen</target></trans-unit>
+<trans-unit id="s7251bd7bf6abc0b2">
+  <source>Filter/sort by rating</source>
+<target>Nach Bewertung filtern/sortieren</target></trans-unit>
+<trans-unit id="s61979f754efe7ebb">
+  <source>⭐ <x id="0" equiv-text="${this._starFilter}" />+ stars</source>
+<target>⭐<x id="0" equiv-text="${this._starFilter}" />+ Sterne</target></trans-unit>
+<trans-unit id="sb6025b595600bbae">
+  <source>Sorted by rating</source>
+<target>Nach Bewertung sortiert</target></trans-unit>
+<trans-unit id="sb4f1dffbb6be6302">
+  <source>Clear</source>
+<target>Löschen</target></trans-unit>
+<trans-unit id="s73a319813e895aaa">
+  <source>No matching recipes</source>
+<target>Keine passenden Rezepte</target></trans-unit>
+<trans-unit id="s11f736a30bf0316b">
+  <source>No recipes with <x id="0" equiv-text="${this._starFilter}" />+ stars</source>
+<target>Keine Rezepte mit<x id="0" equiv-text="${this._starFilter}" />+ Sternen</target></trans-unit>
+<trans-unit id="sdd6fbd3cd5ce597a">
+  <source>No favourites yet — heart a recipe!</source>
+<target>Noch keine Favoriten — markiere ein Rezept mit einem Herz!</target></trans-unit>
+<trans-unit id="s7bb54c3fc71f357f">
+  <source>No recently viewed recipes yet.</source>
+<target>Noch keine kürzlich angesehenen Rezepte.</target></trans-unit>
+<trans-unit id="s0f0578dc72af2f7b">
+  <source>No recipes yet — add one!</source>
+<target>Noch keine Rezepte — füge eines hinzu!</target></trans-unit>
+<trans-unit id="s236e961d403e3c9b">
+  <source>All Recipes</source>
+<target>Alle Rezepte</target></trans-unit>
+<trans-unit id="sf0e261e04eda82ff">
+  <source>Appearance</source>
+<target>Erscheinungsbild</target></trans-unit>
+<trans-unit id="s21b06c38fc4164db">
+  <source>Advanced</source>
+<target>Erweitert</target></trans-unit>
+<trans-unit id="s05073d2537b45d1a">
+  <source>Sync</source>
+<target>Synchronisierung</target></trans-unit>
+<trans-unit id="s352719d86112de9a">
+  <source>Help</source>
+<target>Hilfe</target></trans-unit>
+<trans-unit id="s1c5090b40ed16e6a">
+  <source>Language &amp; Units</source>
+<target>Sprache &amp; Einheiten</target></trans-unit>
+<trans-unit id="sefcf950b3cc4fc3b">
+  <source>Language</source>
+<target>Sprache</target></trans-unit>
+<trans-unit id="s04bcba096f1c53fd">
+  <source>Preferred units</source>
+<target>Bevorzugte Einheiten</target></trans-unit>
+<trans-unit id="s7e3a237721b38a5c">
+  <source>Imperial</source>
+<target>Imperial</target></trans-unit>
+<trans-unit id="s417711f56b5a5681">
+  <source>Metric</source>
+<target>Metrisch</target></trans-unit>
+<trans-unit id="saab875d8cfcfe712">
+  <source>Theme</source>
+<target>Design</target></trans-unit>
+<trans-unit id="s83be0a53c6a14008">
+  <source>Colour theme</source>
+<target>Farbdesign</target></trans-unit>
+<trans-unit id="sdd7faa87991f9adb">
+  <source>Adaptive</source>
+<target>Adaptiv</target></trans-unit>
+<trans-unit id="s1e1c0eed2f00f27c">
+  <source>🎨 Soft Pastel</source>
+<target>🎨 Soft Pastell</target></trans-unit>
+<trans-unit id="s7f03335b908c94ac">
+  <source>🌸 Blossom</source>
+<target>🌸 Blüte</target></trans-unit>
+<trans-unit id="s5019042d133bb90b">
+  <source>Light Themes</source>
+<target>Helle Designs</target></trans-unit>
+<trans-unit id="s013576bb5d31af0f">
+  <source>🧊 Arctic</source>
+<target>🧊 Arktis</target></trans-unit>
+<trans-unit id="s12e416bdb6181375">
+  <source>🌿 Meadow</source>
+<target>🌿 Wiese</target></trans-unit>
+<trans-unit id="s42c4d8abc49d679b">
+  <source>🌊 Ocean Blue</source>
+<target>🌊 Ozeanblau</target></trans-unit>
+<trans-unit id="sa8bb51fbf11a21f9">
+  <source>Dark Themes</source>
+<target>Dunkle Designs</target></trans-unit>
+<trans-unit id="sb7a46c770f267f48">
+  <source>🌙 Midnight Ocean</source>
+<target>🌙 Mitternachtsozean</target></trans-unit>
+<trans-unit id="s73901dbc01e41eb4">
+  <source>🔥 Ember</source>
+<target>🔥 Glut</target></trans-unit>
+<trans-unit id="s41cb654e8909931b">
+  <source>🍇 Purple &amp; Cyan</source>
+<target>🍇 Lila &amp; Cyan</target></trans-unit>
+<trans-unit id="s57ed4d0e053c4318">
+  <source>Dark mode</source>
+<target>Dunkelmodus</target></trans-unit>
+<trans-unit id="s146704cb79da4a24">
+  <source>Always dark for this theme</source>
+<target>Für dieses Design immer dunkel</target></trans-unit>
+<trans-unit id="sd45bf846d03e5174">
+  <source>Always light for this theme</source>
+<target>Für dieses Design immer hell</target></trans-unit>
+<trans-unit id="s3b0ab4b52326316f">
+  <source>Light</source>
+<target>Hell</target></trans-unit>
+<trans-unit id="sdb73788b3c975f16">
+  <source>Auto</source>
+<target>Automatisch</target></trans-unit>
+<trans-unit id="sac895c732f350ac5">
+  <source>Dark</source>
+<target>Dunkel</target></trans-unit>
+<trans-unit id="s66da146c9f6ba983">
+  <source>Text size</source>
+<target>Textgröße</target></trans-unit>
+<trans-unit id="saf640e4c86024182">
+  <source>S</source>
+<target>S</target></trans-unit>
+<trans-unit id="saf64004c860229b8">
+  <source>M</source>
+<target>M</target></trans-unit>
+<trans-unit id="saf64014c86022b6b">
+  <source>L</source>
+<target>L</target></trans-unit>
+<trans-unit id="s9d48cb13194c9979">
+  <source>Recipe Grid</source>
+<target>Rezeptraster</target></trans-unit>
+<trans-unit id="sa875a198e0cb7ae4">
+  <source>Recipe columns</source>
+<target>Rezeptspalten</target></trans-unit>
+<trans-unit id="s9f9651b16deb440a">
+  <source>Favourites section</source>
+<target>Favoriten-Bereich</target></trans-unit>
+<trans-unit id="s3c0080591cb7a5b2">
+  <source>Recent recipes count</source>
+<target>Anzahl zuletzt angesehener Rezepte</target></trans-unit>
+<trans-unit id="s159713f8165070c7">
+  <source>Recipes shown in the Recent filter tab</source>
+<target>Im Tab „Zuletzt angesehen" angezeigte Rezepte</target></trans-unit>
+<trans-unit id="s07e6118e838b2e23">
+  <source>Navigation</source>
+<target>Navigation</target></trans-unit>
+<trans-unit id="s6395bbab5dcf377a">
+  <source>Meal planner</source>
+<target>Essensplaner</target></trans-unit>
+<trans-unit id="s2acd55c9cb052a15">
+  <source>Timer Sound</source>
+<target>Timer-Ton</target></trans-unit>
+<trans-unit id="s3d98cca5ddd5a06d">
+  <source>Alarm sound</source>
+<target>Alarmton</target></trans-unit>
+<trans-unit id="sa08257a7968b283d">
+  <source>Beep</source>
+<target>Piepton</target></trans-unit>
+<trans-unit id="sf46f987358ab6ca5">
+  <source>Ding</source>
+<target>Ding</target></trans-unit>
+<trans-unit id="s5528782ffc9377fd">
+  <source>Alarm (3 beeps)</source>
+<target>Alarm (3 Töne)</target></trans-unit>
+<trans-unit id="s41f3c5dea156cd44">
+  <source>Silent</source>
+<target>Stumm</target></trans-unit>
+<trans-unit id="s4a61c5346038d01e">
+  <source>Custom file…</source>
+<target>Eigene Datei…</target></trans-unit>
+<trans-unit id="se8e6a9de900ca6aa">
+  <source>Sound file</source>
+<target>Tondatei</target></trans-unit>
+<trans-unit id="s2584e42103e83ab1">
+  <source>No file selected</source>
+<target>Keine Datei ausgewählt</target></trans-unit>
+<trans-unit id="s2f64461723d3df5d">
+  <source>Change</source>
+<target>Ändern</target></trans-unit>
+<trans-unit id="s8b103e74bfaa54f6">
+  <source>Choose file</source>
+<target>Datei auswählen</target></trans-unit>
+<trans-unit id="sc80d01c7488e49e6">
+  <source>Test sound</source>
+<target>Ton testen</target></trans-unit>
+<trans-unit id="s2740591ca512c0aa">
+  <source>Play a preview of the selected alarm</source>
+<target>Vorschau des ausgewählten Alarms abspielen</target></trans-unit>
+<trans-unit id="scd105819b5a10243">
+  <source>Play</source>
+<target>Abspielen</target></trans-unit>
+<trans-unit id="s7cd4552febb82d6d">
+  <source>Keep Screen On</source>
+<target>Bildschirm eingeschaltet lassen</target></trans-unit>
+<trans-unit id="sae053488c98df7d2">
+  <source>Keep screen on while viewing a recipe</source>
+<target>Bildschirm beim Anzeigen eines Rezepts eingeschaltet lassen</target></trans-unit>
+<trans-unit id="s9b5bf4678fb483b3">
+  <source>Uses Wake Lock API (Chrome / Edge / Android)</source>
+<target>Verwendet die Wake-Lock-API (Chrome / Edge / Android)</target></trans-unit>
+<trans-unit id="s32b613b27b7728ac">
+  <source>Auto-release after</source>
+<target>Automatisch freigeben nach</target></trans-unit>
+<trans-unit id="s6e27b690063994ff">
+  <source>Screen lock released after this many minutes</source>
+<target>Bildschirmsperre wird nach dieser Anzahl Minuten freigegeben</target></trans-unit>
+<trans-unit id="s244af3d4372c8aa5">
+  <source>Unit Conversion</source>
+<target>Einheitenumrechnung</target></trans-unit>
+<trans-unit id="sab356e1e597a5fec">
+  <source>Show metric conversion button</source>
+<target>Schaltfläche für metrische Umrechnung anzeigen</target></trans-unit>
+<trans-unit id="sd6cefcb61fa2ff73">
+  <source>Button in Ingredients tab converts oz/lb/cups/fl oz → g/ml/kg</source>
+<target>Schaltfläche im Zutaten-Tab rechnet oz/lb/cups/fl oz → g/ml/kg um</target></trans-unit>
+<trans-unit id="s3749afa56d87dee6">
+  <source>Image Slideshow</source>
+<target>Bilderdiashow</target></trans-unit>
+<trans-unit id="s919711922241dd5a">
+  <source>Auto-advance interval</source>
+<target>Automatisches Weiterschalten</target></trans-unit>
+<trans-unit id="sce92f40ee720d004">
+  <source>Seconds between slides when a recipe has multiple images (0 = off)</source>
+<target>Sekunden zwischen den Bildern, wenn ein Rezept mehrere Bilder hat (0 = aus)</target></trans-unit>
+<trans-unit id="s302cbb19bf9a174a">
+  <source>Off</source>
+<target>Aus</target></trans-unit>
+<trans-unit id="sdc55732c061c7683">
+  <source>Backing up…</source>
+<target>Sicherung läuft…</target></trans-unit>
+<trans-unit id="sf63f0ab45a6b8699">
+  <source>Downloaded ✓</source>
+<target>Heruntergeladen ✓</target></trans-unit>
+<trans-unit id="sd75c5a7cfb6c5d31">
+  <source>Failed ✗</source>
+<target>Fehlgeschlagen ✗</target></trans-unit>
+<trans-unit id="s734dd460c9795cd9">
+  <source>Download backup</source>
+<target>Sicherung herunterladen</target></trans-unit>
+<trans-unit id="sd05190d6b6b60a1f">
+  <source>Backup</source>
+<target>Sicherung</target></trans-unit>
+<trans-unit id="s66d665aaf8305020">
+  <source>Export recipes</source>
+<target>Rezepte exportieren</target></trans-unit>
+<trans-unit id="s1643b2cf74b5049a">
+  <source>Download all recipes and meal plans as a JSON file</source>
+<target>Alle Rezepte und Essenspläne als JSON-Datei herunterladen</target></trans-unit>
+<trans-unit id="s70cb697f1f3d7dfa">
+  <source>FAQ &amp; Support</source>
+<target>FAQ &amp; Support</target></trans-unit>
+<trans-unit id="sf32ec7199cf4745b">
+  <source>FAQ</source>
+<target>FAQ</target></trans-unit>
+<trans-unit id="s99ba4d0bb6809469">
+  <source>Frequently asked questions</source>
+<target>Häufig gestellte Fragen</target></trans-unit>
+<trans-unit id="s949fcba12df7cb87">
+  <source>Report a Problem</source>
+<target>Problem melden</target></trans-unit>
+<trans-unit id="s706661ba7942118f">
+  <source>Submit an issue on GitHub</source>
+<target>Ein Issue auf GitHub einreichen</target></trans-unit>
+<trans-unit id="sb7afff3ab2b8ae46">
+  <source>GitHub Repository</source>
+<target>GitHub-Repository</target></trans-unit>
+<trans-unit id="s8cec82ed13d16986">
+  <source>View source code</source>
+<target>Quellcode anzeigen</target></trans-unit>
+<trans-unit id="s0487f33d9ddaabde">
+  <source>About</source>
+<target>Über</target></trans-unit>
+<trans-unit id="sc443c92e7c0383d4">
+  <source>Recipe Manager</source>
+<target>Recipe Manager</target></trans-unit>
+<trans-unit id="scbd4eac6319a49ff">
+  <source>Integration version <x id="0" equiv-text="${this._rmVersion}" /></source>
+<target>Integrationsversion<x id="0" equiv-text="${this._rmVersion}" /></target></trans-unit>
+<trans-unit id="s6c076f69234e73d6">
+  <source>RM Card</source>
+<target>RM-Karte</target></trans-unit>
+<trans-unit id="s3a29c37958d1d189">
+  <source>Card version <x id="0" equiv-text="${this._rmcVersion}" /></source>
+<target>Kartenversion<x id="0" equiv-text="${this._rmcVersion}" /></target></trans-unit>
+<trans-unit id="s03618e2b9163caf9">
+  <source>Refresh versions</source>
+<target>Versionen aktualisieren</target></trans-unit>
+<trans-unit id="s6659633f2b0d0d63">
+  <source>My Shopping List</source>
+<target>Meine Einkaufsliste</target></trans-unit>
+<trans-unit id="s6150ddadcc938f87">
+  <source>Clear checked</source>
+<target>Abgehakte löschen</target></trans-unit>
+<trans-unit id="s8cda828dac449ea5">
+  <source>Clear all</source>
+<target>Alle löschen</target></trans-unit>
+<trans-unit id="s92940b19bb76c10e">
+  <source>Get more features with Shopping List Manager</source>
+<target>Mehr Funktionen mit dem Shopping List Manager</target></trans-unit>
+<trans-unit id="s5de84e9d8c204662">
+  <source>Install the Shopping List Manager HACS integration for shared lists, categories, and sync.</source>
+<target>Installieren Sie die Shopping-List-Manager-HACS-Integration für gemeinsame Listen, Kategorien und Synchronisierung.</target></trans-unit>
+<trans-unit id="sc6303a265f9c575f">
+  <source>Your shopping list is empty.</source>
+<target>Ihre Einkaufsliste ist leer.</target></trans-unit>
+<trans-unit id="sdeb6525d4ec47642">
+  <source>Add ingredients from any recipe to get started.</source>
+<target>Fügen Sie Zutaten aus einem beliebigen Rezept hinzu, um zu beginnen.</target></trans-unit>
+<trans-unit id="s1c271fd88eea93c6">
+  <source>Checked</source>
+<target>Abgehakt</target></trans-unit>
+<trans-unit id="s7ecd0a880f975334">
+  <source>Failed to load recipes</source>
+<target>Rezepte konnten nicht geladen werden</target></trans-unit>
+<trans-unit id="s90c11e6f683020f4">
+  <source><x id="0" equiv-text="${Math.floor(seconds / 60)}" /> min timer</source>
+<target><x id="0" equiv-text="${Math.floor(seconds / 60)}" />-Min.-Timer</target></trans-unit>
+<trans-unit id="s7d826f6eadbd1ff7">
+  <source>Set rating: <x id="0" equiv-text="${hover}" />★</source>
+<target>Bewertung festlegen:<x id="0" equiv-text="${hover}" />★</target></trans-unit>
+<trans-unit id="se57d555c0b80dc2c">
+  <source>Rating: <x id="0" equiv-text="${r}" />★ — click to change</source>
+<target>Bewertung:<x id="0" equiv-text="${r}" />★ — zum Ändern klicken</target></trans-unit>
+<trans-unit id="sb65aa995ea9aa596">
+  <source>Click to rate</source>
+<target>Zum Bewerten klicken</target></trans-unit>
+<trans-unit id="s11c6d3aa1e29786f">
+  <source><x id="0" equiv-text="${label}" /> — coming soon</source>
+<target><x id="0" equiv-text="${label}" />— demnächst verfügbar</target></trans-unit>
+<trans-unit id="s7293d04c5979a8ad">
+  <source>Expand sidebar</source>
+<target>Seitenleiste erweitern</target></trans-unit>
+<trans-unit id="s8f10b4e57121e256">
+  <source>Collapse sidebar</source>
+<target>Seitenleiste einklappen</target></trans-unit>
+<trans-unit id="s9b06b628da2c361d">
+  <source>Search…</source>
+<target>Suchen…</target></trans-unit>
+<trans-unit id="s30b8fa5886f5bd1d">
+  <source>New Recipe</source>
+<target>Neues Rezept</target></trans-unit>
+<trans-unit id="s6abb1cd87fe0114e">
+  <source>Home</source>
+<target>Start</target></trans-unit>
+<trans-unit id="s388fdba2dd0b500f">
+  <source>Shopping List</source>
+<target>Einkaufsliste</target></trans-unit>
+<trans-unit id="s38bdf945c09ef31a">
+  <source>Meal Planner</source>
+<target>Essensplaner</target></trans-unit>
+<trans-unit id="s5fcd43aba2f3eb8c">
+  <source>Cookbook</source>
+<target>Kochbuch</target></trans-unit>
+<trans-unit id="s66882cf40f066fe3">
+  <source>Timers</source>
+<target>Timer</target></trans-unit>
+<trans-unit id="sd3b1224bba381b3c">
+  <source>Sync — coming soon</source>
+<target>Synchronisierung — demnächst verfügbar</target></trans-unit>
+<trans-unit id="sf82654b6b69da0bc">
+  <source>Help — coming soon</source>
+<target>Hilfe — demnächst verfügbar</target></trans-unit>
+<trans-unit id="s9d8b8aa2b404c2c8">
+  <source>Settings</source>
+<target>Einstellungen</target></trans-unit>
+<trans-unit id="s00ac24fb2856b614">
+  <source>Recipes</source>
+<target>Rezepte</target></trans-unit>
+<trans-unit id="s8a96e3d5641b517b">
+  <source>Back to recipe</source>
+<target>Zurück zum Rezept</target></trans-unit>
+<trans-unit id="s1d5d2564d7aae78e">
+  <source>Close menu</source>
+<target>Menü schließen</target></trans-unit>
+<trans-unit id="s6d8c02aee480af7a">
+  <source>Menu</source>
+<target>Menü</target></trans-unit>
+<trans-unit id="s2c8189544e3ea679">
+  <source>Retry</source>
+<target>Erneut versuchen</target></trans-unit>
+<trans-unit id="s6571a4fccd012f7b">
+  <source>Global timer</source>
+<target>Globaler Timer</target></trans-unit>
+<trans-unit id="s061cc20e3432dead">
+  <source>Pause</source>
+<target>Pause</target></trans-unit>
+<trans-unit id="s89118d3a7be870ca">
+  <source>Resume</source>
+<target>Fortsetzen</target></trans-unit>
+<trans-unit id="sd9ad53251f2330a5">
+  <source>Stop</source>
+<target>Stopp</target></trans-unit>
+<trans-unit id="sb55e740c7623bcd0">
+  <source>No active timers.</source>
+<target>Keine aktiven Timer.</target></trans-unit>
+<trans-unit id="s8090a633aa164924">
+  <source>Tap a highlighted time in a recipe's directions to start one.</source>
+<target>Tippen Sie auf eine hervorgehobene Zeit in den Zubereitungsschritten, um einen Timer zu starten.</target></trans-unit>
+<trans-unit id="s2cc5f8163abbc0dd">
+  <source>Add Timer</source>
+<target>Timer hinzufügen</target></trans-unit>
+<trans-unit id="s1a0db8b24dd7845f">
+  <source>Sync timer across all devices via Home Assistant</source>
+<target>Timer geräteübergreifend über Home Assistant synchronisieren</target></trans-unit>
+<trans-unit id="s681c086b8f7afcae">
+  <source>Global</source>
+<target>Global</target></trans-unit>
+<trans-unit id="s2313c5604f7d3cf8">
+  <source>Quick start</source>
+<target>Schnellstart</target></trans-unit>
+<trans-unit id="se470048a914599d8">
+  <source>Label (optional)</source>
+<target>Bezeichnung (optional)</target></trans-unit>
+<trans-unit id="s07f4431917564077">
+  <source>min</source>
+<target>Min.</target></trans-unit>
+<trans-unit id="sae1c7f13b7c0c47f">
+  <source>Start</source>
+<target>Start</target></trans-unit>
+<trans-unit id="sa320cd59f04807e7">
+  <source>Save preset</source>
+<target>Voreinstellung speichern</target></trans-unit>
+<trans-unit id="s7e2c3c9273dffa01">
+  <source>Preset name</source>
+<target>Name der Voreinstellung</target></trans-unit>
+<trans-unit id="s15764785b019720d">
+  <source>+ Preset</source>
+<target>+ Voreinstellung</target></trans-unit>
+<trans-unit id="s7301480d0bb8e2f0">
+  <source>Done!</source>
+<target>Fertig!</target></trans-unit>
+<trans-unit id="s84f447c0c5c0a086">
+  <source>+30s</source>
+<target>+30s</target></trans-unit>
+<trans-unit id="s12b9f617fbc57f04">
+  <source>+1m</source>
+<target>+1m</target></trans-unit>
+<trans-unit id="s12c6f617fbd00960">
+  <source>+5m</source>
+<target>+5m</target></trans-unit>
+<trans-unit id="s688288d7df840ab4">
+  <source>Timer complete!</source>
+<target>Timer abgelaufen!</target></trans-unit>
+<trans-unit id="s1335759599c75565">
+  <source>+1 min</source>
+<target>+1 Min.</target></trans-unit>
+<trans-unit id="sd3b9f23e2b9b0db1">
+  <source>+5 min</source>
+<target>+5 Min.</target></trans-unit>
+<trans-unit id="s403fc869b2213eb3">
+  <source>+10 min</source>
+<target>+10 Min.</target></trans-unit>
+<trans-unit id="sbe1f20bf32f9f65e">
+  <source>+min</source>
+<target>+Min.</target></trans-unit>
+<trans-unit id="s265c7ebce12823fd">
+  <source>Shopping</source>
+<target>Einkauf</target></trans-unit>
+<trans-unit id="sc0793a5a7d545f23">
+  <source>Planner</source>
+<target>Planer</target></trans-unit>
+<trans-unit id="s8abcd224f2261752">
+  <source>Soon</source>
+<target>Bald</target></trans-unit>
+<trans-unit id="s5cc9f324aa312869">
+  <source>Manage, browse, and plan meals with your recipe collection.</source>
+<target>Verwalten, durchsuchen und planen Sie Mahlzeiten mit Ihrer Rezeptsammlung.</target></trans-unit>
+</body>
+</file>
+</xliff>

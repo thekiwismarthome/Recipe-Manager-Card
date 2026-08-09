@@ -2,7 +2,9 @@
  * Recipe Manager Card — main entry point.
  */
 import { LitElement, html, css } from 'lit';
+import { msg, str } from '@lit/localize';
 import { RecipeManagerAPI } from './services/api.js';
+import { setActiveLocale } from './services/localize.js';
 
 import './components/rm-recipe-grid.js';
 import './components/rm-recipe-detail.js';
@@ -43,6 +45,8 @@ const DEFAULT_SETTINGS = {
   keepScreenOn: false,
   keepScreenOnMins: 30,
   showUnitConversion: false,
+  language: 'en',
+  unitSystem: 'imperial',
 };
 
 // ---------------------------------------------------------------------------
@@ -298,6 +302,7 @@ class RecipeManagerCard extends LitElement {
     this._slmAvailable = false;
     this._localShoppingItems = [];
     this._settings = loadSettings();
+    setActiveLocale(this._settings.language);
     this._wide = false;
     this._sidebarCollapsed = false;
     this._gridScrollPos = 0;
@@ -417,7 +422,7 @@ class RecipeManagerCard extends LitElement {
       await Promise.all([this._loadRecipes(), this._loadTags(), this._loadShoppingLists(), this._loadGlobalTimers()]);
       await this._subscribe();
     } catch (e) {
-      this._error = e.message || 'Failed to load recipes';
+      this._error = e.message || msg('Failed to load recipes');
     } finally { this._loading = false; }
   }
 
@@ -547,8 +552,12 @@ class RecipeManagerCard extends LitElement {
   // -- Settings -------------------------------------------------------------
 
   _handleSettingsChange(e) {
+    const prevLanguage = this._settings.language;
     this._settings = e.detail.settings;
     saveSettings(this._settings);
+    if (this._settings.language !== prevLanguage) {
+      setActiveLocale(this._settings.language);
+    }
   }
 
   // -- Timer management -----------------------------------------------------
@@ -589,7 +598,7 @@ class RecipeManagerCard extends LitElement {
   }
 
   async _startTimer(seconds, label, presetId = null, global = false) {
-    const resolvedLabel = label || `${Math.floor(seconds / 60)} min timer`;
+    const resolvedLabel = label || msg(str`${Math.floor(seconds / 60)} min timer`);
     if (global && this._api) {
       try {
         const now = Date.now() / 1000;
@@ -893,7 +902,7 @@ class RecipeManagerCard extends LitElement {
     return html`
       <div class="header-stars"
         @mouseleave=${() => { this._hdrStarHover = 0; }}
-        title="${hover > 0 ? `Set rating: ${hover}★` : r > 0 ? `Rating: ${r}★ — click to change` : 'Click to rate'}">
+        title="${hover > 0 ? msg(str`Set rating: ${hover}★`) : r > 0 ? msg(str`Rating: ${r}★ — click to change`) : msg('Click to rate')}">
         ${[1, 2, 3, 4, 5].map(n => html`
           <span class="hdr-star ${n <= display ? 'filled' : ''}"
             @mouseover=${() => { this._hdrStarHover = n; }}
@@ -920,7 +929,7 @@ class RecipeManagerCard extends LitElement {
     const navItem = (icon, label, view, placeholder = false, clickFn = null) => html`
       <button
         class="sb-item ${v === view ? 'active' : ''} ${placeholder ? 'placeholder' : ''}"
-        title="${placeholder ? label + ' — coming soon' : label}"
+        title="${placeholder ? msg(str`${label} — coming soon`) : label}"
         @click=${placeholder ? undefined : (clickFn || (() => { this._navDirection = 'forward'; this._view = view; this._selectedRecipe = null; }))}
         ?disabled=${placeholder}
       >
@@ -934,7 +943,7 @@ class RecipeManagerCard extends LitElement {
         <div class="sb-top">
           <div class="sb-logo-row">
             <button class="sb-collapse-btn" @click=${() => { this._sidebarCollapsed = !this._sidebarCollapsed; }}
-              title="${collapsed ? 'Expand sidebar' : 'Collapse sidebar'}">
+              title="${collapsed ? msg('Expand sidebar') : msg('Collapse sidebar')}">
               <ha-icon icon="${collapsed ? 'mdi:menu-close' : 'mdi:menu-open'}"></ha-icon>
             </button>
           </div>
@@ -945,7 +954,7 @@ class RecipeManagerCard extends LitElement {
               <input
                 class="sb-search-input"
                 type="text"
-                placeholder="Search…"
+                placeholder="${msg('Search…')}"
                 .value=${this._searchQuery}
                 @input=${e => { this._searchQuery = e.target.value; this._navDirection = 'back'; this._view = 'grid'; }}
               />
@@ -958,43 +967,43 @@ class RecipeManagerCard extends LitElement {
 
             <button class="sb-new-btn" @click=${() => { this._view = 'add'; }}>
               <ha-icon icon="mdi:plus"></ha-icon>
-              <span>New Recipe</span>
+              <span>${msg('New Recipe')}</span>
             </button>
           ` : html`
-            <button class="sb-icon-only-btn" @click=${() => { this._view = 'add'; }} title="New Recipe">
+            <button class="sb-icon-only-btn" @click=${() => { this._view = 'add'; }} title="${msg('New Recipe')}">
               <ha-icon icon="mdi:plus"></ha-icon>
             </button>
           `}
         </div>
 
         <div class="sb-nav">
-          ${navItem('mdi:home', 'Home', 'grid')}
-          ${navItem('mdi:cart-outline', 'Shopping List', 'shopping')}
+          ${navItem('mdi:home', msg('Home'), 'grid')}
+          ${navItem('mdi:cart-outline', msg('Shopping List'), 'shopping')}
           ${this._settings.showPlanner
-        ? navItem('mdi:calendar-week', 'Meal Planner', 'planner', false, () => { this._plannerFromRecipe = null; this._navDirection = 'forward'; this._view = 'planner'; this._selectedRecipe = null; })
+        ? navItem('mdi:calendar-week', msg('Meal Planner'), 'planner', false, () => { this._plannerFromRecipe = null; this._navDirection = 'forward'; this._view = 'planner'; this._selectedRecipe = null; })
         : ''}
-          ${navItem('mdi:book-open-variant', 'Cookbook', 'cookbook', true)}
+          ${navItem('mdi:book-open-variant', msg('Cookbook'), 'cookbook', true)}
           <button
             class="sb-item ${v === 'timers' ? 'active' : ''}"
-            title="Timers"
+            title="${msg('Timers')}"
             @click=${() => { this._timersPrevView = this._view; this._view = 'timers'; }}
           >
             <ha-icon icon="mdi:timer-outline"></ha-icon>
-            ${!collapsed ? html`<span>Timers</span>` : ''}
+            ${!collapsed ? html`<span>${msg('Timers')}</span>` : ''}
             ${this._timers.length ? html`<span class="sb-timer-badge">${this._timers.length}</span>` : ''}
           </button>
         </div>
 
         <div class="sb-bottom">
-          <button class="sb-item placeholder" disabled title="Sync — coming soon">
-            <ha-icon icon="mdi:cloud-sync-outline"></ha-icon>${!collapsed ? html`<span>Sync</span>` : ''}
+          <button class="sb-item placeholder" disabled title="${msg('Sync — coming soon')}">
+            <ha-icon icon="mdi:cloud-sync-outline"></ha-icon>${!collapsed ? html`<span>${msg('Sync')}</span>` : ''}
           </button>
-          <button class="sb-item placeholder" disabled title="Help — coming soon">
-            <ha-icon icon="mdi:help-circle-outline"></ha-icon>${!collapsed ? html`<span>Help</span>` : ''}
+          <button class="sb-item placeholder" disabled title="${msg('Help — coming soon')}">
+            <ha-icon icon="mdi:help-circle-outline"></ha-icon>${!collapsed ? html`<span>${msg('Help')}</span>` : ''}
           </button>
           <button class="sb-item ${v === 'settings' ? 'active' : ''}"
             @click=${() => { this._view = 'settings'; }}>
-            <ha-icon icon="mdi:cog-outline"></ha-icon>${!collapsed ? html`<span>Settings</span>` : ''}
+            <ha-icon icon="mdi:cog-outline"></ha-icon>${!collapsed ? html`<span>${msg('Settings')}</span>` : ''}
           </button>
         </div>
       </nav>
@@ -1009,25 +1018,25 @@ class RecipeManagerCard extends LitElement {
     const wide = this._wide;
 
     const title =
-      inSettings ? 'Settings'
-        : inAdd ? 'New Recipe'
-          : inTimers ? 'Timers'
+      inSettings ? msg('Settings')
+        : inAdd ? msg('New Recipe')
+          : inTimers ? msg('Timers')
             : inDetail ? ''
-              : this._view === 'planner' ? 'Meal Planner'
-                : this._view === 'shopping' ? 'Shopping List'
-                  : 'Recipes';
+              : this._view === 'planner' ? msg('Meal Planner')
+                : this._view === 'shopping' ? msg('Shopping List')
+                  : msg('Recipes');
 
     return html`
       <div class="rm-header">
         <div class="rm-header-left">
           ${inDetail || inAdd ? html`
-            <button class="icon-btn" @click=${this._handleBack} title="Back">
+            <button class="icon-btn" @click=${this._handleBack} title="${msg('Back')}">
               <ha-icon icon="mdi:arrow-left"></ha-icon>
             </button>
           ` : inTimers && this._timersPrevView === 'detail' ? html`
             <button class="icon-btn"
               @click=${() => { this._navDirection = 'back'; this._view = 'detail'; this._timersPrevView = null; }}
-              title="Back to recipe">
+              title="${msg('Back to recipe')}">
               <ha-icon icon="mdi:arrow-left"></ha-icon>
             </button>
           ` : !wide && this._view !== 'grid' && !inSettings && !inTimers ? html`
@@ -1064,7 +1073,7 @@ class RecipeManagerCard extends LitElement {
           ` : !wide ? html`
             <button class="icon-btn"
               @click=${() => { this._mobileMenuOpen = !this._mobileMenuOpen; }}
-              title="${this._mobileMenuOpen ? 'Close menu' : 'Menu'}">
+              title="${this._mobileMenuOpen ? msg('Close menu') : msg('Menu')}">
               <ha-icon icon="${this._mobileMenuOpen ? 'mdi:close' : 'mdi:menu'}"></ha-icon>
             </button>
           ` : ''}
@@ -1100,6 +1109,7 @@ class RecipeManagerCard extends LitElement {
         .api=${this._api}
         .recipes=${this._recipes}
         .fromRecipe=${this._plannerFromRecipe}
+        .settings=${s}
         @rm-open-recipe=${this._handleOpenRecipe}
         @rm-back-to-recipe=${this._handleBackToRecipe}
       ></rm-meal-planner>
@@ -1124,7 +1134,7 @@ class RecipeManagerCard extends LitElement {
       <div class="rm-error">
         <ha-icon icon="mdi:alert-circle-outline"></ha-icon>
         <p>${this._error}</p>
-        <button class="text-btn" @click=${this._init.bind(this)}>Retry</button>
+        <button class="text-btn" @click=${this._init.bind(this)}>${msg('Retry')}</button>
       </div>
     `;
 
@@ -1204,10 +1214,10 @@ class RecipeManagerCard extends LitElement {
               const tOffset = circ * (1 - t.remaining / t.total);
               return html`
                 <div class="timer-card">
-                  <button class="preset-remove" @click=${() => this._stopTimer(t.id)} title="Remove">
+                  <button class="preset-remove" @click=${() => this._stopTimer(t.id)} title="${msg('Remove')}">
                     <ha-icon icon="mdi:close"></ha-icon>
                   </button>
-                  ${t.global ? html`<ha-icon class="timer-global-badge" icon="mdi:earth" title="Global timer"></ha-icon>` : ''}
+                  ${t.global ? html`<ha-icon class="timer-global-badge" icon="mdi:earth" title="${msg('Global timer')}"></ha-icon>` : ''}
                   <span class="timer-card-name">${t.label}</span>
                   <div class="preset-arc-wrap">
                     <svg viewBox="0 0 100 100">
@@ -1223,10 +1233,10 @@ class RecipeManagerCard extends LitElement {
                     </div>
                   </div>
                   <div class="preset-arc-btns">
-                    <button class="timer-ctrl-btn" @click=${() => this._pauseTimer(t.id)} title="${t.running ? 'Pause' : 'Resume'}">
+                    <button class="timer-ctrl-btn" @click=${() => this._pauseTimer(t.id)} title="${t.running ? msg('Pause') : msg('Resume')}">
                       <ha-icon icon="${t.running ? 'mdi:pause' : 'mdi:play'}"></ha-icon>
                     </button>
-                    <button class="timer-ctrl-btn danger" @click=${() => this._stopTimer(t.id)} title="Stop">
+                    <button class="timer-ctrl-btn danger" @click=${() => this._stopTimer(t.id)} title="${msg('Stop')}">
                       <ha-icon icon="mdi:stop"></ha-icon>
                     </button>
                   </div>
@@ -1237,8 +1247,8 @@ class RecipeManagerCard extends LitElement {
         ` : html`
           <div class="timer-empty">
             <ha-icon icon="mdi:timer-off-outline"></ha-icon>
-            <p>No active timers.</p>
-            <p class="timer-empty-hint">Tap a highlighted time in a recipe's directions to start one.</p>
+            <p>${msg('No active timers.')}</p>
+            <p class="timer-empty-hint">${msg("Tap a highlighted time in a recipe's directions to start one.")}</p>
           </div>
         `}
 
@@ -1248,20 +1258,20 @@ class RecipeManagerCard extends LitElement {
         <!-- Add timer section -->
         <div class="timer-add-section">
           <div class="timer-add-header">
-            <span class="timer-add-title">Add Timer</span>
-            <label class="timer-global-toggle ${this._globalMode ? 'active' : ''}" title="Sync timer across all devices via Home Assistant">
+            <span class="timer-add-title">${msg('Add Timer')}</span>
+            <label class="timer-global-toggle ${this._globalMode ? 'active' : ''}" title="${msg('Sync timer across all devices via Home Assistant')}">
               <input type="checkbox" .checked=${this._globalMode}
                 @change=${e => { this._globalMode = e.target.checked; }}
               />
               <ha-icon icon="mdi:earth"></ha-icon>
-              Global
+              ${msg('Global')}
             </label>
           </div>
 
           <div class="timer-add-group">
-            <div class="timer-add-group-label">Quick start</div>
+            <div class="timer-add-group-label">${msg('Quick start')}</div>
             <div class="timer-add-row">
-              <input type="text" class="timer-input" placeholder="Label (optional)"
+              <input type="text" class="timer-input" placeholder="${msg('Label (optional)')}"
                 .value=${this._quickTimerLabel}
                 @input=${e => { this._quickTimerLabel = e.target.value; }}
                 @keydown=${e => {
@@ -1272,7 +1282,7 @@ class RecipeManagerCard extends LitElement {
                   }
                 }}
               />
-              <input type="number" class="timer-input timer-mins-input" placeholder="min" min="0.5" step="0.5"
+              <input type="number" class="timer-input timer-mins-input" placeholder="${msg('min')}" min="0.5" step="0.5"
                 .value=${this._customTimerInput}
                 @input=${e => { this._customTimerInput = e.target.value; }}
                 @keydown=${e => {
@@ -1289,25 +1299,25 @@ class RecipeManagerCard extends LitElement {
                   this._customTimerInput = '';
                   this._quickTimerLabel = '';
                 }}>
-                <ha-icon icon="mdi:play" style="--mdc-icon-size:14px"></ha-icon> Start
+                <ha-icon icon="mdi:play" style="--mdc-icon-size:14px"></ha-icon> ${msg('Start')}
               </button>
             </div>
           </div>
 
           <div class="timer-add-group">
-            <div class="timer-add-group-label">Save preset</div>
+            <div class="timer-add-group-label">${msg('Save preset')}</div>
             <div class="timer-add-row">
-              <input type="text" class="timer-input" placeholder="Preset name"
+              <input type="text" class="timer-input" placeholder="${msg('Preset name')}"
                 .value=${this._presetNameInput}
                 @input=${e => { this._presetNameInput = e.target.value; }}
                 @keydown=${e => { if (e.key === 'Enter') this._addPresetTimer(); }}
               />
-              <input type="number" class="timer-input timer-mins-input" placeholder="min" min="0.5" step="0.5"
+              <input type="number" class="timer-input timer-mins-input" placeholder="${msg('min')}" min="0.5" step="0.5"
                 .value=${this._presetMinsInput}
                 @input=${e => { this._presetMinsInput = e.target.value; }}
                 @keydown=${e => { if (e.key === 'Enter') this._addPresetTimer(); }}
               />
-              <button class="action-btn" ?disabled=${!hasPreset} @click=${this._addPresetTimer}>+ Preset</button>
+              <button class="action-btn" ?disabled=${!hasPreset} @click=${this._addPresetTimer}>${msg('+ Preset')}</button>
             </div>
           </div>
         </div>
@@ -1327,7 +1337,7 @@ class RecipeManagerCard extends LitElement {
               const offset = isAlarming ? 0 : (!activeTimer ? circ : circ * (1 - remaining / total));
               return html`
                 <div class="timer-preset-card ${isAlarming ? 'alarming' : ''}">
-                  <button class="preset-remove" @click=${() => { if (activeTimer) this._stopTimer(activeTimer.id); this._removePreset(p.id); }} title="Remove">
+                  <button class="preset-remove" @click=${() => { if (activeTimer) this._stopTimer(activeTimer.id); this._removePreset(p.id); }} title="${msg('Remove')}">
                     <ha-icon icon="mdi:close"></ha-icon>
                   </button>
                   <span class="preset-arc-name">${p.name}</span>
@@ -1342,7 +1352,7 @@ class RecipeManagerCard extends LitElement {
                     </svg>
                     <div class="preset-arc-center">
                       ${isAlarming ? html`
-                        <span class="preset-arc-time" style="color:var(--error-color,#cf6679)">Done!</span>
+                        <span class="preset-arc-time" style="color:var(--error-color,#cf6679)">${msg('Done!')}</span>
                       ` : html`
                         <span class="preset-arc-time">${formatTimerDisplay(remaining)}</span>
                       `}
@@ -1350,23 +1360,23 @@ class RecipeManagerCard extends LitElement {
                   </div>
                   <div class="preset-arc-btns">
                     ${isAlarming ? html`
-                      <button class="preset-arc-btn" @click=${() => this._addTimeToTimer(activeTimer.id, 30)}>+30s</button>
-                      <button class="preset-arc-btn" @click=${() => this._addTimeToTimer(activeTimer.id, 60)}>+1m</button>
-                      <button class="preset-arc-btn" @click=${() => this._addTimeToTimer(activeTimer.id, 300)}>+5m</button>
-                      <button class="preset-arc-btn stop" @click=${() => this._stopTimer(activeTimer.id)}>Stop</button>
+                      <button class="preset-arc-btn" @click=${() => this._addTimeToTimer(activeTimer.id, 30)}>${msg('+30s')}</button>
+                      <button class="preset-arc-btn" @click=${() => this._addTimeToTimer(activeTimer.id, 60)}>${msg('+1m')}</button>
+                      <button class="preset-arc-btn" @click=${() => this._addTimeToTimer(activeTimer.id, 300)}>${msg('+5m')}</button>
+                      <button class="preset-arc-btn stop" @click=${() => this._stopTimer(activeTimer.id)}>${msg('Stop')}</button>
                     ` : isRunning ? html`
-                      <button class="preset-arc-btn" @click=${() => this._addTimeToTimer(activeTimer.id, 30)}>+30s</button>
-                      <button class="preset-arc-btn" @click=${() => this._addTimeToTimer(activeTimer.id, 60)}>+1m</button>
+                      <button class="preset-arc-btn" @click=${() => this._addTimeToTimer(activeTimer.id, 30)}>${msg('+30s')}</button>
+                      <button class="preset-arc-btn" @click=${() => this._addTimeToTimer(activeTimer.id, 60)}>${msg('+1m')}</button>
                       <button class="preset-arc-btn" @click=${() => this._pauseTimer(activeTimer.id)}>
                         <ha-icon icon="mdi:pause" style="--mdc-icon-size:12px;vertical-align:middle"></ha-icon>
                       </button>
-                      <button class="preset-arc-btn stop" @click=${() => this._stopTimer(activeTimer.id)}>Stop</button>
+                      <button class="preset-arc-btn stop" @click=${() => this._stopTimer(activeTimer.id)}>${msg('Stop')}</button>
                     ` : activeTimer ? html`
-                      <button class="preset-arc-btn" @click=${() => this._pauseTimer(activeTimer.id)}>Resume</button>
-                      <button class="preset-arc-btn stop" @click=${() => this._stopTimer(activeTimer.id)}>Stop</button>
+                      <button class="preset-arc-btn" @click=${() => this._pauseTimer(activeTimer.id)}>${msg('Resume')}</button>
+                      <button class="preset-arc-btn stop" @click=${() => this._stopTimer(activeTimer.id)}>${msg('Stop')}</button>
                     ` : html`
                       <button class="preset-arc-btn play" @click=${() => this._startTimer(p.seconds, p.name, p.id)}>
-                        <ha-icon icon="mdi:play" style="--mdc-icon-size:14px;vertical-align:middle"></ha-icon> Start
+                        <ha-icon icon="mdi:play" style="--mdc-icon-size:14px;vertical-align:middle"></ha-icon> ${msg('Start')}
                       </button>
                     `}
                   </div>
@@ -1387,14 +1397,14 @@ class RecipeManagerCard extends LitElement {
         <div class="alarm-bubble">
           <ha-icon icon="mdi:alarm" class="alarm-icon"></ha-icon>
           <div class="alarm-label">${alarm.label}</div>
-          <div class="alarm-sub">Timer complete!</div>
+          <div class="alarm-sub">${msg('Timer complete!')}</div>
           <div class="alarm-btns">
-            <button class="alarm-btn" @click=${() => this._addTimeToTimer(alarm.id, 30)}>+30s</button>
-            <button class="alarm-btn" @click=${() => this._addTimeToTimer(alarm.id, 60)}>+1 min</button>
-            <button class="alarm-btn" @click=${() => this._addTimeToTimer(alarm.id, 300)}>+5 min</button>
-            <button class="alarm-btn" @click=${() => this._addTimeToTimer(alarm.id, 600)}>+10 min</button>
+            <button class="alarm-btn" @click=${() => this._addTimeToTimer(alarm.id, 30)}>${msg('+30s')}</button>
+            <button class="alarm-btn" @click=${() => this._addTimeToTimer(alarm.id, 60)}>${msg('+1 min')}</button>
+            <button class="alarm-btn" @click=${() => this._addTimeToTimer(alarm.id, 300)}>${msg('+5 min')}</button>
+            <button class="alarm-btn" @click=${() => this._addTimeToTimer(alarm.id, 600)}>${msg('+10 min')}</button>
             <div class="alarm-custom-row">
-              <input type="number" class="alarm-custom-input" placeholder="min" min="1"
+              <input type="number" class="alarm-custom-input" placeholder="${msg('min')}" min="1"
                 .value=${this._alarmAddInput}
                 @input=${e => { this._alarmAddInput = e.target.value; }}
                 @keydown=${e => {
@@ -1410,9 +1420,9 @@ class RecipeManagerCard extends LitElement {
                   const m = parseInt(this._alarmAddInput);
                   if (m > 0) this._addTimeToTimer(alarm.id, m * 60);
                   this._alarmAddInput = '';
-                }}>+min</button>
+                }}>${msg('+min')}</button>
             </div>
-            <button class="alarm-btn stop" @click=${this._dismissAlarm}>Stop</button>
+            <button class="alarm-btn stop" @click=${this._dismissAlarm}>${msg('Stop')}</button>
           </div>
         </div>
       </div>
@@ -1431,19 +1441,19 @@ class RecipeManagerCard extends LitElement {
     `;
     return html`
       <nav class="rm-bottom-nav">
-        ${btn('mdi:home', 'Home', 'grid', () => { this._navDirection = 'back'; this._view = 'grid'; this._selectedRecipe = null; })}
-        ${btn('mdi:cart-outline', 'Shopping', 'shopping')}
+        ${btn('mdi:home', msg('Home'), 'grid', () => { this._navDirection = 'back'; this._view = 'grid'; this._selectedRecipe = null; })}
+        ${btn('mdi:cart-outline', msg('Shopping'), 'shopping')}
         <button class="rm-bn-btn rm-bn-add"
           @click=${() => { this._navDirection = 'forward'; this._view = 'add'; }}
-          title="New Recipe">
+          title="${msg('New Recipe')}">
           <ha-icon icon="mdi:plus"></ha-icon>
         </button>
-        ${btn('mdi:calendar-week', 'Planner', 'planner', () => { this._plannerFromRecipe = null; this._navDirection = 'forward'; this._view = 'planner'; this._selectedRecipe = null; })}
+        ${btn('mdi:calendar-week', msg('Planner'), 'planner', () => { this._plannerFromRecipe = null; this._navDirection = 'forward'; this._view = 'planner'; this._selectedRecipe = null; })}
         <button class="rm-bn-btn ${v === 'timers' ? 'active' : ''}"
           @click=${() => { this._navDirection = 'forward'; this._timersPrevView = this._view; this._view = 'timers'; }}
-          title="Timers">
+          title="${msg('Timers')}">
           <ha-icon icon="mdi:timer-outline"></ha-icon>
-          <span>Timers</span>
+          <span>${msg('Timers')}</span>
           ${this._timers.length ? html`<span class="rm-bn-badge">${this._timers.length}</span>` : ''}
         </button>
       </nav>
@@ -1456,7 +1466,7 @@ class RecipeManagerCard extends LitElement {
         <nav class="rm-mobile-menu" @click=${e => e.stopPropagation()}>
           <div class="rm-mm-header">
             <ha-icon icon="mdi:chef-hat" class="rm-mm-logo"></ha-icon>
-            <span class="rm-mm-title">Recipes</span>
+            <span class="rm-mm-title">${msg('Recipes')}</span>
             <button class="icon-btn" @click=${() => { this._mobileMenuOpen = false; }}>
               <ha-icon icon="mdi:close"></ha-icon>
             </button>
@@ -1464,12 +1474,12 @@ class RecipeManagerCard extends LitElement {
           <div class="rm-mm-items">
             <button class="rm-mm-item" @click=${() => { this._view = 'settings'; this._mobileMenuOpen = false; }}>
               <ha-icon icon="mdi:cog-outline"></ha-icon>
-              <span>Settings</span>
+              <span>${msg('Settings')}</span>
             </button>
             <button class="rm-mm-item" disabled>
               <ha-icon icon="mdi:help-circle-outline"></ha-icon>
-              <span>Help</span>
-              <span class="rm-mm-soon">Soon</span>
+              <span>${msg('Help')}</span>
+              <span class="rm-mm-soon">${msg('Soon')}</span>
             </button>
           </div>
         </nav>
@@ -2308,7 +2318,7 @@ try { customElements.define('recipe-manager-card', RecipeManagerCard); } catch {
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'recipe-manager-card',
-  name: 'Recipe Manager',
-  description: 'Manage, browse, and plan meals with your recipe collection.',
+  name: msg('Recipe Manager'),
+  description: msg('Manage, browse, and plan meals with your recipe collection.'),
   preview: false,
 });

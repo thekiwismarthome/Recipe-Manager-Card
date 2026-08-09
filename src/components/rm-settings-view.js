@@ -3,7 +3,18 @@
  * Tabs: Appearance (theme, dark, font, grid, nav) | Advanced (sound, wake lock, units) | Sync | Help
  */
 import { LitElement, html, css } from 'lit';
+import { msg, str } from '@lit/localize';
 import { CARD_VERSION } from 'virtual:card-version';
+
+const LANGUAGES = [
+  ['en', 'English'],
+  ['es', 'Español'],
+  ['fr', 'Français'],
+  ['de', 'Deutsch'],
+  ['pt', 'Português'],
+  ['nl', 'Nederlands'],
+  ['it', 'Italiano'],
+];
 
 class RmSettingsView extends LitElement {
   static properties = {
@@ -83,10 +94,10 @@ class RmSettingsView extends LitElement {
       <div class="settings-root">
         <div class="tab-bar">
           ${[
-            ['appearance', 'mdi:palette-outline',      'Appearance'],
-            ['advanced',   'mdi:tune-variant',         'Advanced'],
-            ['sync',       'mdi:cloud-sync-outline',   'Sync'],
-            ['help',       'mdi:help-circle-outline',  'Help'],
+            ['appearance', 'mdi:palette-outline',      msg('Appearance')],
+            ['advanced',   'mdi:tune-variant',         msg('Advanced')],
+            ['sync',       'mdi:cloud-sync-outline',   msg('Sync')],
+            ['help',       'mdi:help-circle-outline',  msg('Help')],
           ].map(([id, icon, label]) => html`
             <button class="tab-item ${this._activeTab === id ? 'active' : ''}"
               @click=${() => { this._activeTab = id; }}>
@@ -110,40 +121,64 @@ class RmSettingsView extends LitElement {
     const alwaysLight = s.theme === 'arctic'   || s.theme === 'meadow' || s.theme === 'ocean';
     const noToggle    = alwaysDark || alwaysLight;
     return html`
-      <!-- ── Theme ── -->
+      <!-- ── Language & Units ── -->
       <div class="section">
-        <div class="section-label">Theme</div>
+        <div class="section-label">${msg('Language & Units')}</div>
 
         <div class="setting-row">
-          <span class="setting-name">Colour theme</span>
+          <span class="setting-name">${msg('Language')}</span>
+          <select class="theme-select" @change=${e => this._update({ language: e.target.value })}>
+            ${LANGUAGES.map(([code, label]) => html`
+              <option value="${code}" ?selected=${(s.language ?? 'en') === code}>${label}</option>
+            `)}
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-name">${msg('Preferred units')}</span>
+          <div class="btn-group">
+            ${[['imperial', msg('Imperial')], ['metric', msg('Metric')]].map(([val, lbl]) => html`
+              <button class="seg-btn ${(s.unitSystem ?? 'imperial') === val ? 'active' : ''}"
+                @click=${() => this._update({ unitSystem: val })}>${lbl}</button>
+            `)}
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Theme ── -->
+      <div class="section">
+        <div class="section-label">${msg('Theme')}</div>
+
+        <div class="setting-row">
+          <span class="setting-name">${msg('Colour theme')}</span>
           <select class="theme-select" @change=${e => this._update({ theme: e.target.value })}>
-            <optgroup label="Adaptive">
-              <option value="soft"     ?selected=${s.theme === 'soft' || !s.theme}>🎨 Soft Pastel</option>
-              <option value="blossom"  ?selected=${s.theme === 'blossom' }>🌸 Blossom</option>
+            <optgroup label="${msg('Adaptive')}">
+              <option value="soft"     ?selected=${s.theme === 'soft' || !s.theme}>${msg('🎨 Soft Pastel')}</option>
+              <option value="blossom"  ?selected=${s.theme === 'blossom' }>${msg('🌸 Blossom')}</option>
             </optgroup>
-            <optgroup label="Light Themes">
-              <option value="arctic"   ?selected=${s.theme === 'arctic'  }>🧊 Arctic</option>
-              <option value="meadow"   ?selected=${s.theme === 'meadow'  }>🌿 Meadow</option>
-              <option value="ocean"    ?selected=${s.theme === 'ocean'   }>🌊 Ocean Blue</option>
+            <optgroup label="${msg('Light Themes')}">
+              <option value="arctic"   ?selected=${s.theme === 'arctic'  }>${msg('🧊 Arctic')}</option>
+              <option value="meadow"   ?selected=${s.theme === 'meadow'  }>${msg('🌿 Meadow')}</option>
+              <option value="ocean"    ?selected=${s.theme === 'ocean'   }>${msg('🌊 Ocean Blue')}</option>
             </optgroup>
-            <optgroup label="Dark Themes">
-              <option value="midnight" ?selected=${s.theme === 'midnight'}>🌙 Midnight Ocean</option>
-              <option value="ember"    ?selected=${s.theme === 'ember'   }>🔥 Ember</option>
-              <option value="neon"     ?selected=${s.theme === 'neon'    }>🍇 Purple &amp; Cyan</option>
+            <optgroup label="${msg('Dark Themes')}">
+              <option value="midnight" ?selected=${s.theme === 'midnight'}>${msg('🌙 Midnight Ocean')}</option>
+              <option value="ember"    ?selected=${s.theme === 'ember'   }>${msg('🔥 Ember')}</option>
+              <option value="neon"     ?selected=${s.theme === 'neon'    }>${msg('🍇 Purple & Cyan')}</option>
             </optgroup>
           </select>
         </div>
 
         ${noToggle ? html`
           <div class="setting-row muted-row">
-            <span class="setting-name">Dark mode</span>
-            <span class="muted-note">${alwaysDark ? 'Always dark for this theme' : 'Always light for this theme'}</span>
+            <span class="setting-name">${msg('Dark mode')}</span>
+            <span class="muted-note">${alwaysDark ? msg('Always dark for this theme') : msg('Always light for this theme')}</span>
           </div>
         ` : html`
           <div class="setting-row">
-            <span class="setting-name">Dark mode</span>
+            <span class="setting-name">${msg('Dark mode')}</span>
             <div class="btn-group">
-              ${[['off','Light'],['system','Auto'],['on','Dark']].map(([val, lbl]) => html`
+              ${[['off', msg('Light')], ['system', msg('Auto')], ['on', msg('Dark')]].map(([val, lbl]) => html`
                 <button class="seg-btn ${s.darkMode === val ? 'active' : ''}"
                   @click=${() => this._update({ darkMode: val })}>${lbl}</button>
               `)}
@@ -152,9 +187,9 @@ class RmSettingsView extends LitElement {
         `}
 
         <div class="setting-row">
-          <span class="setting-name">Text size</span>
+          <span class="setting-name">${msg('Text size')}</span>
           <div class="btn-group">
-            ${[['small','S'],['medium','M'],['large','L']].map(([val, lbl]) => html`
+            ${[['small', msg('S')], ['medium', msg('M')], ['large', msg('L')]].map(([val, lbl]) => html`
               <button class="seg-btn ${s.fontSize === val ? 'active' : ''}"
                 @click=${() => this._update({ fontSize: val })}>${lbl}</button>
             `)}
@@ -164,10 +199,10 @@ class RmSettingsView extends LitElement {
 
       <!-- ── Recipe Grid ── -->
       <div class="section">
-        <div class="section-label">Recipe Grid</div>
+        <div class="section-label">${msg('Recipe Grid')}</div>
 
         <div class="setting-row">
-          <span class="setting-name">Recipe columns</span>
+          <span class="setting-name">${msg('Recipe columns')}</span>
           <div class="btn-group">
             ${[2, 3, 4, 5, 8, 10].map(n => html`
               <button class="seg-btn ${s.columns === n ? 'active' : ''}"
@@ -177,7 +212,7 @@ class RmSettingsView extends LitElement {
         </div>
 
         <div class="setting-row">
-          <span class="setting-name">Favourites section</span>
+          <span class="setting-name">${msg('Favourites section')}</span>
           <label class="toggle">
             <input type="checkbox" ?checked=${s.showFavourites}
               @change=${e => this._update({ showFavourites: e.target.checked })} />
@@ -187,8 +222,8 @@ class RmSettingsView extends LitElement {
 
         <div class="setting-row">
           <div class="setting-info">
-            <span class="setting-name">Recent recipes count</span>
-            <span class="setting-hint">Recipes shown in the Recent filter tab</span>
+            <span class="setting-name">${msg('Recent recipes count')}</span>
+            <span class="setting-hint">${msg('Recipes shown in the Recent filter tab')}</span>
           </div>
           <div class="btn-group">
             ${[6, 12, 24].map(n => html`
@@ -201,10 +236,10 @@ class RmSettingsView extends LitElement {
 
       <!-- ── Navigation ── -->
       <div class="section">
-        <div class="section-label">Navigation</div>
+        <div class="section-label">${msg('Navigation')}</div>
 
         <div class="setting-row">
-          <span class="setting-name">Meal planner</span>
+          <span class="setting-name">${msg('Meal planner')}</span>
           <label class="toggle">
             <input type="checkbox" ?checked=${s.showPlanner}
               @change=${e => this._update({ showPlanner: e.target.checked })} />
@@ -219,53 +254,53 @@ class RmSettingsView extends LitElement {
     return html`
       <!-- ── Timer Sound ── -->
       <div class="section">
-        <div class="section-label">Timer Sound</div>
+        <div class="section-label">${msg('Timer Sound')}</div>
 
         <div class="setting-row">
-          <span class="setting-name">Alarm sound</span>
+          <span class="setting-name">${msg('Alarm sound')}</span>
           <select class="theme-select" @change=${e => this._update({ timerSound: e.target.value })}>
-            <option value="beep"  ?selected=${(s.timerSound ?? 'beep') === 'beep'}>Beep</option>
-            <option value="ding"  ?selected=${s.timerSound === 'ding'            }>Ding</option>
-            <option value="alarm" ?selected=${s.timerSound === 'alarm'           }>Alarm (3 beeps)</option>
-            <option value="none"  ?selected=${s.timerSound === 'none'            }>Silent</option>
-            <option value="file"  ?selected=${s.timerSound === 'file'            }>Custom file…</option>
+            <option value="beep"  ?selected=${(s.timerSound ?? 'beep') === 'beep'}>${msg('Beep')}</option>
+            <option value="ding"  ?selected=${s.timerSound === 'ding'            }>${msg('Ding')}</option>
+            <option value="alarm" ?selected=${s.timerSound === 'alarm'           }>${msg('Alarm (3 beeps)')}</option>
+            <option value="none"  ?selected=${s.timerSound === 'none'            }>${msg('Silent')}</option>
+            <option value="file"  ?selected=${s.timerSound === 'file'            }>${msg('Custom file…')}</option>
           </select>
         </div>
 
         ${s.timerSound === 'file' ? html`
           <div class="setting-row">
             <div class="setting-info">
-              <span class="setting-name">Sound file</span>
-              <span class="setting-hint">${s.timerSoundFileName || 'No file selected'}</span>
+              <span class="setting-name">${msg('Sound file')}</span>
+              <span class="setting-hint">${s.timerSoundFileName || msg('No file selected')}</span>
             </div>
             <label class="file-label">
               <input type="file" accept="audio/*" class="file-input"
                 @change=${this._handleSoundFileChange} />
               <ha-icon icon="mdi:folder-music-outline"></ha-icon>
-              ${s.timerSoundFile ? 'Change' : 'Choose file'}
+              ${s.timerSoundFile ? msg('Change') : msg('Choose file')}
             </label>
           </div>
         ` : ''}
 
         <div class="setting-row">
           <div class="setting-info">
-            <span class="setting-name">Test sound</span>
-            <span class="setting-hint">Play a preview of the selected alarm</span>
+            <span class="setting-name">${msg('Test sound')}</span>
+            <span class="setting-hint">${msg('Play a preview of the selected alarm')}</span>
           </div>
           <button class="seg-btn active" @click=${() => this._testSound(s.timerSound ?? 'beep', s.timerSoundFile)}>
-            <ha-icon icon="mdi:volume-high"></ha-icon> Play
+            <ha-icon icon="mdi:volume-high"></ha-icon> ${msg('Play')}
           </button>
         </div>
       </div>
 
       <!-- ── Keep Screen On ── -->
       <div class="section">
-        <div class="section-label">Keep Screen On</div>
+        <div class="section-label">${msg('Keep Screen On')}</div>
 
         <div class="setting-row">
           <div class="setting-info">
-            <span class="setting-name">Keep screen on while viewing a recipe</span>
-            <span class="setting-hint">Uses Wake Lock API (Chrome / Edge / Android)</span>
+            <span class="setting-name">${msg('Keep screen on while viewing a recipe')}</span>
+            <span class="setting-hint">${msg('Uses Wake Lock API (Chrome / Edge / Android)')}</span>
           </div>
           <label class="toggle">
             <input type="checkbox" ?checked=${s.keepScreenOn}
@@ -277,8 +312,8 @@ class RmSettingsView extends LitElement {
         ${s.keepScreenOn ? html`
           <div class="setting-row">
             <div class="setting-info">
-              <span class="setting-name">Auto-release after</span>
-              <span class="setting-hint">Screen lock released after this many minutes</span>
+              <span class="setting-name">${msg('Auto-release after')}</span>
+              <span class="setting-hint">${msg('Screen lock released after this many minutes')}</span>
             </div>
             <div class="btn-group">
               ${[15, 30, 45, 60].map(n => html`
@@ -292,12 +327,12 @@ class RmSettingsView extends LitElement {
 
       <!-- ── Unit Conversion ── -->
       <div class="section">
-        <div class="section-label">Unit Conversion</div>
+        <div class="section-label">${msg('Unit Conversion')}</div>
 
         <div class="setting-row">
           <div class="setting-info">
-            <span class="setting-name">Show metric conversion button</span>
-            <span class="setting-hint">Button in Ingredients tab converts oz/lb/cups/fl oz → g/ml/kg</span>
+            <span class="setting-name">${msg('Show metric conversion button')}</span>
+            <span class="setting-hint">${msg('Button in Ingredients tab converts oz/lb/cups/fl oz → g/ml/kg')}</span>
           </div>
           <label class="toggle">
             <input type="checkbox" ?checked=${s.showUnitConversion}
@@ -309,17 +344,17 @@ class RmSettingsView extends LitElement {
 
       <!-- ── Image Slideshow ── -->
       <div class="section">
-        <div class="section-label">Image Slideshow</div>
+        <div class="section-label">${msg('Image Slideshow')}</div>
 
         <div class="setting-row">
           <div class="setting-info">
-            <span class="setting-name">Auto-advance interval</span>
-            <span class="setting-hint">Seconds between slides when a recipe has multiple images (0 = off)</span>
+            <span class="setting-name">${msg('Auto-advance interval')}</span>
+            <span class="setting-hint">${msg('Seconds between slides when a recipe has multiple images (0 = off)')}</span>
           </div>
           <div class="btn-group">
             ${[0, 3, 5, 10, 15].map(n => html`
               <button class="seg-btn ${(s.slideshowInterval ?? 5) === n ? 'active' : ''}"
-                @click=${() => this._update({ slideshowInterval: n })}>${n === 0 ? 'Off' : `${n}s`}</button>
+                @click=${() => this._update({ slideshowInterval: n })}>${n === 0 ? msg('Off') : `${n}s`}</button>
             `)}
           </div>
         </div>
@@ -377,19 +412,19 @@ class RmSettingsView extends LitElement {
 
 
   _renderSync() {
-    const btnLabel = this._backupState === 'loading' ? 'Backing up…'
-                   : this._backupState === 'done'    ? 'Downloaded ✓'
-                   : this._backupState === 'error'   ? 'Failed ✗'
-                   : 'Download backup';
+    const btnLabel = this._backupState === 'loading' ? msg('Backing up…')
+                   : this._backupState === 'done'    ? msg('Downloaded ✓')
+                   : this._backupState === 'error'   ? msg('Failed ✗')
+                   : msg('Download backup');
 
     return html`
       <div class="section">
-        <div class="section-label">Backup</div>
+        <div class="section-label">${msg('Backup')}</div>
 
         <div class="setting-row">
           <div class="setting-info">
-            <span class="setting-name">Export recipes</span>
-            <span class="setting-hint">Download all recipes and meal plans as a JSON file</span>
+            <span class="setting-name">${msg('Export recipes')}</span>
+            <span class="setting-hint">${msg('Download all recipes and meal plans as a JSON file')}</span>
           </div>
           <button
             class="seg-btn backup-btn ${this._backupState || ''}"
@@ -404,13 +439,13 @@ class RmSettingsView extends LitElement {
   _renderHelp() {
     return html`
       <div class="section">
-        <div class="section-label">FAQ &amp; Support</div>
+        <div class="section-label">${msg('FAQ & Support')}</div>
 
         <a class="help-link" href="https://github.com/thekiwismarthome/recipe-manager/wiki" target="_blank">
           <ha-icon icon="mdi:help-circle-outline"></ha-icon>
           <div class="help-link-content">
-            <span class="setting-name">FAQ</span>
-            <span class="setting-hint">Frequently asked questions</span>
+            <span class="setting-name">${msg('FAQ')}</span>
+            <span class="setting-hint">${msg('Frequently asked questions')}</span>
           </div>
           <ha-icon icon="mdi:open-in-new" class="help-link-ext"></ha-icon>
         </a>
@@ -418,8 +453,8 @@ class RmSettingsView extends LitElement {
         <a class="help-link" href="https://github.com/thekiwismarthome/recipe-manager/issues" target="_blank">
           <ha-icon icon="mdi:bug-outline"></ha-icon>
           <div class="help-link-content">
-            <span class="setting-name">Report a Problem</span>
-            <span class="setting-hint">Submit an issue on GitHub</span>
+            <span class="setting-name">${msg('Report a Problem')}</span>
+            <span class="setting-hint">${msg('Submit an issue on GitHub')}</span>
           </div>
           <ha-icon icon="mdi:open-in-new" class="help-link-ext"></ha-icon>
         </a>
@@ -427,28 +462,28 @@ class RmSettingsView extends LitElement {
         <a class="help-link" href="https://github.com/thekiwismarthome/recipe-manager" target="_blank">
           <ha-icon icon="mdi:github"></ha-icon>
           <div class="help-link-content">
-            <span class="setting-name">GitHub Repository</span>
-            <span class="setting-hint">View source code</span>
+            <span class="setting-name">${msg('GitHub Repository')}</span>
+            <span class="setting-hint">${msg('View source code')}</span>
           </div>
           <ha-icon icon="mdi:open-in-new" class="help-link-ext"></ha-icon>
         </a>
       </div>
 
       <div class="section">
-        <div class="section-label">About</div>
+        <div class="section-label">${msg('About')}</div>
 
         <div class="setting-row">
-          <span class="setting-name">Recipe Manager</span>
-          <span class="muted-note">Integration version ${this._rmVersion}</span>
+          <span class="setting-name">${msg('Recipe Manager')}</span>
+          <span class="muted-note">${msg(str`Integration version ${this._rmVersion}`)}</span>
         </div>
 
         <div class="setting-row">
-          <span class="setting-name">RM Card</span>
-          <span class="muted-note">Card version ${this._rmcVersion}</span>
+          <span class="setting-name">${msg('RM Card')}</span>
+          <span class="muted-note">${msg(str`Card version ${this._rmcVersion}`)}</span>
         </div>
 
         <div class="setting-row">
-          <span class="setting-name">Refresh versions</span>
+          <span class="setting-name">${msg('Refresh versions')}</span>
           <button class="seg-btn" @click=${() => this._fetchVersionsFromHacs()}>
             <ha-icon icon="mdi:refresh"></ha-icon>
           </button>

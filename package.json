@@ -9,7 +9,7 @@
     "lint:fix": "eslint src/**/*.js --fix",
     "prebuild": "npm run lint",
     "build": "rollup -c",
-    "postbuild": "cp recipe-manager-card.js ../Recipe-Manager/custom_components/recipe_manager/www/recipe-manager-card.js",
+    "postbuild": "cp recipe-manager-card.js ../Recipe-Manager/custom_components/recipe_manager/www/recipe-manager-card.js && rm -rf ../Recipe-Manager/custom_components/recipe_manager/www/locales ../Recipe-Manager/custom_components/recipe_manager/www/chunks && cp -r locales ../Recipe-Manager/custom_components/recipe_manager/www/locales && ([ -d chunks ] && cp -r chunks ../Recipe-Manager/custom_components/recipe_manager/www/chunks || true)",
     "watch": "rollup -c -w"
   },
   "dependencies": {
