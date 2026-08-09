@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "jszip": "^3.10.1",
-    "lit": "^3.0.0"
+    "lit": "^3.0.0",
+    "@lit/localize": "^0.12.2"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.7",
@@ -24,6 +25,7 @@
     "eslint": "^8.57.0",
     "@babel/eslint-parser": "^7.24.7",
     "eslint-plugin-wc": "^2.1.0",
-    "eslint-plugin-lit-a11y": "^4.1.2"
+    "eslint-plugin-lit-a11y": "^4.1.2",
+    "@lit/localize-tools": "^0.8.2"
   }
 }
