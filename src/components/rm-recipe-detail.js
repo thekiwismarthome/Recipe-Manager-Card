@@ -4,6 +4,9 @@
 import { LitElement, html, css } from 'lit';
 import { msg, str } from '@lit/localize';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+import { acquire as acquireWakeLock, release as releaseWakeLock, isWakeLockSupported, onChange as onWakeLockChange } from '../services/wake-lock.js';
+
+const WAKE_LOCK_REASON = 'recipe-detail';
 
 // ---------------------------------------------------------------------------
 // Minimal Markdown renderer (bold, italic, headers, lists, links, code)
@@ -200,35 +203,41 @@ class RmRecipeDetail extends LitElement {
     this._editIngEdit = null;
     this._slideTimer = null;
     this._slideTouchStartX = null;
-    this._wakeLockSentinel = null;
     this._wakeLockTimeout = null;
+    this._wakeLockUnsubscribeFn = null;
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    // Keep _wakeActive in sync even if the lock is released by the browser
+    // itself (e.g. another tab/component reason changed) rather than by us.
+    this._wakeLockUnsubscribeFn = onWakeLockChange(active => { this._wakeActive = active; });
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     this._releaseWakeLock();
+    this._wakeLockUnsubscribeFn?.();
+    this._wakeLockUnsubscribeFn = null;
     this._stopSlideTimer();
   }
 
-  // -- Wake Lock -----------------------------------------------------------
+  // -- Wake Lock -------------------------------------------------------------
+  // Auto-engages whenever a recipe is open and "keep screen on" is enabled
+  // in settings (see updated() below) — the button is a manual override on
+  // top of that, e.g. to release it early or to engage it once even when
+  // the setting is off.
 
   async _requestWakeLock() {
-    if (!('wakeLock' in navigator)) return;
-    try {
-      this._wakeLockSentinel = await navigator.wakeLock.request('screen');
-      this._wakeActive = true;
-      const durationMin = this.settings?.wakeLockDuration ?? 60;
-      this._wakeLockTimeout = setTimeout(() => this._releaseWakeLock(), durationMin * 60_000);
-    } catch (err) { console.warn('Wake Lock failed:', err); }
+    if (this._wakeLockTimeout) { clearTimeout(this._wakeLockTimeout); this._wakeLockTimeout = null; }
+    await acquireWakeLock(WAKE_LOCK_REASON);
+    const durationMin = this.settings?.wakeLockDuration ?? 60;
+    this._wakeLockTimeout = setTimeout(() => this._releaseWakeLock(), durationMin * 60_000);
   }
 
   async _releaseWakeLock() {
-    if (this._wakeLockSentinel) {
-      try { await this._wakeLockSentinel.release(); } catch { /* ignore */ }
-      this._wakeLockSentinel = null;
-    }
-    this._wakeActive = false;
     if (this._wakeLockTimeout) { clearTimeout(this._wakeLockTimeout); this._wakeLockTimeout = null; }
+    await releaseWakeLock(WAKE_LOCK_REASON);
   }
 
   updated(changedProps) {
@@ -252,6 +261,13 @@ class RmRecipeDetail extends LitElement {
     }
     if (changedProps.has('settings')) {
       this._startSlideTimer();
+    }
+    if ((changedProps.has('recipe') || changedProps.has('settings')) && this.recipe) {
+      if (this.settings?.keepScreenOn) this._requestWakeLock();
+      else this._releaseWakeLock();
+    }
+    if (changedProps.has('recipe') && !this.recipe) {
+      this._releaseWakeLock();
     }
     if (changedProps.has('shoppingLists') && this.shoppingLists.length && !this._selectedListId) {
       this._selectedListId = this.shoppingLists[0]?.id ?? '';
@@ -1036,6 +1052,17 @@ class RmRecipeDetail extends LitElement {
 
   _renderWakeLock() {
     if (!this.settings?.keepScreenOn) return '';
+    if (!isWakeLockSupported()) {
+      return html`
+        <div class="wakelock-row">
+          <span class="wakelock-unsupported"
+            title="${msg('Requires a secure (HTTPS) connection and a browser that supports the Wake Lock API')}">
+            <ha-icon icon="mdi:eye-off-outline"></ha-icon>
+            ${msg('Screen lock unavailable')}
+          </span>
+        </div>
+      `;
+    }
     return html`
       <div class="wakelock-row">
         <button class="wakelock-btn ${this._wakeActive ? 'active' : ''}"
@@ -2274,6 +2301,13 @@ class RmRecipeDetail extends LitElement {
       background: var(--rm-accent-soft); color: var(--rm-accent);
       border-color: var(--rm-accent);
     }
+    .wakelock-unsupported {
+      display: inline-flex; align-items: center; gap: 5px;
+      border: 1px dashed var(--rm-border);
+      border-radius: 20px; padding: 4px 12px;
+      font-size: 12px; color: var(--rm-text-muted); opacity: 0.8;
+    }
+    .wakelock-unsupported ha-icon { --mdc-icon-size: 14px; }
 
     /* Metric toggle */
     .metric-toggle-row {

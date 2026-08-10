@@ -5,6 +5,7 @@
 import { LitElement, html, css } from 'lit';
 import { msg, str } from '@lit/localize';
 import { CARD_VERSION } from 'virtual:card-version';
+import { isWakeLockSupported } from '../services/wake-lock.js';
 
 const LANGUAGES = [
   ['en', 'English'],
@@ -300,7 +301,7 @@ class RmSettingsView extends LitElement {
         <div class="setting-row">
           <div class="setting-info">
             <span class="setting-name">${msg('Keep screen on while viewing a recipe')}</span>
-            <span class="setting-hint">${msg('Uses Wake Lock API (Chrome / Edge / Android)')}</span>
+            <span class="setting-hint">${msg('Uses the Wake Lock API — engages automatically while a recipe is open')}</span>
           </div>
           <label class="toggle">
             <input type="checkbox" ?checked=${s.keepScreenOn}
@@ -308,6 +309,12 @@ class RmSettingsView extends LitElement {
             <span class="toggle-track"><span class="toggle-thumb"></span></span>
           </label>
         </div>
+
+        ${s.keepScreenOn && !isWakeLockSupported() ? html`
+          <div class="setting-row muted-row">
+            <span class="setting-hint">${msg('Not available in this browser/connection — the Wake Lock API requires a secure (HTTPS) connection to Home Assistant. This is the most common reason "keep screen on" doesn\'t work.')}</span>
+          </div>
+        ` : ''}
 
         ${s.keepScreenOn ? html`
           <div class="setting-row">

@@ -5,6 +5,9 @@ import { LitElement, html, css } from 'lit';
 import { msg, str } from '@lit/localize';
 import { RecipeManagerAPI } from './services/api.js';
 import { setActiveLocale, allLocales } from './services/localize.js';
+import { acquire as acquireWakeLock, release as releaseWakeLock, isWakeLockSupported } from './services/wake-lock.js';
+
+const GLOBAL_WAKE_LOCK_REASON = 'manual-toggle';
 
 import './components/rm-recipe-grid.js';
 import './components/rm-recipe-detail.js';
@@ -22,6 +25,20 @@ const LOCAL_SHOPPING_KEY = 'rm_shopping';
 const RECENT_RECIPES_KEY = 'rm_recent_recipes';
 const TIMERS_KEY = 'rm_timers';
 const TIMER_PRESETS_KEY = 'rm_timer_presets';
+const VIEW_STATE_KEY = 'rm_view_state';
+// Views worth restoring after a reload — excludes transient/in-progress ones
+// like 'add' (mid-import dialog) or 'timers' (a temporary overlay).
+const RESTORABLE_VIEWS = ['grid', 'detail', 'settings', 'planner', 'shopping'];
+
+function loadViewState() {
+  try {
+    const raw = sessionStorage.getItem(VIEW_STATE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+function saveViewState(state) {
+  try { sessionStorage.setItem(VIEW_STATE_KEY, JSON.stringify(state)); } catch { /* ignore */ }
+}
 
 function loadTimerPresets() {
   try {
@@ -295,10 +312,15 @@ class RecipeManagerCard extends LitElement {
     _plannerFromRecipe: { type: Object },
     _globalMode: { type: Boolean },
     _quickTimerLabel: { type: String },
+    _globalWakeActive: { type: Boolean },
   };
 
   constructor() {
     super();
+    // Captured immediately so the very first reactive update cycle (which
+    // fires before _init() finishes loading recipes) can't clobber it by
+    // saving the default 'grid' view over whatever was persisted.
+    this._pendingViewRestore = loadViewState();
     this._view = 'grid';
     this._recipes = [];
     this._tags = [];
@@ -342,6 +364,8 @@ class RecipeManagerCard extends LitElement {
     this._darkModeQuery = null;
     this._resizeObserver = null;
     this._timerTick = null;
+    this._globalWakeActive = false;
+    this._globalWakeUnsubscribeFn = null;
   }
 
   setConfig(config) { this._config = config; }
@@ -389,6 +413,7 @@ class RecipeManagerCard extends LitElement {
     if (this._timerAlarm) { this._stopAlarmLoop(); this._timerAlarm = null; }
     this._timerAlarmQueue = [];
     saveTimers(this._timers);
+    if (this._globalWakeActive) releaseWakeLock(GLOBAL_WAKE_LOCK_REASON);
   }
 
   _onSystemDark = () => {
@@ -410,6 +435,37 @@ class RecipeManagerCard extends LitElement {
     }
     if (changedProps.has('hass') && this._api) this._api.hass = this.hass;
     if (changedProps.has('_settings')) this._applyTheme();
+    if (changedProps.has('_view') || changedProps.has('_selectedRecipe')) this._saveViewState();
+  }
+
+  // -- View-state persistence -------------------------------------------------
+  // Mobile browsers commonly discard a backgrounded tab's JS state (e.g.
+  // after the screen locks) and reload it fresh when it comes back into
+  // view. Without this, that reload always dumps the user back on the grid
+  // — this restores whatever they were last looking at.
+
+  _saveViewState() {
+    if (!RESTORABLE_VIEWS.includes(this._view)) return;
+    saveViewState({
+      view: this._view,
+      recipeId: this._view === 'detail' ? (this._selectedRecipe?.id ?? null) : null,
+    });
+  }
+
+  _restoreViewState() {
+    const state = this._pendingViewRestore;
+    this._pendingViewRestore = null;
+    if (!state || !RESTORABLE_VIEWS.includes(state.view)) return;
+    if (state.view === 'detail' && state.recipeId) {
+      const recipe = this._recipes.find(r => r.id === state.recipeId);
+      if (recipe) {
+        this._selectedRecipe = recipe;
+        this._view = 'detail';
+      }
+      // If the recipe no longer exists, fall through and stay on the default grid.
+    } else if (state.view !== 'detail') {
+      this._view = state.view;
+    }
   }
 
   _applyTheme() {
@@ -438,6 +494,7 @@ class RecipeManagerCard extends LitElement {
     this._loadLocalShopping();
     try {
       await Promise.all([this._loadRecipes(), this._loadTags(), this._loadShoppingLists(), this._loadGlobalTimers()]);
+      this._restoreViewState();
       await this._subscribe();
     } catch (e) {
       this._error = e.message || msg('Failed to load recipes');
@@ -575,6 +632,22 @@ class RecipeManagerCard extends LitElement {
     saveSettings(this._settings);
     if (this._settings.language !== prevLanguage) {
       setActiveLocale(this._settings.language);
+    }
+  }
+
+  // -- Screen wake lock -------------------------------------------------------
+  // Manual, global override — independent of rm-recipe-detail's automatic
+  // per-recipe lock, and with no auto-release timeout: stays on until the
+  // user turns it off (or navigates away from the card entirely).
+
+  async _toggleGlobalWakeLock() {
+    if (!isWakeLockSupported()) return;
+    if (this._globalWakeActive) {
+      await releaseWakeLock(GLOBAL_WAKE_LOCK_REASON);
+      this._globalWakeActive = false;
+    } else {
+      await acquireWakeLock(GLOBAL_WAKE_LOCK_REASON);
+      this._globalWakeActive = true;
     }
   }
 
@@ -1083,6 +1156,15 @@ class RecipeManagerCard extends LitElement {
           ` : ''}
 
           ${inDetail ? this._renderStars(this._selectedRecipe.rating) : ''}
+
+          <button class="icon-btn wake-toggle-btn ${this._globalWakeActive ? 'active' : ''}"
+            @click=${this._toggleGlobalWakeLock}
+            ?disabled=${!isWakeLockSupported()}
+            title="${!isWakeLockSupported()
+              ? msg('Keep screen awake — requires a secure (HTTPS) connection and a supported browser')
+              : this._globalWakeActive ? msg('Screen awake — click to allow sleep') : msg('Keep screen awake')}">
+            <ha-icon icon="${this._globalWakeActive ? 'mdi:eye' : 'mdi:eye-off-outline'}"></ha-icon>
+          </button>
 
           ${inSettings || inAdd || inTimers ? html`
             <button class="icon-btn" @click=${this._handleShowGrid}>
@@ -1817,6 +1899,9 @@ class RecipeManagerCard extends LitElement {
       transition: background 0.15s, color 0.15s; padding: 0; flex-shrink: 0;
     }
     .icon-btn:hover { background: var(--rm-border); color: var(--rm-text); }
+    .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .icon-btn:disabled:hover { background: none; }
+    .wake-toggle-btn.active { background: var(--rm-accent-soft); color: var(--rm-accent); }
 
     .text-btn {
       background: var(--rm-accent); color: #fff; border: none;

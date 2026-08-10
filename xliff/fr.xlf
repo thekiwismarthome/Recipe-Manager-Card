@@ -779,9 +779,6 @@
 <trans-unit id="sae053488c98df7d2">
   <source>Keep screen on while viewing a recipe</source>
 <target>Garder l'écran allumé pendant l'affichage d'une recette</target></trans-unit>
-<trans-unit id="s9b5bf4678fb483b3">
-  <source>Uses Wake Lock API (Chrome / Edge / Android)</source>
-<target>Utilise l'API Wake Lock (Chrome / Edge / Android)</target></trans-unit>
 <trans-unit id="s32b613b27b7728ac">
   <source>Auto-release after</source>
 <target>Libération automatique après</target></trans-unit>
@@ -1049,6 +1046,27 @@
 <trans-unit id="s5cc9f324aa312869">
   <source>Manage, browse, and plan meals with your recipe collection.</source>
 <target>Gérez, parcourez et planifiez des repas avec votre collection de recettes.</target></trans-unit>
+<trans-unit id="s846ec0c0514bfe80">
+  <source>Requires a secure (HTTPS) connection and a browser that supports the Wake Lock API</source>
+<target>Nécessite une connexion sécurisée (HTTPS) et un navigateur prenant en charge l'API Wake Lock</target></trans-unit>
+<trans-unit id="sb1aadf39bb1f8b26">
+  <source>Screen lock unavailable</source>
+<target>Verrouillage d'écran indisponible</target></trans-unit>
+<trans-unit id="s2d73ff026ed96788">
+  <source>Uses the Wake Lock API — engages automatically while a recipe is open</source>
+<target>Utilise l'API Wake Lock — s'active automatiquement lors de l'affichage d'une recette</target></trans-unit>
+<trans-unit id="s344cbe7520342ad3">
+  <source>Not available in this browser/connection — the Wake Lock API requires a secure (HTTPS) connection to Home Assistant. This is the most common reason "keep screen on" doesn't work.</source>
+<target>Non disponible sur ce navigateur/cette connexion — l'API Wake Lock nécessite une connexion sécurisée (HTTPS) à Home Assistant. C'est la raison la plus courante pour laquelle « garder l'écran allumé » ne fonctionne pas.</target></trans-unit>
+<trans-unit id="s7ad0d6112cabb5c1">
+  <source>Keep screen awake — requires a secure (HTTPS) connection and a supported browser</source>
+<target>Garder l'écran allumé — nécessite une connexion sécurisée (HTTPS) et un navigateur compatible</target></trans-unit>
+<trans-unit id="s7453cf188e1a1b29">
+  <source>Screen awake — click to allow sleep</source>
+<target>Écran allumé — cliquez pour autoriser la mise en veille</target></trans-unit>
+<trans-unit id="sfb75e276e558684f">
+  <source>Keep screen awake</source>
+<target>Garder l'écran allumé</target></trans-unit>
 </body>
 </file>
 </xliff>
