@@ -779,9 +779,6 @@
 <trans-unit id="sae053488c98df7d2">
   <source>Keep screen on while viewing a recipe</source>
 <target>Scherm aan houden tijdens het bekijken van een recept</target></trans-unit>
-<trans-unit id="s9b5bf4678fb483b3">
-  <source>Uses Wake Lock API (Chrome / Edge / Android)</source>
-<target>Gebruikt Wake Lock API (Chrome / Edge / Android)</target></trans-unit>
 <trans-unit id="s32b613b27b7728ac">
   <source>Auto-release after</source>
 <target>Automatisch vrijgeven na</target></trans-unit>
@@ -1049,6 +1046,27 @@
 <trans-unit id="s5cc9f324aa312869">
   <source>Manage, browse, and plan meals with your recipe collection.</source>
 <target>Beheer, blader en plan maaltijden met je receptencollectie.</target></trans-unit>
+<trans-unit id="s846ec0c0514bfe80">
+  <source>Requires a secure (HTTPS) connection and a browser that supports the Wake Lock API</source>
+<target>Vereist een beveiligde (HTTPS-)verbinding en een browser die de Wake Lock API ondersteunt</target></trans-unit>
+<trans-unit id="sb1aadf39bb1f8b26">
+  <source>Screen lock unavailable</source>
+<target>Schermvergrendeling niet beschikbaar</target></trans-unit>
+<trans-unit id="s2d73ff026ed96788">
+  <source>Uses the Wake Lock API — engages automatically while a recipe is open</source>
+<target>Gebruikt de Wake Lock API — wordt automatisch geactiveerd terwijl een recept geopend is</target></trans-unit>
+<trans-unit id="s344cbe7520342ad3">
+  <source>Not available in this browser/connection — the Wake Lock API requires a secure (HTTPS) connection to Home Assistant. This is the most common reason "keep screen on" doesn't work.</source>
+<target>Niet beschikbaar in deze browser/verbinding — de Wake Lock API vereist een beveiligde (HTTPS-)verbinding met Home Assistant. Dit is de meest voorkomende reden waarom "scherm aan houden" niet werkt.</target></trans-unit>
+<trans-unit id="s7ad0d6112cabb5c1">
+  <source>Keep screen awake — requires a secure (HTTPS) connection and a supported browser</source>
+<target>Scherm wakker houden — vereist een beveiligde (HTTPS-)verbinding en een ondersteunde browser</target></trans-unit>
+<trans-unit id="s7453cf188e1a1b29">
+  <source>Screen awake — click to allow sleep</source>
+<target>Scherm actief — klik om slaapstand toe te staan</target></trans-unit>
+<trans-unit id="sfb75e276e558684f">
+  <source>Keep screen awake</source>
+<target>Scherm wakker houden</target></trans-unit>
 </body>
 </file>
 </xliff>

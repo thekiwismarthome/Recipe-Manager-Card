@@ -779,9 +779,6 @@
 <trans-unit id="sae053488c98df7d2">
   <source>Keep screen on while viewing a recipe</source>
 <target>Bildschirm beim Anzeigen eines Rezepts eingeschaltet lassen</target></trans-unit>
-<trans-unit id="s9b5bf4678fb483b3">
-  <source>Uses Wake Lock API (Chrome / Edge / Android)</source>
-<target>Verwendet die Wake-Lock-API (Chrome / Edge / Android)</target></trans-unit>
 <trans-unit id="s32b613b27b7728ac">
   <source>Auto-release after</source>
 <target>Automatisch freigeben nach</target></trans-unit>
@@ -1049,6 +1046,27 @@
 <trans-unit id="s5cc9f324aa312869">
   <source>Manage, browse, and plan meals with your recipe collection.</source>
 <target>Verwalten, durchsuchen und planen Sie Mahlzeiten mit Ihrer Rezeptsammlung.</target></trans-unit>
+<trans-unit id="s846ec0c0514bfe80">
+  <source>Requires a secure (HTTPS) connection and a browser that supports the Wake Lock API</source>
+<target>Erfordert eine sichere (HTTPS-)Verbindung und einen Browser, der die Wake-Lock-API unterstützt</target></trans-unit>
+<trans-unit id="sb1aadf39bb1f8b26">
+  <source>Screen lock unavailable</source>
+<target>Bildschirmsperre nicht verfügbar</target></trans-unit>
+<trans-unit id="s2d73ff026ed96788">
+  <source>Uses the Wake Lock API — engages automatically while a recipe is open</source>
+<target>Verwendet die Wake-Lock-API — aktiviert sich automatisch, während ein Rezept geöffnet ist</target></trans-unit>
+<trans-unit id="s344cbe7520342ad3">
+  <source>Not available in this browser/connection — the Wake Lock API requires a secure (HTTPS) connection to Home Assistant. This is the most common reason "keep screen on" doesn't work.</source>
+<target>In diesem Browser/dieser Verbindung nicht verfügbar — die Wake-Lock-API erfordert eine sichere (HTTPS-)Verbindung zu Home Assistant. Dies ist der häufigste Grund, warum „Bildschirm eingeschaltet lassen" nicht funktioniert.</target></trans-unit>
+<trans-unit id="s7ad0d6112cabb5c1">
+  <source>Keep screen awake — requires a secure (HTTPS) connection and a supported browser</source>
+<target>Bildschirm wach halten — erfordert eine sichere (HTTPS-)Verbindung und einen unterstützten Browser</target></trans-unit>
+<trans-unit id="s7453cf188e1a1b29">
+  <source>Screen awake — click to allow sleep</source>
+<target>Bildschirm wach — klicken, um den Ruhezustand zuzulassen</target></trans-unit>
+<trans-unit id="sfb75e276e558684f">
+  <source>Keep screen awake</source>
+<target>Bildschirm wach halten</target></trans-unit>
 </body>
 </file>
 </xliff>
