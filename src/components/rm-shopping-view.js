@@ -6,9 +6,21 @@
  */
 import { LitElement, html, css } from 'lit';
 import { msg } from '@lit/localize';
+import { paletteFor, normaliseUiStyle } from '../styles/ui-styles.js';
+
+const SLM_PALETTE_MAP = {
+  '--slm-bg-main': '--rm-bg-main', '--slm-bg-surface': '--rm-bg-surface', '--slm-bg-elevated': '--rm-bg-elevated',
+  '--slm-tile-bg': '--rm-bg-surface',
+  '--slm-text-primary': '--rm-text', '--slm-text-secondary': '--rm-text-secondary', '--slm-text-muted': '--rm-text-secondary',
+  '--slm-border-subtle': '--rm-border', '--slm-line-soft': '--rm-line',
+  '--slm-accent-primary': '--rm-accent', '--slm-accent-ink': '--rm-ink', '--slm-accent-soft': '--rm-accent-soft',
+  '--slm-accent-text': '--rm-accent-text', '--slm-accent-warning': '--rm-warn', '--slm-accent-danger': '--rm-danger',
+};
+const SLM_PALETTE_TOKENS = Object.keys(SLM_PALETTE_MAP);
 
 class RmShoppingView extends LitElement {
   static properties = {
+    uiStyle: { type: String, attribute: 'ui-style', reflect: true },
     hass: { type: Object },
     slmAvailable: { type: Boolean },
     shoppingLists: { type: Array },
@@ -49,7 +61,7 @@ class RmShoppingView extends LitElement {
         if (changedProps.has('hass') && this.hass) {
           this._slmCard.hass = this.hass;
         }
-        if (changedProps.has('settings') && this.settings && this._slmCard) {
+        if ((changedProps.has('settings') || changedProps.has('uiStyle')) && this.settings && this._slmCard) {
           this._syncSlmTheme();
         }
       }
@@ -61,6 +73,43 @@ class RmShoppingView extends LitElement {
     const { theme, darkMode } = this.settings;
     this._slmCard.settings = { ...this._slmCard.settings, theme, darkMode };
     this._slmCard.applyColorScheme?.();
+    this._syncSlmPalette();
+  }
+
+  // Fresh / Compact: give the embedded Shopping List Manager the same palette as the rest of
+  // the card. Outer inline custom properties beat SLM's own :host defaults, so no change is
+  // needed inside SLM. (Its layout stays the classic embedded one.)
+  _syncSlmPalette() {
+    const card = this._slmCard;
+    if (!card) return;
+    const ui = normaliseUiStyle(this.settings?.uiStyle);
+    const d = this.settings?.darkMode;
+    const dark = d === 'on' ? true : d === 'off' ? false : (window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false);
+    const frame = ['--ha-card-border-radius', '--ha-card-box-shadow', '--ha-card-border-width'];
+
+    // Newer Shopping List Manager builds take the host's style and colour mode directly and
+    // restyle themselves (Fresh / Compact). Older builds ignore this and get the colour-only fallback below.
+    if ('hostUi' in card) {
+      for (const k of SLM_PALETTE_TOKENS) card.style.removeProperty(k);
+      card.hostUi = ui === 'classic' ? undefined : ui;
+      card.hostDark = dark;
+      card.applyColorScheme?.();
+      if (ui === 'classic') frame.forEach(k => card.style.removeProperty(k));
+      else {
+        card.style.setProperty('--ha-card-border-radius', '0');
+        card.style.setProperty('--ha-card-box-shadow', 'none');
+        card.style.setProperty('--ha-card-border-width', '0');
+      }
+      return;
+    }
+    const map = SLM_PALETTE_MAP;
+    if (ui === 'classic') {
+      for (const k of [...Object.keys(map), '--ha-card-border-radius']) card.style.removeProperty(k);
+      return;
+    }
+    const pal = paletteFor(ui, dark);
+    for (const [slm, rm] of Object.entries(map)) card.style.setProperty(slm, pal[rm]);
+    card.style.setProperty('--ha-card-border-radius', pal['--rm-radius-card']);
   }
 
   _mountSlmCard() {
@@ -377,6 +426,24 @@ class RmShoppingView extends LitElement {
     }
     .sv-checkbox.checked { color: #fff; background: #78909c; border-color: #78909c; }
     .sv-checkbox ha-icon { --mdc-icon-size: 14px; }
+
+    /* ═══ Fresh + Compact ═══ */
+    :host([ui-style="fresh"]) .slm-card-wrap,
+    :host([ui-style="compact"]) .slm-card-wrap { padding: 0; }
+    :host([ui-style="fresh"]) .sv-header,
+    :host([ui-style="compact"]) .sv-header { border-bottom: none; padding: 20px 20px 8px; }
+    :host([ui-style="fresh"]) .sv-list-name,
+    :host([ui-style="compact"]) .sv-list-name { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: var(--rm-text); }
+    :host([ui-style="fresh"]) .sv-btn,
+    :host([ui-style="compact"]) .sv-btn { min-height: 44px; border-radius: 999px; }
+    :host([ui-style="compact"]) .sv-btn { border-radius: 12px; }
+    :host([ui-style="fresh"]) .sv-install-banner,
+    :host([ui-style="compact"]) .sv-install-banner { margin: 8px 20px; border: none; border-radius: var(--rm-radius-card); background: var(--rm-accent-soft); color: var(--rm-accent-text); }
+    :host([ui-style="fresh"]) .sv-items,
+    :host([ui-style="compact"]) .sv-items { margin: 8px 20px 24px; padding: 2px 14px; background: var(--rm-bg-surface); border: 1px solid var(--rm-border); border-radius: var(--rm-radius-card); overflow: hidden; }
+    :host([ui-style="compact"]) .sv-items { border-color: transparent; }
+    :host([ui-style="fresh"]) .sv-checkbox.checked,
+    :host([ui-style="compact"]) .sv-checkbox.checked { background: var(--rm-accent); border-color: var(--rm-accent); color: var(--rm-ink); }
   `;
 }
 

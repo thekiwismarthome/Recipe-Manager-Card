@@ -19,6 +19,7 @@ const LANGUAGES = [
 
 class RmSettingsView extends LitElement {
   static properties = {
+    uiStyle: { type: String, attribute: 'ui-style', reflect: true },
     hass:          { type: Object },
     settings:      { type: Object },
     _activeTab:    { type: String },
@@ -151,6 +152,19 @@ class RmSettingsView extends LitElement {
         <div class="section-label">${msg('Theme')}</div>
 
         <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-name">${msg('Interface style')}</span>
+          </div>
+          <div class="btn-group">
+            ${[['fresh', msg('Fresh')], ['compact', msg('Compact')], ['classic', msg('Classic')]].map(([val, lbl]) => html`
+              <button class="seg-btn ${(s.uiStyle ?? 'fresh') === val ? 'active' : ''}"
+                @click=${() => this._update({ uiStyle: val })}>${lbl}</button>
+            `)}
+          </div>
+        </div>
+
+        ${(s.uiStyle ?? 'fresh') === 'classic' ? html`
+        <div class="setting-row">
           <span class="setting-name">${msg('Colour theme')}</span>
           <select class="theme-select" @change=${e => this._update({ theme: e.target.value })}>
             <optgroup label="${msg('Adaptive')}">
@@ -169,8 +183,9 @@ class RmSettingsView extends LitElement {
             </optgroup>
           </select>
         </div>
+        ` : ''}
 
-        ${noToggle ? html`
+        ${noToggle && (s.uiStyle ?? 'fresh') === 'classic' ? html`
           <div class="setting-row muted-row">
             <span class="setting-name">${msg('Dark mode')}</span>
             <span class="muted-note">${alwaysDark ? msg('Always dark for this theme') : msg('Always light for this theme')}</span>
@@ -599,7 +614,7 @@ class RmSettingsView extends LitElement {
     }
     .seg-btn ha-icon { --mdc-icon-size: 16px; }
     .seg-btn:last-child { border-right: none; }
-    .seg-btn.active { background: var(--rm-accent); color: #fff; }
+    .seg-btn.active { background: var(--rm-accent); color: var(--rm-ink, #fff); }
     .seg-btn:hover:not(.active) { background: var(--rm-border); color: var(--rm-text); }
 
     .toggle { display: flex; align-items: center; cursor: pointer; flex-shrink: 0; }
@@ -636,6 +651,64 @@ class RmSettingsView extends LitElement {
     .placeholder-tab ha-icon { --mdc-icon-size: 48px; opacity: 0.3; }
     .placeholder-title { font-size: 18px; font-weight: 600; color: var(--rm-text); }
     .placeholder-msg { font-size: 14px; max-width: 280px; line-height: 1.5; }
+
+    /* ═══ Fresh + Compact ═══ */
+    :host([ui-style="fresh"]) .tab-bar,
+    :host([ui-style="compact"]) .tab-bar { background: transparent; border-bottom: none; gap: 8px; padding: 16px 16px 4px; }
+    :host([ui-style="fresh"]) .tab-item,
+    :host([ui-style="compact"]) .tab-item {
+      min-height: 40px; padding: 0 16px; border: 1px solid var(--rm-border); border-radius: 999px;
+      background: var(--rm-bg-surface); color: var(--rm-text); font-weight: 600; font-size: 14px;
+    }
+    :host([ui-style="compact"]) .tab-item { border-radius: 12px; border-color: transparent; }
+    :host([ui-style="fresh"]) .tab-item.active,
+    :host([ui-style="compact"]) .tab-item.active { background: var(--rm-text); border-color: var(--rm-text); color: var(--rm-bg-main); font-weight: 700; }
+    :host([ui-style="fresh"]) .settings-body,
+    :host([ui-style="compact"]) .settings-body { padding-bottom: 32px; }
+    :host([ui-style="fresh"]) .section-label,
+    :host([ui-style="compact"]) .section-label {
+      padding: 18px 24px 8px; font-size: 12px; letter-spacing: 0.06em; color: var(--rm-text-secondary);
+    }
+    /* Rows in a section read as one rounded card */
+    :host([ui-style="fresh"]) .setting-row,
+    :host([ui-style="compact"]) .setting-row {
+      margin: 0 16px; padding: 12px 16px; min-height: 60px;
+      background: var(--rm-bg-surface);
+      border: 1px solid var(--rm-border); border-top: none; border-bottom-color: var(--rm-line);
+    }
+    :host([ui-style="compact"]) .setting-row { border-color: transparent; border-bottom-color: var(--rm-line); }
+    :host([ui-style="fresh"]) .section-label + .setting-row,
+    :host([ui-style="compact"]) .section-label + .setting-row { border-top: 1px solid var(--rm-border); border-radius: var(--rm-radius-card) var(--rm-radius-card) 0 0; }
+    :host([ui-style="compact"]) .section-label + .setting-row { border-top-color: transparent; }
+    :host([ui-style="fresh"]) .setting-row:last-child,
+    :host([ui-style="compact"]) .setting-row:last-child { border-bottom-color: var(--rm-border); border-radius: 0 0 var(--rm-radius-card) var(--rm-radius-card); }
+    :host([ui-style="compact"]) .setting-row:last-child { border-bottom-color: transparent; }
+    :host([ui-style="fresh"]) .section-label + .setting-row:last-child,
+    :host([ui-style="compact"]) .section-label + .setting-row:last-child { border-radius: var(--rm-radius-card); }
+    :host([ui-style="fresh"]) .setting-name,
+    :host([ui-style="compact"]) .setting-name { font-weight: 700; }
+    :host([ui-style="fresh"]) .btn-group,
+    :host([ui-style="compact"]) .btn-group { border-radius: 14px; padding: 3px; gap: 2px; background: var(--rm-bg-main); }
+    :host([ui-style="fresh"]) .seg-btn,
+    :host([ui-style="compact"]) .seg-btn { min-height: 38px; padding: 0 14px; border-right: none; border-radius: 11px; font-weight: 600; color: var(--rm-text-secondary); }
+    :host([ui-style="fresh"]) .seg-btn.active,
+    :host([ui-style="compact"]) .seg-btn.active { background: var(--rm-accent); color: var(--rm-ink); font-weight: 700; }
+    :host([ui-style="fresh"]) .theme-select,
+    :host([ui-style="compact"]) .theme-select { border-radius: 12px; min-height: 44px; padding: 0 12px; }
+    :host([ui-style="fresh"]) .toggle-track,
+    :host([ui-style="compact"]) .toggle-track { width: 48px; height: 28px; border-radius: 99px; background: var(--rm-bg-elevated); box-shadow: inset 0 0 0 1px var(--rm-border); }
+    :host([ui-style="fresh"]) .toggle-thumb,
+    :host([ui-style="compact"]) .toggle-thumb { top: 3px; left: 3px; width: 22px; height: 22px; background: var(--rm-text-secondary); box-shadow: none; }
+    :host([ui-style="fresh"]) .toggle input:checked + .toggle-track,
+    :host([ui-style="compact"]) .toggle input:checked + .toggle-track { background: var(--rm-accent); box-shadow: none; }
+    :host([ui-style="fresh"]) .toggle input:checked ~ .toggle-track .toggle-thumb,
+    :host([ui-style="compact"]) .toggle input:checked ~ .toggle-track .toggle-thumb { transform: translateX(20px); background: var(--rm-ink); }
+    :host([ui-style="fresh"]) .file-label,
+    :host([ui-style="compact"]) .file-label { border-radius: 999px; min-height: 40px; padding: 0 16px; }
+    :host([ui-style="fresh"]) .setting-row,
+    :host([ui-style="compact"]) .setting-row { flex-wrap: wrap; }
+    :host([ui-style="fresh"]) .btn-group,
+    :host([ui-style="compact"]) .btn-group { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
   `;
 }
 

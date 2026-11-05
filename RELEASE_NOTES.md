@@ -1,3 +1,17 @@
+# Beta 2026.11.1-beta.1 — Fresh and Compact interface styles
+
+Branch `beta`. Not a release. Versions now follow the Shopping List Manager scheme (`YYYY.M.N`, betas as `-beta.N`).
+
+- **Interface style** setting (Settings > Appearance): **Fresh** (default), **Compact**, or **Classic** (the previous look and named colour themes, unchanged).
+- Fresh and Compact use the same palettes and shapes as Shopping List Manager, in light and dark.
+- **Fresh:** pill header, round buttons, rounded recipe cards, a "Tonight" card showing today's planned dinner and how many dinners are planned this week, floating bottom nav and a + button.
+- **Compact:** bold title, square buttons, collapsible recipe rows, flat bottom tab bar, + in the header.
+- Restyled: recipe grid and filters, recipe detail (narrow and wide), planner, settings, add recipe, timers, sidebar.
+- **Meal planner** has a new day view in Fresh and Compact: pick a day, see its breakfast, lunch, dinner and snack in one card, with today and the next day shown together (side by side on wide screens). Classic keeps the week grid.
+- The embedded **Shopping List Manager** follows the style and light/dark mode (needs the matching Shopping List Manager beta; older versions only pick up the colours). Its own tab bar sits flat inside the card.
+
+---
+
 # Release Notes — Recipe Manager Card v1.0.0
 
 First public release of the Recipe Manager Card for Home Assistant.

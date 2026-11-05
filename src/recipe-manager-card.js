@@ -6,6 +6,7 @@ import { msg, str } from '@lit/localize';
 import { RecipeManagerAPI } from './services/api.js';
 import { setActiveLocale, allLocales } from './services/localize.js';
 import { acquire as acquireWakeLock, release as releaseWakeLock, isWakeLockSupported } from './services/wake-lock.js';
+import { paletteFor, normaliseUiStyle } from './styles/ui-styles.js';
 
 const GLOBAL_WAKE_LOCK_REASON = 'manual-toggle';
 
@@ -51,6 +52,9 @@ function saveTimerPresets(presets) {
 }
 
 const DEFAULT_SETTINGS = {
+  // 'fresh' | 'compact' | 'classic'. Fresh and Compact share their palettes with
+  // Shopping List Manager; Classic keeps the original named themes below.
+  uiStyle: 'fresh',
   theme: 'soft',
   darkMode: 'system',
   fontSize: 'medium',
@@ -294,6 +298,7 @@ class RecipeManagerCard extends LitElement {
     _wide: { type: Boolean },
     _sidebarCollapsed: { type: Boolean },
     _gridScrollPos: { type: Number },
+    _weekPlan: { type: Array },
     _recentRecipeIds: { type: Array },
     _timers: { type: Array },
     _timerAlarm: { type: Object },
@@ -337,6 +342,7 @@ class RecipeManagerCard extends LitElement {
     setActiveLocale(this._settings.language);
     this._wide = false;
     this._sidebarCollapsed = false;
+    this._weekPlan = [];
     this._gridScrollPos = 0;
     this._recentRecipeIds = loadRecentRecipes();
     this._timers = loadTimers();
@@ -470,6 +476,30 @@ class RecipeManagerCard extends LitElement {
 
   _applyTheme() {
     const s = this._settings;
+    const ui = normaliseUiStyle(s.uiStyle);
+    this.setAttribute('data-ui', ui);
+    this.style.setProperty('--rm-font-size-base', FONT_SIZE_MAP[s.fontSize] ?? '15px');
+    this.style.setProperty('--rm-grid-columns', `repeat(${s.columns ?? 3}, minmax(0, 1fr))`);
+
+    // Fresh / Compact: one fixed palette per style (light or dark), same as Shopping List Manager.
+    if (ui !== 'classic') {
+      let dark;
+      if (s.darkMode === 'on') dark = true;
+      else if (s.darkMode === 'off') dark = false;
+      else dark = this._darkModeQuery?.matches ?? false;
+      this.setAttribute('data-mode', dark ? 'dark' : 'light');
+      for (const [k, v] of Object.entries(paletteFor(ui, dark))) this.style.setProperty(k, v);
+      return;
+    }
+
+    // Classic: original named themes. Clear the tokens only the new styles define so
+    // they fall back to the stylesheet defaults.
+    this.removeAttribute('data-mode');
+    for (const k of ['--rm-bg', '--rm-surface', '--rm-success', '--rm-accent-text', '--rm-ink', '--rm-line', '--rm-warn', '--rm-danger', '--rm-radius-card', '--rm-shadow-float']) {
+      this.style.removeProperty(k);
+    }
+    this.style.removeProperty('--rm-radius');
+    this.style.removeProperty('--rm-radius-sm');
     const themeVars = THEME_VARS[s.theme] ?? THEME_VARS.soft;
     const alwaysDark = !themeVars.light;
     const alwaysLight = !themeVars.dark;
@@ -493,12 +523,24 @@ class RecipeManagerCard extends LitElement {
     this._loading = true;
     this._loadLocalShopping();
     try {
-      await Promise.all([this._loadRecipes(), this._loadTags(), this._loadShoppingLists(), this._loadGlobalTimers()]);
+      await Promise.all([this._loadRecipes(), this._loadTags(), this._loadShoppingLists(), this._loadGlobalTimers(), this._loadWeekPlan()]);
       this._restoreViewState();
       await this._subscribe();
     } catch (e) {
       this._error = e.message || msg('Failed to load recipes');
     } finally { this._loading = false; }
+  }
+
+  // This week's meal plan, used by the "tonight" hero on the recipe grid.
+  async _loadWeekPlan() {
+    try {
+      const d = new Date();
+      const day = (d.getDay() + 6) % 7; // Monday = 0
+      d.setDate(d.getDate() - day);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const res = await this._api.getMealPlan(iso);
+      this._weekPlan = res?.entries ?? [];
+    } catch { this._weekPlan = []; }
   }
 
   async _loadGlobalTimers() {
@@ -576,6 +618,8 @@ class RecipeManagerCard extends LitElement {
             this._selectedRecipe = this._recipes.find(r => r.id === this._selectedRecipe.id)
               ?? this._selectedRecipe;
           }
+        } else if (/meal_plan/.test(t ?? '')) {
+          this._loadWeekPlan();
         } else if (t === 'recipe_manager_global_timer_added') {
           // Only add if not already present (this device may have added it optimistically)
           if (!this._timers.find(x => x.id === d.id)) {
@@ -1135,7 +1179,7 @@ class RecipeManagerCard extends LitElement {
               <ha-icon icon="mdi:arrow-left"></ha-icon>
             </button>
           ` : ''}
-          <div class="rm-title">
+          <div class="rm-title ${title ? '' : 'empty'}">
             <ha-icon icon="mdi:chef-hat"></ha-icon>
             <span>${title}</span>
           </div>
@@ -1166,6 +1210,12 @@ class RecipeManagerCard extends LitElement {
             <ha-icon icon="${this._globalWakeActive ? 'mdi:eye' : 'mdi:eye-off-outline'}"></ha-icon>
           </button>
 
+          ${!wide && this._view === 'grid' && normaliseUiStyle(this._settings.uiStyle) === 'compact' ? html`
+            <button class="icon-btn primary" @click=${() => { this._navDirection = 'forward'; this._view = 'add'; }} title="${msg('New Recipe')}">
+              <ha-icon icon="mdi:plus"></ha-icon>
+            </button>
+          ` : ''}
+
           ${inSettings || inAdd || inTimers ? html`
             <button class="icon-btn" @click=${this._handleShowGrid}>
               <ha-icon icon="mdi:close"></ha-icon>
@@ -1184,17 +1234,18 @@ class RecipeManagerCard extends LitElement {
 
   _renderBody() {
     const s = this._settings;
+    const ui = normaliseUiStyle(s.uiStyle);
 
     // ── Full-screen views (replace everything, use directional slide) ──────
     if (this._view === 'settings') return html`
-      <rm-settings-view
+      <rm-settings-view ui-style=${ui}
         .hass=${this.hass}
         .settings=${s}
         @rm-settings-change=${this._handleSettingsChange}
       ></rm-settings-view>
     `;
     if (this._view === 'add') return html`
-      <rm-add-recipe-dialog
+      <rm-add-recipe-dialog ui-style=${ui}
         .api=${this._api}
         .asPanel=${true}
         .inlineMode=${true}
@@ -1205,7 +1256,7 @@ class RecipeManagerCard extends LitElement {
     `;
     if (this._view === 'timers') return this._renderTimersView();
     if (this._view === 'planner') return html`
-      <rm-meal-planner
+      <rm-meal-planner ui-style=${ui}
         .api=${this._api}
         .recipes=${this._recipes}
         .fromRecipe=${this._plannerFromRecipe}
@@ -1215,7 +1266,7 @@ class RecipeManagerCard extends LitElement {
       ></rm-meal-planner>
     `;
     if (this._view === 'shopping') return html`
-      <rm-shopping-view
+      <rm-shopping-view ui-style=${ui}
         .hass=${this.hass}
         .slmAvailable=${this._slmAvailable}
         .shoppingLists=${this._shoppingLists}
@@ -1258,6 +1309,10 @@ class RecipeManagerCard extends LitElement {
             .recentRecipes=${this._recentRecipes}
             .recentCount=${s.recentCount ?? 12}
             .filterPreset=${this._gridFilterPreset}
+            .uiStyle=${normaliseUiStyle(s.uiStyle)}
+            .weekPlan=${this._weekPlan}
+            .showPlanner=${s.showPlanner}
+            @rm-open-planner=${() => { this._plannerFromRecipe = null; this._navDirection = 'forward'; this._view = 'planner'; this._selectedRecipe = null; }}
             @rm-search=${this._handleSearch}
             @rm-tag-filter=${this._handleTagFilter}
             @rm-open-recipe=${this._handleOpenRecipe}
@@ -1266,7 +1321,7 @@ class RecipeManagerCard extends LitElement {
         </div>
         <div class="rm-slide-pane">
           ${keepDetail ? html`
-            <rm-recipe-detail
+            <rm-recipe-detail ui-style=${ui}
               .recipe=${this._selectedRecipe}
               .api=${this._api}
               .settings=${s}
@@ -1543,11 +1598,12 @@ class RecipeManagerCard extends LitElement {
       <nav class="rm-bottom-nav">
         ${btn('mdi:home', msg('Home'), 'grid', () => { this._navDirection = 'back'; this._view = 'grid'; this._selectedRecipe = null; })}
         ${btn('mdi:cart-outline', msg('Shopping'), 'shopping')}
+        ${normaliseUiStyle(this._settings.uiStyle) === 'classic' ? html`
         <button class="rm-bn-btn rm-bn-add"
           @click=${() => { this._navDirection = 'forward'; this._view = 'add'; }}
           title="${msg('New Recipe')}">
           <ha-icon icon="mdi:plus"></ha-icon>
-        </button>
+        </button>` : ''}
         ${btn('mdi:calendar-week', msg('Planner'), 'planner', () => { this._plannerFromRecipe = null; this._navDirection = 'forward'; this._view = 'planner'; this._selectedRecipe = null; })}
         <button class="rm-bn-btn ${v === 'timers' ? 'active' : ''}"
           @click=${() => { this._navDirection = 'forward'; this._timersPrevView = this._view; this._view = 'timers'; }}
@@ -1598,6 +1654,12 @@ class RecipeManagerCard extends LitElement {
           ${!wide ? this._renderBottomNav() : ''}
         </div>
 
+        ${!wide && this._view === 'grid' && normaliseUiStyle(this._settings.uiStyle) === 'fresh' ? html`
+          <button class="rm-fab" @click=${() => { this._navDirection = 'forward'; this._view = 'add'; }} title="${msg('New Recipe')}" aria-label="${msg('New Recipe')}">
+            <ha-icon icon="mdi:plus"></ha-icon>
+          </button>
+        ` : ''}
+
         ${!wide && this._mobileMenuOpen ? this._renderMobileMenu() : ''}
 
         <!-- Timer alarm modal -->
@@ -1624,6 +1686,13 @@ class RecipeManagerCard extends LitElement {
       --rm-shadow:         0 2px 6px rgba(0,0,0,0.08);
       --rm-radius:         12px;
       --rm-radius-sm:      8px;
+      --rm-radius-card:    12px;
+      --rm-accent-text:    var(--rm-accent);
+      --rm-ink:            #ffffff;
+      --rm-line:           var(--rm-border);
+      --rm-warn:           #f5a623;
+      --rm-danger:         var(--error-color, #cf6679);
+      --rm-shadow-float:   0 4px 12px rgba(0,0,0,0.2);
       --rm-font-size-base: 15px;
       --rm-grid-columns:   repeat(3, minmax(0, 1fr));
       font-size: var(--rm-font-size-base);
@@ -1734,7 +1803,7 @@ class RecipeManagerCard extends LitElement {
     .sb-new-btn {
       display: flex; align-items: center; gap: 8px;
       width: 100%; padding: 8px 10px;
-      background: var(--rm-accent); color: #fff;
+      background: var(--rm-accent); color: var(--rm-ink, #fff);
       border: none; border-radius: 8px;
       font-size: 13px; font-weight: 600; cursor: pointer;
       transition: opacity 0.15s;
@@ -1745,7 +1814,7 @@ class RecipeManagerCard extends LitElement {
     .sb-icon-only-btn {
       display: flex; align-items: center; justify-content: center;
       width: 40px; height: 40px; margin: 0 auto;
-      background: var(--rm-accent); color: #fff;
+      background: var(--rm-accent); color: var(--rm-ink, #fff);
       border: none; border-radius: 8px;
       cursor: pointer; transition: opacity 0.15s;
     }
@@ -1786,7 +1855,7 @@ class RecipeManagerCard extends LitElement {
     .sb-timer-badge {
       margin-left: auto;
       background: var(--rm-accent);
-      color: #fff;
+      color: var(--rm-ink, #fff);
       border-radius: 10px;
       font-size: 11px;
       font-weight: 700;
@@ -1904,7 +1973,7 @@ class RecipeManagerCard extends LitElement {
     .wake-toggle-btn.active { background: var(--rm-accent-soft); color: var(--rm-accent); }
 
     .text-btn {
-      background: var(--rm-accent); color: #fff; border: none;
+      background: var(--rm-accent); color: var(--rm-ink, #fff); border: none;
       border-radius: var(--rm-radius-sm); padding: 8px 16px;
       cursor: pointer; font-size: 14px; font-weight: 500;
     }
@@ -2052,7 +2121,7 @@ class RecipeManagerCard extends LitElement {
     .preset-arc-btn.stop { color: var(--error-color, #cf6679); border-color: var(--error-color, #cf6679); }
     .preset-arc-btn.stop:hover { background: rgba(207,102,121,0.12); }
     .preset-arc-btn.play {
-      background: var(--rm-accent); color: #fff; border-color: var(--rm-accent);
+      background: var(--rm-accent); color: var(--rm-ink, #fff); border-color: var(--rm-accent);
       padding: 3px 12px; font-size: 11px; border-radius: 12px;
     }
     .preset-arc-btn.play:hover { opacity: 0.85; }
@@ -2152,7 +2221,7 @@ class RecipeManagerCard extends LitElement {
     .action-btn.primary {
       background: var(--rm-accent);
       border-color: var(--rm-accent);
-      color: #fff;
+      color: var(--rm-ink, #fff);
     }
     .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -2225,7 +2294,7 @@ class RecipeManagerCard extends LitElement {
     }
     .alarm-btn:hover { background: var(--rm-accent-soft); }
     .alarm-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-    .alarm-btn.accent { background: var(--rm-accent); color: #fff; border-color: var(--rm-accent); }
+    .alarm-btn.accent { background: var(--rm-accent); color: var(--rm-ink, #fff); border-color: var(--rm-accent); }
     .alarm-btn.stop {
       background: var(--error-color, #cf6679);
       color: #fff;
@@ -2319,7 +2388,7 @@ class RecipeManagerCard extends LitElement {
 
     .rm-bn-add {
       background: var(--rm-accent);
-      color: white !important;
+      color: var(--rm-ink, #fff) !important;
       border-radius: 50%;
       width: 44px;
       height: 44px;
@@ -2336,7 +2405,7 @@ class RecipeManagerCard extends LitElement {
       top: 2px;
       right: calc(50% - 20px);
       background: var(--rm-accent);
-      color: #fff;
+      color: var(--rm-ink, #fff);
       border-radius: 8px;
       font-size: 9px;
       font-weight: 700;
@@ -2414,6 +2483,175 @@ class RecipeManagerCard extends LitElement {
       padding: 2px 6px;
     }
 
+
+    /* ═══════════════════════════════════════════════════════════════
+       Fresh + Compact interface styles (same language as Shopping List
+       Manager). Classic keeps everything above untouched.
+       Fresh: rounded cards, pill header, floating nav, + button.
+       Compact: flat bars, rows, square buttons.
+    ═══════════════════════════════════════════════════════════════ */
+
+    :host([data-ui="fresh"]) ha-card.rm-card,
+    :host([data-ui="compact"]) ha-card.rm-card { background: var(--rm-bg-main); }
+
+    /* Header */
+    :host([data-ui="fresh"]) .rm-header,
+    :host([data-ui="compact"]) .rm-header {
+      background: transparent;
+      border-bottom: none;
+      padding: 20px 20px 0;
+      gap: 10px;
+    }
+    :host([data-ui="compact"]) .rm-header { padding: 20px 16px 0 20px; gap: 8px; }
+    :host([data-ui="fresh"]) ha-card.rm-wide .rm-header,
+    :host([data-ui="compact"]) ha-card.rm-wide .rm-header { padding: 28px 28px 0; }
+    :host([data-ui="fresh"]) .rm-title.empty,
+    :host([data-ui="compact"]) .rm-title.empty { display: none; }
+
+    /* Fresh phone: title is a pill with an icon chip */
+    :host([data-ui="fresh"]) ha-card:not(.rm-wide) .rm-title {
+      height: 48px; padding: 0 16px 0 8px; gap: 10px; flex: 1;
+      border-radius: 999px; border: 1px solid var(--rm-border);
+      background: var(--rm-bg-surface); font-size: 15px; font-weight: 700;
+    }
+    :host([data-ui="fresh"]) ha-card:not(.rm-wide) .rm-title ha-icon {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--rm-accent-soft); color: var(--rm-accent-text);
+      --mdc-icon-size: 18px;
+    }
+    /* Compact phone + wide: plain bold title */
+    :host([data-ui="compact"]) .rm-title ha-icon,
+    :host([data-ui="fresh"]) ha-card.rm-wide .rm-title ha-icon { display: none; }
+    :host([data-ui="compact"]) .rm-title { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+    :host([data-ui="fresh"]) ha-card.rm-wide .rm-title,
+    :host([data-ui="compact"]) ha-card.rm-wide .rm-title {
+      font-size: 30px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1;
+    }
+
+    /* Round header buttons */
+    :host([data-ui="fresh"]) .icon-btn {
+      width: 48px; height: 48px;
+      border: 1px solid var(--rm-border); background: var(--rm-bg-surface); color: var(--rm-text);
+    }
+    :host([data-ui="compact"]) .icon-btn {
+      width: 44px; height: 44px; border-radius: 14px;
+      border: none; background: var(--rm-bg-elevated); color: var(--rm-text);
+    }
+    :host([data-ui="fresh"]) .icon-btn:hover,
+    :host([data-ui="compact"]) .icon-btn:hover { background: var(--rm-accent-soft); color: var(--rm-accent-text); }
+    :host([data-ui="fresh"]) .icon-btn.primary,
+    :host([data-ui="compact"]) .icon-btn.primary { background: var(--rm-accent); border-color: var(--rm-accent); color: var(--rm-ink); }
+    :host([data-ui="fresh"]) .wake-toggle-btn.active,
+    :host([data-ui="compact"]) .wake-toggle-btn.active { background: var(--rm-accent-soft); color: var(--rm-accent-text); }
+    :host([data-ui="fresh"]) .hdr-star.filled,
+    :host([data-ui="compact"]) .hdr-star.filled { color: var(--rm-warn); -webkit-text-stroke: 0; }
+    :host([data-ui="fresh"]) .hdr-star,
+    :host([data-ui="compact"]) .hdr-star { -webkit-text-stroke: 0; color: var(--rm-border); }
+    :host([data-ui="fresh"]) .timer-pill,
+    :host([data-ui="compact"]) .timer-pill {
+      background: var(--rm-accent-soft); color: var(--rm-accent-text); border-radius: 999px; padding: 6px 10px;
+    }
+
+    /* Sidebar */
+    :host([data-ui="fresh"]) .rm-sidebar,
+    :host([data-ui="compact"]) .rm-sidebar { width: 236px; min-width: 236px; }
+    :host([data-ui="fresh"]) .rm-sidebar.collapsed,
+    :host([data-ui="compact"]) .rm-sidebar.collapsed { width: 72px; min-width: 72px; }
+    :host([data-ui="fresh"]) .sb-top,
+    :host([data-ui="compact"]) .sb-top { padding: 20px 14px 8px; }
+    :host([data-ui="fresh"]) .sb-search,
+    :host([data-ui="compact"]) .sb-search { height: 44px; padding: 0 14px; border-radius: 999px; gap: 8px; }
+    :host([data-ui="compact"]) .sb-search { border-radius: 12px; }
+    :host([data-ui="fresh"]) .sb-search-input,
+    :host([data-ui="compact"]) .sb-search-input { font-size: 14px; }
+    :host([data-ui="fresh"]) .sb-new-btn,
+    :host([data-ui="compact"]) .sb-new-btn {
+      justify-content: center; min-height: 48px; border-radius: 999px;
+      font-size: 15px; font-weight: 700; color: var(--rm-ink);
+    }
+    :host([data-ui="compact"]) .sb-new-btn { border-radius: 12px; }
+    :host([data-ui="fresh"]) .sb-icon-only-btn { width: 48px; height: 48px; border-radius: 50%; color: var(--rm-ink); }
+    :host([data-ui="compact"]) .sb-icon-only-btn { width: 48px; height: 48px; border-radius: 12px; color: var(--rm-ink); }
+    :host([data-ui="fresh"]) .sb-nav,
+    :host([data-ui="compact"]) .sb-nav { padding: 8px 14px 4px; }
+    :host([data-ui="fresh"]) .sb-bottom,
+    :host([data-ui="compact"]) .sb-bottom { padding: 8px 14px 16px; border-top: none; }
+    :host([data-ui="fresh"]) .sb-item,
+    :host([data-ui="compact"]) .sb-item {
+      min-height: 48px; padding: 0 14px; gap: 12px; border-radius: 16px;
+      font-size: 15px; font-weight: 600;
+    }
+    :host([data-ui="compact"]) .sb-item { border-radius: 12px; }
+    :host([data-ui="fresh"]) .rm-sidebar.collapsed .sb-item,
+    :host([data-ui="compact"]) .rm-sidebar.collapsed .sb-item { padding: 0; justify-content: center; }
+    :host([data-ui="fresh"]) .sb-item.active,
+    :host([data-ui="compact"]) .sb-item.active { background: var(--rm-accent-soft); color: var(--rm-accent-text); font-weight: 700; }
+    :host([data-ui="fresh"]) .sb-timer-badge,
+    :host([data-ui="compact"]) .sb-timer-badge { color: var(--rm-ink); }
+
+    /* Phone bottom nav */
+    :host([data-ui="fresh"]) .rm-bottom-nav {
+      margin: 0 12px 12px; padding: 8px; gap: 4px;
+      border: 1px solid var(--rm-border); border-radius: 28px;
+      box-shadow: var(--rm-shadow-float); justify-content: stretch;
+    }
+    :host([data-ui="fresh"]) .rm-bn-btn {
+      min-height: 56px; justify-content: center; border-radius: 20px;
+      gap: 3px; padding: 4px 2px; font-size: 11.5px; font-weight: 600;
+      color: var(--rm-text-secondary); min-width: 0;
+    }
+    :host([data-ui="fresh"]) .rm-bn-btn.active { background: var(--rm-accent-soft); color: var(--rm-accent-text); font-weight: 700; }
+    :host([data-ui="compact"]) .rm-bottom-nav { padding: 0; box-shadow: none; }
+    :host([data-ui="compact"]) .rm-bn-btn {
+      min-height: 60px; justify-content: center; gap: 4px;
+      font-size: 11.5px; font-weight: 600; color: var(--rm-text-secondary); min-width: 0;
+    }
+    :host([data-ui="compact"]) .rm-bn-btn.active { color: var(--rm-accent-text); font-weight: 700; }
+    :host([data-ui="compact"]) .rm-bn-btn.active::before {
+      content: ""; position: absolute; top: -1px; left: 30%; right: 30%;
+      height: 3px; border-radius: 0 0 3px 3px; background: var(--rm-accent);
+    }
+    :host([data-ui="fresh"]) .rm-bn-badge,
+    :host([data-ui="compact"]) .rm-bn-badge {
+      color: var(--rm-ink); font-size: 11px; min-width: 18px; border-radius: 9px; padding: 1px 5px;
+    }
+
+    /* + button (Fresh) */
+    .rm-fab {
+      position: absolute; right: 24px; bottom: 104px; z-index: 11;
+      width: 56px; height: 56px; padding: 0; border: none; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+      background: var(--rm-text); color: var(--rm-bg-main);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.28);
+    }
+    .rm-fab ha-icon { --mdc-icon-size: 26px; }
+
+    /* Menus, timers, buttons */
+    :host([data-ui="fresh"]) .rm-mobile-menu,
+    :host([data-ui="compact"]) .rm-mobile-menu { border-radius: 28px 0 0 28px; }
+    :host([data-ui="fresh"]) .rm-mm-item:hover:not(:disabled),
+    :host([data-ui="compact"]) .rm-mm-item:hover:not(:disabled) { color: var(--rm-accent-text); }
+    :host([data-ui="fresh"]) .timers-view,
+    :host([data-ui="compact"]) .timers-view { padding: 16px 20px 24px; }
+    :host([data-ui="fresh"]) .timer-card,
+    :host([data-ui="fresh"]) .timer-preset-card,
+    :host([data-ui="compact"]) .timer-card,
+    :host([data-ui="compact"]) .timer-preset-card { border-radius: var(--rm-radius-card); background: var(--rm-bg-surface); }
+    :host([data-ui="compact"]) .timer-card,
+    :host([data-ui="compact"]) .timer-preset-card { border-color: transparent; }
+    :host([data-ui="fresh"]) .text-btn,
+    :host([data-ui="fresh"]) .action-btn,
+    :host([data-ui="compact"]) .text-btn,
+    :host([data-ui="compact"]) .action-btn { min-height: 44px; }
+    :host([data-ui="fresh"]) .text-btn,
+    :host([data-ui="fresh"]) .action-btn { border-radius: 999px; padding: 0 18px; }
+    :host([data-ui="compact"]) .text-btn,
+    :host([data-ui="compact"]) .action-btn { border-radius: 12px; padding: 0 16px; }
+    :host([data-ui="fresh"]) .text-btn,
+    :host([data-ui="compact"]) .text-btn { color: var(--rm-ink); }
+    :host([data-ui="fresh"]) .alarm-btn.accent,
+    :host([data-ui="compact"]) .alarm-btn.accent { color: var(--rm-ink); }
   `;
 }
 
