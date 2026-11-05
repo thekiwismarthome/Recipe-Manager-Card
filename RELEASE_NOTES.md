@@ -1,7 +1,17 @@
-# Beta 2026.11.1-beta.1 — Fresh and Compact interface styles
+# Beta 2026.11.1-beta.2 — Fresh and Compact interface styles
 
-Branch `beta`. Not a release. Versions now follow the Shopping List Manager scheme (`YYYY.M.N`, betas as `-beta.N`).
+Branch `beta`. Not a release. Versions follow the Shopping List Manager scheme (`YYYY.M.N`, betas as `-beta.N`).
 
+## Changes since beta.1
+- **Filter and sort:** the tune button opens a sheet with Show (all, favourites, recent, course, category, collection), Sort by (favourites first, highest rated, quickest, A to Z) and **Minimum rating** (star rows).
+- **Timers:** new Timers view for Fresh and Compact. Quick-start chips, one card per timer with a big clock and progress bar, a green Ready card when a timer finishes. Local, Home Assistant global and Voice PE timers appear together.
+- **Voice PE / ESPHome timers:** mirrors the template sensors from the ha-timer-card guide (`sensor.vpe_timer_1`, state active, paused, finished, idle). Pause, resume and cancel work when the sensor exposes `timer_id` and `control_entity`. Turn on or off, and change the sensor prefix, in Settings > Advanced.
+- **Settings:** icon tiles on every row, and Appearance now matches Shopping List Manager: **Interface style** cards with previews, **Theme** (Meadow, Slate, Sunset), and **Colour mode** (Light, Dark, Match device, which follows Home Assistant's theme first).
+- **Planner:** meal slots use the demo's icons and colours (breakfast amber sun, lunch blue cutlery, dinner purple moon, snack pink cup).
+- Sheets (filter, planner picker) now cover the bottom nav and + button.
+- The embedded Shopping List Manager follows the chosen theme too (needs Shopping List Manager 2026.11.3-beta.8).
+
+## Beta 1 (2026.11.1-beta.1)
 - **Interface style** setting (Settings > Appearance): **Fresh** (default), **Compact**, or **Classic** (the previous look and named colour themes, unchanged).
 - Fresh and Compact use the same palettes and shapes as Shopping List Manager, in light and dark.
 - **Fresh:** pill header, round buttons, rounded recipe cards, a "Tonight" card showing today's planned dinner and how many dinners are planned this week, floating bottom nav and a + button.

@@ -6,6 +6,7 @@ import { LitElement, html, css } from 'lit';
 import { msg, str } from '@lit/localize';
 import { CARD_VERSION } from 'virtual:card-version';
 import { isWakeLockSupported } from '../services/wake-lock.js';
+import { THEMES, themeEntry } from '../styles/ui-styles.js';
 
 const LANGUAGES = [
   ['en', 'English'],
@@ -81,6 +82,21 @@ class RmSettingsView extends LitElement {
       });
   }
 
+  // Dark palette in use right now (for the theme previews)
+  get _darkNow() {
+    const m = this.settings?.darkMode;
+    if (m === 'on') return true;
+    if (m === 'off') return false;
+    const ha = this.hass?.themes?.darkMode;
+    if (typeof ha === 'boolean') return ha;
+    return typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+
+  // Coloured icon tile at the start of a settings row (hue 1-6, same hues as Shopping List Manager)
+  _tile(icon, hue = 1) {
+    return html`<span class="tile" style="--hue: var(--rm-h${hue}, var(--rm-accent))"><ha-icon icon="${icon}"></ha-icon></span>`;
+  }
+
   _update(patch) {
     const next = { ...this.settings, ...patch };
     this.dispatchEvent(new CustomEvent('rm-settings-change', {
@@ -122,87 +138,103 @@ class RmSettingsView extends LitElement {
     const alwaysDark  = s.theme === 'midnight' || s.theme === 'ember' || s.theme === 'neon';
     const alwaysLight = s.theme === 'arctic'   || s.theme === 'meadow' || s.theme === 'ocean';
     const noToggle    = alwaysDark || alwaysLight;
+    const style       = ['fresh', 'compact', 'classic'].includes(s.uiStyle) ? s.uiStyle : 'fresh';
     return html`
-      <!-- ── Language & Units ── -->
+      <!-- ── Interface style ── -->
       <div class="section">
-        <div class="section-label">${msg('Language & Units')}</div>
-
-        <div class="setting-row">
-          <span class="setting-name">${msg('Language')}</span>
-          <select class="theme-select" @change=${e => this._update({ language: e.target.value })}>
-            ${LANGUAGES.map(([code, label]) => html`
-              <option value="${code}" ?selected=${(s.language ?? 'en') === code}>${label}</option>
-            `)}
-          </select>
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-name">${msg('Preferred units')}</span>
-          <div class="btn-group">
-            ${[['imperial', msg('Imperial')], ['metric', msg('Metric')]].map(([val, lbl]) => html`
-              <button class="seg-btn ${(s.unitSystem ?? 'imperial') === val ? 'active' : ''}"
-                @click=${() => this._update({ unitSystem: val })}>${lbl}</button>
+        <div class="section-label">${msg('Interface style')}</div>
+        <div class="setting-row block">
+          <div class="style-options" role="radiogroup" aria-label="${msg('Interface style')}">
+            ${[['fresh', msg('Fresh'), msg('Soft cards, summary card, floating menu')],
+               ['compact', msg('Compact'), msg('Dense list, checkboxes, flat tab bar')],
+               ['classic', msg('Classic'), msg('The original look and colour themes')]].map(([id, label, hint]) => html`
+              <button class="style-option ${style === id ? 'selected' : ''}" role="radio"
+                aria-checked="${style === id ? 'true' : 'false'}"
+                @click=${() => this._update({ uiStyle: id })}>
+                <span class="sp sp-${id}" aria-hidden="true"></span>
+                <span class="so-label">${label}</span>
+                <span class="so-hint">${hint}</span>
+              </button>
             `)}
           </div>
         </div>
       </div>
 
-      <!-- ── Theme ── -->
-      <div class="section">
-        <div class="section-label">${msg('Theme')}</div>
-
-        <div class="setting-row">
-          <div class="setting-info">
-            <span class="setting-name">${msg('Interface style')}</span>
-          </div>
-          <div class="btn-group">
-            ${[['fresh', msg('Fresh')], ['compact', msg('Compact')], ['classic', msg('Classic')]].map(([val, lbl]) => html`
-              <button class="seg-btn ${(s.uiStyle ?? 'fresh') === val ? 'active' : ''}"
-                @click=${() => this._update({ uiStyle: val })}>${lbl}</button>
-            `)}
+      ${style === 'classic' ? html`
+        <div class="section">
+          <div class="section-label">${msg('Theme')}</div>
+          <div class="setting-row">
+            ${this._tile('mdi:palette-outline', 1)}
+            <span class="setting-name">${msg('Colour theme')}</span>
+            <select class="theme-select" @change=${e => this._update({ theme: e.target.value })}>
+              <optgroup label="${msg('Adaptive')}">
+                <option value="soft"     ?selected=${s.theme === 'soft' || !s.theme}>${msg('🎨 Soft Pastel')}</option>
+                <option value="blossom"  ?selected=${s.theme === 'blossom' }>${msg('🌸 Blossom')}</option>
+              </optgroup>
+              <optgroup label="${msg('Light Themes')}">
+                <option value="arctic"   ?selected=${s.theme === 'arctic'  }>${msg('🧊 Arctic')}</option>
+                <option value="meadow"   ?selected=${s.theme === 'meadow'  }>${msg('🌿 Meadow')}</option>
+                <option value="ocean"    ?selected=${s.theme === 'ocean'   }>${msg('🌊 Ocean Blue')}</option>
+              </optgroup>
+              <optgroup label="${msg('Dark Themes')}">
+                <option value="midnight" ?selected=${s.theme === 'midnight'}>${msg('🌙 Midnight Ocean')}</option>
+                <option value="ember"    ?selected=${s.theme === 'ember'   }>${msg('🔥 Ember')}</option>
+                <option value="neon"     ?selected=${s.theme === 'neon'    }>${msg('🍇 Purple & Cyan')}</option>
+              </optgroup>
+            </select>
           </div>
         </div>
-
-        ${(s.uiStyle ?? 'fresh') === 'classic' ? html`
-        <div class="setting-row">
-          <span class="setting-name">${msg('Colour theme')}</span>
-          <select class="theme-select" @change=${e => this._update({ theme: e.target.value })}>
-            <optgroup label="${msg('Adaptive')}">
-              <option value="soft"     ?selected=${s.theme === 'soft' || !s.theme}>${msg('🎨 Soft Pastel')}</option>
-              <option value="blossom"  ?selected=${s.theme === 'blossom' }>${msg('🌸 Blossom')}</option>
-            </optgroup>
-            <optgroup label="${msg('Light Themes')}">
-              <option value="arctic"   ?selected=${s.theme === 'arctic'  }>${msg('🧊 Arctic')}</option>
-              <option value="meadow"   ?selected=${s.theme === 'meadow'  }>${msg('🌿 Meadow')}</option>
-              <option value="ocean"    ?selected=${s.theme === 'ocean'   }>${msg('🌊 Ocean Blue')}</option>
-            </optgroup>
-            <optgroup label="${msg('Dark Themes')}">
-              <option value="midnight" ?selected=${s.theme === 'midnight'}>${msg('🌙 Midnight Ocean')}</option>
-              <option value="ember"    ?selected=${s.theme === 'ember'   }>${msg('🔥 Ember')}</option>
-              <option value="neon"     ?selected=${s.theme === 'neon'    }>${msg('🍇 Purple & Cyan')}</option>
-            </optgroup>
-          </select>
+      ` : html`
+        <div class="section">
+          <div class="section-label">${msg('Theme')}</div>
+          <div class="setting-row block">
+            <div class="theme-cards" role="radiogroup" aria-label="${msg('Theme')}">
+              ${THEMES.map(th => {
+                const pv = this._darkNow ? th.preview.dark : th.preview.light;
+                const sel = themeEntry(style, s.designTheme)?.id === th.id;
+                return html`
+                  <button class="theme-card ${sel ? 'selected' : ''}" role="radio" aria-checked="${sel ? 'true' : 'false'}"
+                    @click=${() => this._update({ designTheme: th.id })}>
+                    <span class="theme-sw" style="background: ${pv.bg}">
+                      <i style="background: ${pv.a}; height: 14px"></i>
+                      <i style="background: ${pv.s}; height: 22px"></i>
+                    </span>
+                    <span class="theme-name">${th.name}${sel ? html`<ha-icon icon="mdi:check"></ha-icon>` : ''}</span>
+                  </button>
+                `;
+              })}
+            </div>
+          </div>
         </div>
-        ` : ''}
+      `}
 
-        ${noToggle && (s.uiStyle ?? 'fresh') === 'classic' ? html`
+      ${style === 'classic' && noToggle ? html`
+        <div class="section">
+          <div class="section-label">${msg('Colour mode')}</div>
           <div class="setting-row muted-row">
             <span class="setting-name">${msg('Dark mode')}</span>
             <span class="muted-note">${alwaysDark ? msg('Always dark for this theme') : msg('Always light for this theme')}</span>
           </div>
-        ` : html`
-          <div class="setting-row">
-            <span class="setting-name">${msg('Dark mode')}</span>
-            <div class="btn-group">
-              ${[['off', msg('Light')], ['system', msg('Auto')], ['on', msg('Dark')]].map(([val, lbl]) => html`
-                <button class="seg-btn ${s.darkMode === val ? 'active' : ''}"
-                  @click=${() => this._update({ darkMode: val })}>${lbl}</button>
+        </div>
+      ` : html`
+        <div class="section">
+          <div class="section-label">${msg('Colour mode')}</div>
+          <div class="setting-row block">
+            <div class="mode-seg" role="radiogroup" aria-label="${msg('Colour mode')}">
+              ${[['off', msg('Light')], ['on', msg('Dark')], ['system', msg('Match device')]].map(([val, label]) => html`
+                <button class="mode-opt ${(s.darkMode ?? 'system') === val ? 'selected' : ''}" role="radio"
+                  aria-checked="${(s.darkMode ?? 'system') === val ? 'true' : 'false'}"
+                  @click=${() => this._update({ darkMode: val })}>${label}</button>
               `)}
             </div>
           </div>
-        `}
+        </div>
+      `}
 
+      <div class="section">
+        <div class="section-label">${msg('Text')}</div>
         <div class="setting-row">
+          ${this._tile('mdi:format-size', 5)}
           <span class="setting-name">${msg('Text size')}</span>
           <div class="btn-group">
             ${[['small', msg('S')], ['medium', msg('M')], ['large', msg('L')]].map(([val, lbl]) => html`
@@ -213,11 +245,38 @@ class RmSettingsView extends LitElement {
         </div>
       </div>
 
+      <!-- ── Language & Units ── -->
+      <div class="section">
+        <div class="section-label">${msg('Language & Units')}</div>
+
+        <div class="setting-row">
+          ${this._tile('mdi:translate', 2)}
+          <span class="setting-name">${msg('Language')}</span>
+          <select class="theme-select" @change=${e => this._update({ language: e.target.value })}>
+            ${LANGUAGES.map(([code, label]) => html`
+              <option value="${code}" ?selected=${(s.language ?? 'en') === code}>${label}</option>
+            `)}
+          </select>
+        </div>
+
+        <div class="setting-row">
+          ${this._tile('mdi:scale-balance', 3)}
+          <span class="setting-name">${msg('Preferred units')}</span>
+          <div class="btn-group">
+            ${[['imperial', msg('Imperial')], ['metric', msg('Metric')]].map(([val, lbl]) => html`
+              <button class="seg-btn ${(s.unitSystem ?? 'imperial') === val ? 'active' : ''}"
+                @click=${() => this._update({ unitSystem: val })}>${lbl}</button>
+            `)}
+          </div>
+        </div>
+      </div>
+
       <!-- ── Recipe Grid ── -->
       <div class="section">
         <div class="section-label">${msg('Recipe Grid')}</div>
 
         <div class="setting-row">
+          ${this._tile('mdi:view-grid-outline', 2)}
           <span class="setting-name">${msg('Recipe columns')}</span>
           <div class="btn-group">
             ${[2, 3, 4, 5, 8, 10].map(n => html`
@@ -228,6 +287,7 @@ class RmSettingsView extends LitElement {
         </div>
 
         <div class="setting-row">
+          ${this._tile('mdi:heart-outline', 6)}
           <span class="setting-name">${msg('Favourites section')}</span>
           <label class="toggle">
             <input type="checkbox" ?checked=${s.showFavourites}
@@ -237,6 +297,7 @@ class RmSettingsView extends LitElement {
         </div>
 
         <div class="setting-row">
+          ${this._tile('mdi:history', 5)}
           <div class="setting-info">
             <span class="setting-name">${msg('Recent recipes count')}</span>
             <span class="setting-hint">${msg('Recipes shown in the Recent filter tab')}</span>
@@ -255,6 +316,7 @@ class RmSettingsView extends LitElement {
         <div class="section-label">${msg('Navigation')}</div>
 
         <div class="setting-row">
+          ${this._tile('mdi:calendar-week', 5)}
           <span class="setting-name">${msg('Meal planner')}</span>
           <label class="toggle">
             <input type="checkbox" ?checked=${s.showPlanner}
@@ -273,6 +335,7 @@ class RmSettingsView extends LitElement {
         <div class="section-label">${msg('Timer Sound')}</div>
 
         <div class="setting-row">
+          ${this._tile('mdi:bell-ring-outline', 6)}
           <span class="setting-name">${msg('Alarm sound')}</span>
           <select class="theme-select" @change=${e => this._update({ timerSound: e.target.value })}>
             <option value="beep"  ?selected=${(s.timerSound ?? 'beep') === 'beep'}>${msg('Beep')}</option>
@@ -286,7 +349,8 @@ class RmSettingsView extends LitElement {
         ${s.timerSound === 'file' ? html`
           <div class="setting-row">
             <div class="setting-info">
-              <span class="setting-name">${msg('Sound file')}</span>
+              ${this._tile('mdi:file-music-outline', 4)}
+          <span class="setting-name">${msg('Sound file')}</span>
               <span class="setting-hint">${s.timerSoundFileName || msg('No file selected')}</span>
             </div>
             <label class="file-label">
@@ -300,7 +364,8 @@ class RmSettingsView extends LitElement {
 
         <div class="setting-row">
           <div class="setting-info">
-            <span class="setting-name">${msg('Test sound')}</span>
+            ${this._tile('mdi:play-circle-outline', 1)}
+          <span class="setting-name">${msg('Test sound')}</span>
             <span class="setting-hint">${msg('Play a preview of the selected alarm')}</span>
           </div>
           <button class="seg-btn active" @click=${() => this._testSound(s.timerSound ?? 'beep', s.timerSoundFile)}>
@@ -311,9 +376,39 @@ class RmSettingsView extends LitElement {
 
       <!-- ── Keep Screen On ── -->
       <div class="section">
+        <div class="section-label">${msg('Voice PE / ESPHome timers')}</div>
+
+        <div class="setting-row">
+          ${this._tile('mdi:microphone-outline', 4)}
+          <div class="setting-info">
+            <span class="setting-name">${msg('Show Voice PE timers')}</span>
+            <span class="setting-hint">${msg('Lists timers started by voice in the Timers tab')}</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" .checked=${s.vpeTimers !== false}
+              @change=${e => this._update({ vpeTimers: e.target.checked })} />
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+        </div>
+
+        ${s.vpeTimers !== false ? html`
+          <div class="setting-row">
+            ${this._tile('mdi:code-tags', 2)}
+            <div class="setting-info">
+              <span class="setting-name">${msg('Sensor prefix')}</span>
+              <span class="setting-hint">${msg('Template sensors named like sensor.vpe_timer_1')}</span>
+            </div>
+            <input class="text-field" type="text" .value=${s.vpePrefix ?? 'sensor.vpe_timer'}
+              @change=${e => this._update({ vpePrefix: e.target.value.trim() || 'sensor.vpe_timer' })} />
+          </div>
+        ` : ''}
+      </div>
+
+      <div class="section">
         <div class="section-label">${msg('Keep Screen On')}</div>
 
         <div class="setting-row">
+          ${this._tile('mdi:eye-outline', 1)}
           <div class="setting-info">
             <span class="setting-name">${msg('Keep screen on while viewing a recipe')}</span>
             <span class="setting-hint">${msg('Uses the Wake Lock API — engages automatically while a recipe is open')}</span>
@@ -334,7 +429,8 @@ class RmSettingsView extends LitElement {
         ${s.keepScreenOn ? html`
           <div class="setting-row">
             <div class="setting-info">
-              <span class="setting-name">${msg('Auto-release after')}</span>
+              ${this._tile('mdi:timer-sand', 5)}
+          <span class="setting-name">${msg('Auto-release after')}</span>
               <span class="setting-hint">${msg('Screen lock released after this many minutes')}</span>
             </div>
             <div class="btn-group">
@@ -352,6 +448,7 @@ class RmSettingsView extends LitElement {
         <div class="section-label">${msg('Unit Conversion')}</div>
 
         <div class="setting-row">
+          ${this._tile('mdi:swap-horizontal', 3)}
           <div class="setting-info">
             <span class="setting-name">${msg('Show metric conversion button')}</span>
             <span class="setting-hint">${msg('Button in Ingredients tab converts oz/lb/cups/fl oz → g/ml/kg')}</span>
@@ -370,7 +467,8 @@ class RmSettingsView extends LitElement {
 
         <div class="setting-row">
           <div class="setting-info">
-            <span class="setting-name">${msg('Auto-advance interval')}</span>
+            ${this._tile('mdi:image-multiple-outline', 4)}
+          <span class="setting-name">${msg('Auto-advance interval')}</span>
             <span class="setting-hint">${msg('Seconds between slides when a recipe has multiple images (0 = off)')}</span>
           </div>
           <div class="btn-group">
@@ -445,7 +543,8 @@ class RmSettingsView extends LitElement {
 
         <div class="setting-row">
           <div class="setting-info">
-            <span class="setting-name">${msg('Export recipes')}</span>
+            ${this._tile('mdi:download', 1)}
+          <span class="setting-name">${msg('Export recipes')}</span>
             <span class="setting-hint">${msg('Download all recipes and meal plans as a JSON file')}</span>
           </div>
           <button
@@ -466,7 +565,8 @@ class RmSettingsView extends LitElement {
         <a class="help-link" href="https://github.com/thekiwismarthome/recipe-manager/wiki" target="_blank">
           <ha-icon icon="mdi:help-circle-outline"></ha-icon>
           <div class="help-link-content">
-            <span class="setting-name">${msg('FAQ')}</span>
+            ${this._tile('mdi:help-circle-outline', 2)}
+          <span class="setting-name">${msg('FAQ')}</span>
             <span class="setting-hint">${msg('Frequently asked questions')}</span>
           </div>
           <ha-icon icon="mdi:open-in-new" class="help-link-ext"></ha-icon>
@@ -475,7 +575,8 @@ class RmSettingsView extends LitElement {
         <a class="help-link" href="https://github.com/thekiwismarthome/recipe-manager/issues" target="_blank">
           <ha-icon icon="mdi:bug-outline"></ha-icon>
           <div class="help-link-content">
-            <span class="setting-name">${msg('Report a Problem')}</span>
+            ${this._tile('mdi:bug-outline', 6)}
+          <span class="setting-name">${msg('Report a Problem')}</span>
             <span class="setting-hint">${msg('Submit an issue on GitHub')}</span>
           </div>
           <ha-icon icon="mdi:open-in-new" class="help-link-ext"></ha-icon>
@@ -484,7 +585,8 @@ class RmSettingsView extends LitElement {
         <a class="help-link" href="https://github.com/thekiwismarthome/recipe-manager" target="_blank">
           <ha-icon icon="mdi:github"></ha-icon>
           <div class="help-link-content">
-            <span class="setting-name">${msg('GitHub Repository')}</span>
+            ${this._tile('mdi:github', 4)}
+          <span class="setting-name">${msg('GitHub Repository')}</span>
             <span class="setting-hint">${msg('View source code')}</span>
           </div>
           <ha-icon icon="mdi:open-in-new" class="help-link-ext"></ha-icon>
@@ -495,16 +597,19 @@ class RmSettingsView extends LitElement {
         <div class="section-label">${msg('About')}</div>
 
         <div class="setting-row">
+          ${this._tile('mdi:chef-hat', 1)}
           <span class="setting-name">${msg('Recipe Manager')}</span>
           <span class="muted-note">${msg(str`Integration version ${this._rmVersion}`)}</span>
         </div>
 
         <div class="setting-row">
+          ${this._tile('mdi:card-text-outline', 2)}
           <span class="setting-name">${msg('RM Card')}</span>
           <span class="muted-note">${msg(str`Card version ${this._rmcVersion}`)}</span>
         </div>
 
         <div class="setting-row">
+          ${this._tile('mdi:refresh', 5)}
           <span class="setting-name">${msg('Refresh versions')}</span>
           <button class="seg-btn" @click=${() => this._fetchVersionsFromHacs()}>
             <ha-icon icon="mdi:refresh"></ha-icon>
@@ -709,6 +814,64 @@ class RmSettingsView extends LitElement {
     :host([ui-style="compact"]) .setting-row { flex-wrap: wrap; }
     :host([ui-style="fresh"]) .btn-group,
     :host([ui-style="compact"]) .btn-group { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+
+    /* ═══ Settings in the demo look: icon tiles, style / theme cards, colour mode ═══ */
+    .tile { display: none; }
+    :host([ui-style="fresh"]) .tile,
+    :host([ui-style="compact"]) .tile {
+      display: inline-flex; flex: none; align-items: center; justify-content: center;
+      width: 38px; height: 38px; border-radius: 12px;
+      background: color-mix(in srgb, var(--hue) 18%, var(--rm-bg-surface)); color: var(--hue);
+    }
+    :host([ui-style="compact"]) .tile { width: 32px; height: 32px; border-radius: 9px; background: var(--hue); color: var(--rm-bg-main); }
+    .tile ha-icon { --mdc-icon-size: 20px; }
+    :host([ui-style="compact"]) .tile ha-icon { --mdc-icon-size: 18px; }
+    :host([ui-style="fresh"]) .setting-info,
+    :host([ui-style="compact"]) .setting-info { flex: 1; }
+    :host([ui-style="fresh"]) .setting-row > .setting-name,
+    :host([ui-style="compact"]) .setting-row > .setting-name { flex: 1; min-width: 0; text-align: left; }
+    :host([ui-style="fresh"]) .setting-hint,
+    :host([ui-style="compact"]) .setting-hint { color: var(--rm-text-secondary); font-size: 13px; }
+    .setting-row.block { display: block; padding: 12px; min-height: 0; }
+
+    .style-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .style-option {
+      display: flex; flex-direction: column; gap: 6px; padding: 8px;
+      border: 2px solid var(--rm-border); border-radius: 14px; background: transparent;
+      color: var(--rm-text); text-align: left; cursor: pointer; font: inherit;
+    }
+    .style-option.selected { border-color: var(--rm-accent); background: color-mix(in srgb, var(--rm-accent) 10%, transparent); }
+    .style-option:focus-visible, .theme-card:focus-visible, .mode-opt:focus-visible { outline: 2px solid var(--rm-accent); outline-offset: 2px; }
+    .so-label { font-size: 13px; font-weight: 700; }
+    .so-hint { font-size: 11px; line-height: 1.25; color: var(--rm-text-secondary); }
+    .sp { position: relative; display: block; height: 58px; border-radius: 8px; background: var(--rm-bg-main); border: 1px solid var(--rm-border); overflow: hidden; }
+    .sp::before { content: ""; position: absolute; left: 6px; right: 6px; top: 6px; height: 8px; border-radius: 3px; background: var(--rm-border); }
+    .sp::after { content: ""; position: absolute; left: 6px; right: 6px; top: 20px; height: 14px; border-radius: 3px; background: var(--rm-bg-surface); box-shadow: 0 16px 0 -2px var(--rm-bg-surface); }
+    .sp-fresh::after { border-radius: 7px; border: 1px solid var(--rm-border); box-sizing: border-box; height: 16px; }
+    .sp-fresh { background-image: linear-gradient(var(--rm-accent), var(--rm-accent)); background-repeat: no-repeat; background-size: 60% 7px; background-position: center bottom 5px; }
+    .sp-compact { background-image: linear-gradient(var(--rm-accent), var(--rm-accent)); background-repeat: no-repeat; background-size: 26% 3px; background-position: 50% bottom 0; }
+    .sp-compact::after { border-radius: 0; box-shadow: none; border-bottom: 1px solid var(--rm-border); background: transparent; height: 8px; top: 22px; }
+    .sp-classic { background: #fafbfc; }
+    .sp-classic::before { background: #e8eaf6; }
+    .sp-classic::after { background: #fff; border-radius: 6px; border: 1px solid #e8eaf6; box-sizing: border-box; height: 16px; box-shadow: 0 16px 0 -2px #fff; }
+
+    .theme-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .theme-card {
+      display: flex; flex-direction: column; gap: 8px; padding: 8px;
+      border: 2px solid var(--rm-border); border-radius: 18px; background: var(--rm-bg-surface);
+      color: var(--rm-text); font: inherit; text-align: left; cursor: pointer;
+    }
+    .theme-card.selected { border-color: var(--rm-accent); }
+    .theme-sw { display: flex; align-items: flex-end; gap: 4px; height: 56px; padding: 8px; border-radius: 12px; box-sizing: border-box; }
+    .theme-sw i { flex: 1; display: block; border-radius: 5px; }
+    .theme-name { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 700; }
+    .theme-name ha-icon { --mdc-icon-size: 16px; color: var(--rm-accent); }
+    .mode-seg { display: flex; gap: 4px; padding: 4px; border-radius: 16px; background: var(--rm-bg-elevated); }
+    .mode-opt { flex: 1; min-height: 44px; padding: 0 8px; border: none; border-radius: 12px; background: transparent; color: var(--rm-text-secondary); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .mode-opt.selected { background: var(--rm-bg-surface); color: var(--rm-text); font-weight: 700; box-shadow: var(--rm-shadow); }
+
+    .text-field { min-width: 0; width: 170px; min-height: 40px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--rm-border); background: var(--rm-bg-surface); color: var(--rm-text); font: inherit; font-size: 14px; }
+    .text-field:focus-visible { outline: 2px solid var(--rm-accent); outline-offset: 1px; }
   `;
 }
 

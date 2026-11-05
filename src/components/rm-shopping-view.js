@@ -6,7 +6,7 @@
  */
 import { LitElement, html, css } from 'lit';
 import { msg } from '@lit/localize';
-import { paletteFor, normaliseUiStyle } from '../styles/ui-styles.js';
+import { paletteFor, normaliseUiStyle, themeOverrides } from '../styles/ui-styles.js';
 
 const SLM_PALETTE_MAP = {
   '--slm-bg-main': '--rm-bg-main', '--slm-bg-surface': '--rm-bg-surface', '--slm-bg-elevated': '--rm-bg-elevated',
@@ -83,8 +83,10 @@ class RmShoppingView extends LitElement {
     const card = this._slmCard;
     if (!card) return;
     const ui = normaliseUiStyle(this.settings?.uiStyle);
+    const host = this.getRootNode()?.host;
+    const hostMode = host?.getAttribute?.('data-mode');
     const d = this.settings?.darkMode;
-    const dark = d === 'on' ? true : d === 'off' ? false : (window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false);
+    const dark = hostMode ? hostMode === 'dark' : d === 'on' ? true : d === 'off' ? false : (window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false);
     const frame = ['--ha-card-border-radius', '--ha-card-box-shadow', '--ha-card-border-width'];
 
     // Newer Shopping List Manager builds take the host's style and colour mode directly and
@@ -93,6 +95,7 @@ class RmShoppingView extends LitElement {
       for (const k of SLM_PALETTE_TOKENS) card.style.removeProperty(k);
       card.hostUi = ui === 'classic' ? undefined : ui;
       card.hostDark = dark;
+      card.hostAccent = ui === 'classic' ? null : themeOverrides(ui, this.settings?.designTheme, dark);
       card.applyColorScheme?.();
       if (ui === 'classic') frame.forEach(k => card.style.removeProperty(k));
       else {
@@ -107,7 +110,7 @@ class RmShoppingView extends LitElement {
       for (const k of [...Object.keys(map), '--ha-card-border-radius']) card.style.removeProperty(k);
       return;
     }
-    const pal = paletteFor(ui, dark);
+    const pal = paletteFor(ui, dark, this.settings?.designTheme);
     for (const [slm, rm] of Object.entries(map)) card.style.setProperty(slm, pal[rm]);
     card.style.setProperty('--ha-card-border-radius', pal['--rm-radius-card']);
   }

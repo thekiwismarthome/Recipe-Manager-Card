@@ -5,6 +5,9 @@
 import { LitElement, html, css } from 'lit';
 import { msg, str } from '@lit/localize';
 
+const hasAny = (g) => g._filterMode !== 'all' || g._sort !== 'default' || g._sortByRating || g._starFilter > 0
+  || g._selectedCourses.size > 0 || g._selectedCategories.size > 0 || g._selectedCollections.size > 0;
+
 class RmRecipeGrid extends LitElement {
   static properties = {
     recipes:        { type: Array },
@@ -26,6 +29,8 @@ class RmRecipeGrid extends LitElement {
     _starFilter:         { type: Number },   // 0 = no filter; 1-5 = minimum rating
     _sortByRating:       { type: Boolean },  // sort recipes by rating desc
     _showRatingMenu:     { type: Boolean },  // star filter dropdown open
+    _sort:               { type: String },   // 'default'|'rating'|'time'|'name' (Fresh/Compact sheet)
+    _showSheet:          { type: Boolean },  // filter + sort sheet (Fresh/Compact)
     _selectedCourses:    { type: Object },
     _selectedCategories: { type: Object },
     _selectedCollections:{ type: Object },
@@ -53,6 +58,8 @@ class RmRecipeGrid extends LitElement {
     this._starFilter = 0;
     this._sortByRating = false;
     this._showRatingMenu = false;
+    this._sort = 'default';
+    this._showSheet = false;
     this._selectedCourses = new Set();
     this._selectedCategories = new Set();
     this._selectedCollections = new Set();
@@ -71,6 +78,9 @@ class RmRecipeGrid extends LitElement {
   }
 
   updated(changedProps) {
+    if (changedProps.has('_showSheet')) {
+      this.dispatchEvent(new CustomEvent('rm-overlay', { detail: { open: this._showSheet }, bubbles: true, composed: true }));
+    }
     // Apply filterPreset when it changes (chip navigation from recipe detail)
     if (changedProps.has('filterPreset') && this.filterPreset) {
       const { filterMode, selectedValues } = this.filterPreset;
@@ -190,7 +200,11 @@ class RmRecipeGrid extends LitElement {
     }
 
     if (this._starFilter > 0) base = base.filter(r => (r.rating || 0) >= this._starFilter);
-    if (this._sortByRating) base = [...base].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    if (this._sortByRating || this._sort === 'rating') base = [...base].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    else if (this._sort === 'time') {
+      const t = r => r.total_time || (r.prep_time || 0) + (r.cook_time || 0) || 9999;
+      base = [...base].sort((a, b) => t(a) - t(b));
+    } else if (this._sort === 'name') base = [...base].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     return base;
   }
 
@@ -431,11 +445,11 @@ class RmRecipeGrid extends LitElement {
 
   render() {
     const list = this._getFilteredList();
-    const showFavSection = this._filterMode === 'all' && this.showFavourites && !this.activeTag && !this.searchQuery && !this._starFilter && !this._sortByRating;
+    const showFavSection = this._filterMode === 'all' && this.showFavourites && !this.activeTag && !this.searchQuery && !this._starFilter && !this._sortByRating && this._sort === 'default';
     const favourites = showFavSection ? list.filter(r => r.is_favourite) : [];
     const mainList = showFavSection && favourites.length ? list.filter(r => !r.is_favourite) : list;
     const gridStyle = `grid-template-columns: var(--rm-grid-columns, repeat(${this.columns}, minmax(0, 1fr)));`;
-    const hasActiveFilter = this._starFilter > 0 || this._sortByRating;
+    const hasActiveFilter = this._starFilter > 0 || this._sortByRating || this._sort !== 'default';
     const showHero = this.uiStyle === 'fresh' && this.showPlanner && this._filterMode === 'all' && !this.activeTag && !this.searchQuery && !hasActiveFilter;
 
     return html`
@@ -494,13 +508,14 @@ class RmRecipeGrid extends LitElement {
             <div class="rating-filter-wrap">
               <button
                 class="rating-filter-btn ${hasActiveFilter ? 'active' : ''}"
-                @click=${(e) => { e.stopPropagation(); this._showRatingMenu = !this._showRatingMenu; }}
-                title="${msg('Filter/sort by rating')}"
+                @click=${(e) => { e.stopPropagation(); if (this._styled) this._showSheet = true; else this._showRatingMenu = !this._showRatingMenu; }}
+                title="${this._styled ? msg('Filter and sort') : msg('Filter/sort by rating')}"
+                aria-label="${this._styled ? msg('Filter and sort') : msg('Filter/sort by rating')}"
               >
-                <ha-icon icon="mdi:filter-menu-outline"></ha-icon>
+                <ha-icon icon="${this._styled ? 'mdi:tune-variant' : 'mdi:filter-menu-outline'}"></ha-icon>
                 ${hasActiveFilter ? html`<span class="rating-filter-badge"></span>` : ''}
               </button>
-              ${this._showRatingMenu ? this._renderRatingMenu() : ''}
+              ${this._showRatingMenu && !this._styled ? this._renderRatingMenu() : ''}
             </div>
           </div>
         ` : ''}
@@ -589,6 +604,77 @@ class RmRecipeGrid extends LitElement {
               ? this._renderSection('all', showFavSection && favourites.length ? msg('All Recipes') : (this._styled && this._filterMode === 'all' ? msg('All Recipes') : ''), mainList, gridStyle)
               : ''}
           `}
+        </div>
+        ${this._showSheet ? this._renderSheet() : ''}
+      </div>
+    `;
+  }
+
+  // Filter + sort sheet (Fresh / Compact): what to show, sort order, minimum star rating
+  _renderSheet() {
+    const all = this.allRecipes;
+    const favs = all.filter(r => r.is_favourite).length;
+    const show = (mode) => this._filterMode === mode && !this._selectedCourses.size && !this._selectedCategories.size && !this._selectedCollections.size;
+    const setMode = (mode) => {
+      this._filterMode = mode;
+      this._selectedCourses = new Set(); this._selectedCategories = new Set(); this._selectedCollections = new Set();
+    };
+    const pickValue = (type, value) => {
+      setMode(type);
+      const key = type === 'courses' ? '_selectedCourses' : type === 'categories' ? '_selectedCategories' : '_selectedCollections';
+      this[key] = new Set([value]);
+    };
+    const valueGroup = (label, type, values, selected, counts) => values.length ? html`
+      <div class="sheet-label">${label}</div>
+      <div class="sheet-opts">
+        ${values.map(v => html`
+          <button class="sheet-opt" aria-pressed="${selected.has(v) ? 'true' : 'false'}" @click=${() => pickValue(type, v)}>
+            ${v}<span class="so-count">${counts[v] || 0}</span>
+          </button>`)}
+      </div>` : '';
+    const opt = (label, pressed, onClick, extra = '') => html`
+      <button class="sheet-opt" aria-pressed="${pressed ? 'true' : 'false'}" @click=${onClick}>
+        ${label}${extra}${pressed ? html`<ha-icon class="so-ok" icon="mdi:check"></ha-icon>` : ''}
+      </button>`;
+    return html`
+      <div class="sheet-layer ${this.hideSidebar ? 'modal' : ''}" @click=${e => e.stopPropagation()}>
+        <div class="sheet-scrim" @click=${() => { this._showSheet = false; }}></div>
+        <div class="sheet" role="dialog" aria-modal="true" aria-label="${msg('Filter and sort')}">
+          <div class="sheet-grab"></div>
+          <div class="sheet-head">
+            <h2>${msg('Filter and sort')}</h2>
+            <button class="sheet-done" @click=${() => { this._showSheet = false; }}>${msg('Done')}</button>
+          </div>
+
+          <div class="sheet-label">${msg('Show')}</div>
+          <div class="sheet-opts">
+            ${opt(msg('All recipes'), show('all'), () => setMode('all'), html`<span class="so-count">${all.length}</span>`)}
+            ${opt(msg('Favourites'), show('favourites'), () => setMode('favourites'), html`<span class="so-count">${favs}</span>`)}
+            ${opt(msg('Recent'), show('recent'), () => setMode('recent'), html`<span class="so-count">${Math.min(this.recentRecipes.length, this.recentCount)}</span>`)}
+          </div>
+          ${valueGroup(msg('Course'), 'courses', this._allCourses, this._selectedCourses, this._coursecounts)}
+          ${valueGroup(msg('Category'), 'categories', this._allCategories, this._selectedCategories, this._categorycounts)}
+          ${valueGroup(msg('Collection'), 'collections', this._allCollections, this._selectedCollections, this._collectioncounts)}
+
+          <div class="sheet-label">${msg('Sort by')}</div>
+          <div class="sheet-opts">
+            ${[['default', msg('Favourites first')], ['rating', msg('Highest rated')], ['time', msg('Quickest')], ['name', msg('A to Z')]]
+              .map(([v, l]) => opt(l, this._sort === v && !(v === 'default' && this._sortByRating), () => { this._sort = v; this._sortByRating = false; }))}
+          </div>
+
+          <div class="sheet-label">${msg('Minimum rating')}</div>
+          <div class="sheet-opts">
+            ${opt(msg('Any rating'), this._starFilter === 0, () => { this._starFilter = 0; })}
+            ${[5, 4, 3, 2, 1].map(n => html`
+              <button class="sheet-opt" aria-pressed="${this._starFilter === n ? 'true' : 'false'}" @click=${() => { this._starFilter = n; }}
+                aria-label="${msg(str`${n} stars and up`)}">
+                <span class="so-stars" aria-hidden="true">${[1, 2, 3, 4, 5].map(i => html`<ha-icon icon="${i <= n ? 'mdi:star' : 'mdi:star-outline'}"></ha-icon>`)}</span>
+                ${n < 5 ? html`<span class="so-plus">${n}+</span>` : ''}
+                ${this._starFilter === n ? html`<ha-icon class="so-ok" icon="mdi:check"></ha-icon>` : ''}
+              </button>`)}
+          </div>
+
+          ${hasAny(this) ? html`<button class="sheet-reset" @click=${() => { setMode('all'); this._sort = 'default'; this._sortByRating = false; this._starFilter = 0; }}>${msg('Reset filters')}</button>` : ''}
         </div>
       </div>
     `;
@@ -1050,6 +1136,39 @@ class RmRecipeGrid extends LitElement {
     .row-fav.active { color: var(--rm-danger); }
     :host([ui-style="compact"]) .empty-state ha-icon,
     :host([ui-style="fresh"]) .empty-state ha-icon { color: var(--rm-accent-text); opacity: 0.6; }
+
+    /* ── Filter + sort sheet ── */
+    .sheet-layer { position: absolute; inset: 0; z-index: 300; }
+    .sheet-scrim { position: absolute; inset: 0; background: rgba(10,16,13,0.5); }
+    .sheet {
+      position: absolute; left: 0; right: 0; bottom: 0; max-height: 90%; overflow-y: auto; box-sizing: border-box;
+      padding: 10px 20px 28px; border-radius: 32px 32px 0 0; background: var(--rm-bg-main); color: var(--rm-text);
+      box-shadow: 0 -10px 40px rgba(0,0,0,0.22);
+    }
+    .sheet-layer.modal .sheet { left: 50%; right: auto; bottom: auto; top: 50%; transform: translate(-50%, -50%); width: min(480px, 92%); max-height: 86%; border-radius: 28px; }
+    .sheet-grab { width: 40px; height: 5px; border-radius: 99px; margin: 0 auto 8px; background: var(--rm-border); }
+    .sheet-layer.modal .sheet-grab { display: none; }
+    .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 4px 6px; }
+    .sheet-head h2 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+    .sheet-done { flex: none; min-height: 44px; padding: 0 20px; border: none; border-radius: 999px; background: var(--rm-accent); color: var(--rm-ink, #fff); font-weight: 700; font-size: 14px; cursor: pointer; }
+    .sheet-label { padding: 14px 4px 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rm-text-secondary); }
+    .sheet-opts { border-radius: 22px; border: 1px solid var(--rm-border); background: var(--rm-bg-surface); padding: 0 14px; }
+    :host([ui-style="compact"]) .sheet-opts { border-color: transparent; border-radius: 18px; }
+    .sheet-opt {
+      display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 0;
+      border: none; border-bottom: 1px solid var(--rm-line); background: transparent; text-align: left;
+      font: inherit; font-size: 15px; font-weight: 600; color: var(--rm-text); cursor: pointer;
+    }
+    .sheet-opts > .sheet-opt:last-child { border-bottom: none; }
+    .sheet-opt[aria-pressed="true"] { color: var(--rm-accent-text); font-weight: 700; }
+    .sheet-opt:focus-visible, .sheet-done:focus-visible, .sheet-reset:focus-visible { outline: 2px solid var(--rm-accent); outline-offset: 2px; }
+    .so-count { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--rm-text-secondary); }
+    .so-ok { margin-left: auto; --mdc-icon-size: 20px; color: var(--rm-accent-text); }
+    .so-count + .so-ok { margin-left: 8px; }
+    .so-stars { display: inline-flex; color: var(--rm-warn); }
+    .so-stars ha-icon { --mdc-icon-size: 20px; }
+    .so-plus { font-size: 13px; font-weight: 700; color: var(--rm-text-secondary); }
+    .sheet-reset { display: block; width: 100%; margin-top: 16px; min-height: 48px; border: 1px solid var(--rm-border); border-radius: 999px; background: var(--rm-bg-surface); color: var(--rm-text); font: inherit; font-weight: 700; cursor: pointer; }
   `;
 }
 

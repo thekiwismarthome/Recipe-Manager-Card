@@ -63,6 +63,9 @@ const DEFAULT_SETTINGS = {
   showPlanner: true,
   recentCount: 12,
   timerSound: 'beep',
+  // Mirror Voice PE / ESPHome timers (template sensors, see ha-timer-card voice-pe docs)
+  vpeTimers: true,
+  vpePrefix: 'sensor.vpe_timer',
   keepScreenOn: false,
   keepScreenOnMins: 30,
   showUnitConversion: false,
@@ -299,6 +302,7 @@ class RecipeManagerCard extends LitElement {
     _sidebarCollapsed: { type: Boolean },
     _gridScrollPos: { type: Number },
     _weekPlan: { type: Array },
+    _overlayOpen: { type: Boolean },
     _recentRecipeIds: { type: Array },
     _timers: { type: Array },
     _timerAlarm: { type: Object },
@@ -343,6 +347,7 @@ class RecipeManagerCard extends LitElement {
     this._wide = false;
     this._sidebarCollapsed = false;
     this._weekPlan = [];
+    this._overlayOpen = false;
     this._gridScrollPos = 0;
     this._recentRecipeIds = loadRecentRecipes();
     this._timers = loadTimers();
@@ -441,6 +446,9 @@ class RecipeManagerCard extends LitElement {
     }
     if (changedProps.has('hass') && this._api) this._api.hass = this.hass;
     if (changedProps.has('_settings')) this._applyTheme();
+    else if (changedProps.has('hass') && this.hass?.themes?.darkMode !== this._lastHaDark) this._applyTheme();
+    this._lastHaDark = this.hass?.themes?.darkMode;
+    if (changedProps.has('_view') && this._overlayOpen) this._overlayOpen = false;
     if (changedProps.has('_view') || changedProps.has('_selectedRecipe')) this._saveViewState();
   }
 
@@ -474,6 +482,16 @@ class RecipeManagerCard extends LitElement {
     }
   }
 
+  // Dark when set to Dark, or when set to "Match device" and Home Assistant (else the OS) is dark.
+  _isDarkNow() {
+    const m = this._settings.darkMode;
+    if (m === 'on') return true;
+    if (m === 'off') return false;
+    const ha = this.hass?.themes?.darkMode;
+    if (typeof ha === 'boolean') return ha;
+    return this._darkModeQuery?.matches ?? false;
+  }
+
   _applyTheme() {
     const s = this._settings;
     const ui = normaliseUiStyle(s.uiStyle);
@@ -483,12 +501,9 @@ class RecipeManagerCard extends LitElement {
 
     // Fresh / Compact: one fixed palette per style (light or dark), same as Shopping List Manager.
     if (ui !== 'classic') {
-      let dark;
-      if (s.darkMode === 'on') dark = true;
-      else if (s.darkMode === 'off') dark = false;
-      else dark = this._darkModeQuery?.matches ?? false;
+      const dark = this._isDarkNow();
       this.setAttribute('data-mode', dark ? 'dark' : 'light');
-      for (const [k, v] of Object.entries(paletteFor(ui, dark))) this.style.setProperty(k, v);
+      for (const [k, v] of Object.entries(paletteFor(ui, dark, s.designTheme))) this.style.setProperty(k, v);
       return;
     }
 
@@ -698,6 +713,7 @@ class RecipeManagerCard extends LitElement {
   // -- Timer management -----------------------------------------------------
 
   _tickTimers() {
+    if (this._view === 'timers' && this._vpeTimers.some(t => t.running)) this.requestUpdate();
     if (!this._timers.length) return;
     let changed = false;
     const newAlarms = [];
@@ -1125,7 +1141,7 @@ class RecipeManagerCard extends LitElement {
           >
             <ha-icon icon="mdi:timer-outline"></ha-icon>
             ${!collapsed ? html`<span>${msg('Timers')}</span>` : ''}
-            ${this._timers.length ? html`<span class="sb-timer-badge">${this._timers.length}</span>` : ''}
+            ${this._timerCount ? html`<span class="sb-timer-badge">${this._timerCount}</span>` : ''}
           </button>
         </div>
 
@@ -1347,69 +1363,11 @@ class RecipeManagerCard extends LitElement {
     `;
   }
 
-  _renderTimersView() {
+  // "Add timer" form: quick start (label + minutes), global toggle, save preset
+  _renderTimerAddSection() {
     const hasCustom = this._customTimerInput.trim();
     const hasPreset = this._presetNameInput.trim() && this._presetMinsInput.trim();
-    const quickAdd = [
-      { label: '+30s', secs: 30 },
-      { label: '+1m',  secs: 60 },
-      { label: '+5m',  secs: 300 },
-      { label: '+10m', secs: 600 },
-    ];
-    const nonPresetTimers = this._timers.filter(t => !t.presetId);
-    const circ = 263.9;
     return html`
-      <div class="timers-view">
-
-        <!-- Active timers (non-preset): horizontal wrap of square arc tiles -->
-        ${nonPresetTimers.length ? html`
-          <div class="timer-list">
-            ${nonPresetTimers.map(t => {
-              const tArcColor = t.remaining < 60 ? '#f59e0b' : 'var(--rm-accent)';
-              const tOffset = circ * (1 - t.remaining / t.total);
-              return html`
-                <div class="timer-card">
-                  <button class="preset-remove" @click=${() => this._stopTimer(t.id)} title="${msg('Remove')}">
-                    <ha-icon icon="mdi:close"></ha-icon>
-                  </button>
-                  ${t.global ? html`<ha-icon class="timer-global-badge" icon="mdi:earth" title="${msg('Global timer')}"></ha-icon>` : ''}
-                  <span class="timer-card-name">${t.label}</span>
-                  <div class="preset-arc-wrap">
-                    <svg viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" r="42" fill="none" stroke="var(--rm-border)" stroke-width="6"/>
-                      <circle cx="50" cy="50" r="42" fill="none"
-                        stroke="${tArcColor}" stroke-width="6" stroke-linecap="round"
-                        stroke-dasharray="${circ}" stroke-dashoffset="${tOffset}"
-                        transform="rotate(-90 50 50)"
-                        style="transition: stroke-dashoffset 0.8s linear, stroke 0.3s;"/>
-                    </svg>
-                    <div class="preset-arc-center">
-                      <span class="preset-arc-time">${formatTimerDisplay(t.remaining)}</span>
-                    </div>
-                  </div>
-                  <div class="preset-arc-btns">
-                    <button class="timer-ctrl-btn" @click=${() => this._pauseTimer(t.id)} title="${t.running ? msg('Pause') : msg('Resume')}">
-                      <ha-icon icon="${t.running ? 'mdi:pause' : 'mdi:play'}"></ha-icon>
-                    </button>
-                    <button class="timer-ctrl-btn danger" @click=${() => this._stopTimer(t.id)} title="${msg('Stop')}">
-                      <ha-icon icon="mdi:stop"></ha-icon>
-                    </button>
-                  </div>
-                </div>
-              `;
-            })}
-          </div>
-        ` : html`
-          <div class="timer-empty">
-            <ha-icon icon="mdi:timer-off-outline"></ha-icon>
-            <p>${msg('No active timers.')}</p>
-            <p class="timer-empty-hint">${msg("Tap a highlighted time in a recipe's directions to start one.")}</p>
-          </div>
-        `}
-
-        <!-- Spacer pushes add+presets to bottom -->
-        <div style="flex:1"></div>
-
         <!-- Add timer section -->
         <div class="timer-add-section">
           <div class="timer-add-header">
@@ -1476,6 +1434,74 @@ class RecipeManagerCard extends LitElement {
             </div>
           </div>
         </div>
+    `;
+  }
+
+  _renderTimersView() {
+    if (normaliseUiStyle(this._settings.uiStyle) !== 'classic') return this._renderTimersViewStyled();
+    const hasCustom = this._customTimerInput.trim();
+    const hasPreset = this._presetNameInput.trim() && this._presetMinsInput.trim();
+    const quickAdd = [
+      { label: '+30s', secs: 30 },
+      { label: '+1m',  secs: 60 },
+      { label: '+5m',  secs: 300 },
+      { label: '+10m', secs: 600 },
+    ];
+    const nonPresetTimers = this._timers.filter(t => !t.presetId);
+    const circ = 263.9;
+    return html`
+      <div class="timers-view">
+
+        <!-- Active timers (non-preset): horizontal wrap of square arc tiles -->
+        ${nonPresetTimers.length ? html`
+          <div class="timer-list">
+            ${nonPresetTimers.map(t => {
+              const tArcColor = t.remaining < 60 ? '#f59e0b' : 'var(--rm-accent)';
+              const tOffset = circ * (1 - t.remaining / t.total);
+              return html`
+                <div class="timer-card">
+                  <button class="preset-remove" @click=${() => this._stopTimer(t.id)} title="${msg('Remove')}">
+                    <ha-icon icon="mdi:close"></ha-icon>
+                  </button>
+                  ${t.global ? html`<ha-icon class="timer-global-badge" icon="mdi:earth" title="${msg('Global timer')}"></ha-icon>` : ''}
+                  <span class="timer-card-name">${t.label}</span>
+                  <div class="preset-arc-wrap">
+                    <svg viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="42" fill="none" stroke="var(--rm-border)" stroke-width="6"/>
+                      <circle cx="50" cy="50" r="42" fill="none"
+                        stroke="${tArcColor}" stroke-width="6" stroke-linecap="round"
+                        stroke-dasharray="${circ}" stroke-dashoffset="${tOffset}"
+                        transform="rotate(-90 50 50)"
+                        style="transition: stroke-dashoffset 0.8s linear, stroke 0.3s;"/>
+                    </svg>
+                    <div class="preset-arc-center">
+                      <span class="preset-arc-time">${formatTimerDisplay(t.remaining)}</span>
+                    </div>
+                  </div>
+                  <div class="preset-arc-btns">
+                    <button class="timer-ctrl-btn" @click=${() => this._pauseTimer(t.id)} title="${t.running ? msg('Pause') : msg('Resume')}">
+                      <ha-icon icon="${t.running ? 'mdi:pause' : 'mdi:play'}"></ha-icon>
+                    </button>
+                    <button class="timer-ctrl-btn danger" @click=${() => this._stopTimer(t.id)} title="${msg('Stop')}">
+                      <ha-icon icon="mdi:stop"></ha-icon>
+                    </button>
+                  </div>
+                </div>
+              `;
+            })}
+          </div>
+        ` : html`
+          <div class="timer-empty">
+            <ha-icon icon="mdi:timer-off-outline"></ha-icon>
+            <p>${msg('No active timers.')}</p>
+            <p class="timer-empty-hint">${msg("Tap a highlighted time in a recipe's directions to start one.")}</p>
+          </div>
+        `}
+
+        <!-- Spacer pushes add+presets to bottom -->
+        <div style="flex:1"></div>
+
+        ${this._renderTimerAddSection()}
 
         <!-- Preset timers grid (bottom) -->
         ${this._timerPresets.length ? html`
@@ -1540,6 +1566,137 @@ class RecipeManagerCard extends LitElement {
             })}
           </div>
         ` : ''}
+      </div>
+    `;
+  }
+
+  // -- Voice PE / ESPHome timers (mirrored from Home Assistant sensors) ------------------
+  // Template sensors `sensor.vpe_timer_N`: state active|paused|finished|idle, attributes duration,
+  // remaining ("H:MM:SS"), display_name, and optionally timer_id + control_entity for control.
+
+  _hms(str) {
+    if (!str) return 0;
+    const p = String(str).split(':').map(n => parseInt(n, 10) || 0);
+    if (p.length === 3) return p[0] * 3600 + p[1] * 60 + p[2];
+    if (p.length === 2) return p[0] * 60 + p[1];
+    return 0;
+  }
+
+  get _vpeTimers() {
+    if (this._settings.vpeTimers === false || !this.hass?.states) return [];
+    const prefix = (this._settings.vpePrefix || 'sensor.vpe_timer').trim();
+    const out = [];
+    for (const [entityId, st] of Object.entries(this.hass.states)) {
+      if (!entityId.startsWith(prefix)) continue;
+      const state = st.state;
+      if (!['active', 'paused', 'finished'].includes(state)) continue;
+      const a = st.attributes || {};
+      const total = this._hms(a.duration);
+      let remaining = this._hms(a.remaining);
+      if (state === 'active') {
+        const ref = Date.parse(st.last_updated) || Date.now();
+        const end = a.finishes_at ? Date.parse(a.finishes_at) : ref + remaining * 1000;
+        remaining = Math.max(0, Math.round((end - Date.now()) / 1000));
+      }
+      if (state === 'finished') remaining = 0;
+      const id = a.timer_id ?? a.timerId ?? a.id ?? null;
+      out.push({
+        id: `vpe-${entityId}`,
+        entityId,
+        label: (a.timer_name && String(a.timer_name).trim()) || (a.display_name && String(a.display_name).trim()) || msg('Voice timer'),
+        sub: a.display_name && a.timer_name ? String(a.display_name).trim() : msg('Voice PE'),
+        total: total || remaining || 1,
+        remaining,
+        running: state === 'active',
+        finished: state === 'finished',
+        vpeId: id ? String(id).trim() : null,
+        control: a.control_entity ? String(a.control_entity).trim() : null,
+        source: 'voice_pe',
+      });
+    }
+    return out.sort((x, y) => x.remaining - y.remaining);
+  }
+
+  // Everything the Timers tab counts: local + Home Assistant global timers + Voice PE
+  get _timerCount() {
+    // Voice PE timers only appear in the Fresh / Compact Timers view
+    if (normaliseUiStyle(this._settings.uiStyle) === 'classic') return this._timers.length;
+    return this._timers.length + this._vpeTimers.filter(t => !t.finished).length;
+  }
+
+  async _vpeCommand(t, verb) {
+    if (!t.control || !t.vpeId || !this.hass) return;
+    const domain = t.control.split('.')[0];
+    if (domain !== 'text' && domain !== 'input_text') return;
+    try { await this.hass.callService(domain, 'set_value', { entity_id: t.control, value: `${verb}:${t.vpeId}` }); } catch { /* ignore */ }
+  }
+
+  // Timers view for Fresh / Compact: quick-start chips, one card per timer (local, global and Voice PE)
+  _renderTimersViewStyled() {
+    const vpe = this._vpeTimers;
+    const local = this._timers.map(t => ({
+      id: t.id, label: t.label, total: t.total || t.remaining || 1, remaining: t.remaining, running: t.running,
+      finished: !!t.alarming, global: !!t.global, source: 'local',
+    }));
+    const all = [...vpe, ...local];
+    const pct = t => Math.max(0, Math.min(100, Math.round((1 - t.remaining / (t.total || 1)) * 100)));
+    const card = (t) => {
+      const isVpe = t.source === 'voice_pe';
+      const canControl = !isVpe || !!(t.control && t.vpeId);
+      return html`
+        <div class="tm-card ${t.finished ? 'done' : ''}">
+          <div class="tm-row">
+            <div class="tm-mid">
+              <div class="tm-name">
+                ${isVpe ? html`<ha-icon icon="mdi:microphone-outline"></ha-icon>` : t.global ? html`<ha-icon icon="mdi:earth"></ha-icon>` : ''}
+                <span>${t.label}</span>
+              </div>
+              <div class="tm-clock">${t.finished ? msg('Ready') : formatTimerDisplay(t.remaining)}</div>
+              ${isVpe ? html`<div class="tm-sub">${t.sub}</div>` : ''}
+            </div>
+            ${t.finished ? html`
+              ${!isVpe ? html`<button class="tm-btn text" @click=${() => this._addTimeToTimer(t.id, 60)} aria-label="${msg('Add one minute')}">+1m</button>` : ''}
+              ${canControl ? html`<button class="tm-btn" @click=${() => isVpe ? this._vpeCommand(t, 'cancel') : this._stopTimer(t.id)} aria-label="${msg('Dismiss')}"><ha-icon icon="mdi:check"></ha-icon></button>` : ''}
+            ` : html`
+              ${canControl ? html`
+                <button class="tm-btn" @click=${() => isVpe ? this._vpeCommand(t, t.running ? 'pause' : 'resume') : this._pauseTimer(t.id)}
+                  aria-label="${t.running ? msg('Pause') : msg('Resume')}"><ha-icon icon="${t.running ? 'mdi:pause' : 'mdi:play'}"></ha-icon></button>
+                <button class="tm-btn" @click=${() => isVpe ? this._vpeCommand(t, 'cancel') : this._stopTimer(t.id)}
+                  aria-label="${msg('Delete timer')}"><ha-icon icon="mdi:trash-can-outline"></ha-icon></button>
+              ` : ''}
+            `}
+          </div>
+          <div class="tm-bar"><i style="width:${t.finished ? 100 : pct(t)}%"></i></div>
+        </div>
+      `;
+    };
+    return html`
+      <div class="timers-view tm-view">
+        <div class="tm-quick" role="group" aria-label="${msg('Quick timers')}">
+          ${[5, 10, 15, 30].map(m => html`
+            <button class="tm-chip" @click=${() => this._startTimer(m * 60, null, null, this._globalMode)}>
+              <ha-icon icon="mdi:plus"></ha-icon>${msg(str`${m} min`)}
+            </button>`)}
+          ${this._timerPresets.map(p => html`
+            <span class="tm-chip preset">
+              <button class="tm-chip-main" @click=${() => this._startTimer(p.seconds, p.name, p.id, this._globalMode)}>${p.name} · ${Math.round(p.seconds / 60)} ${msg('min')}</button>
+              <button class="tm-chip-x" @click=${() => this._removePreset(p.id)} aria-label="${msg(str`Remove preset ${p.name}`)}"><ha-icon icon="mdi:close"></ha-icon></button>
+            </span>`)}
+          <label class="tm-chip toggle ${this._globalMode ? 'on' : ''}" title="${msg('Sync timer across all devices via Home Assistant')}">
+            <input type="checkbox" .checked=${this._globalMode} @change=${e => { this._globalMode = e.target.checked; }} />
+            <ha-icon icon="mdi:earth"></ha-icon>${msg('Global')}
+          </label>
+        </div>
+
+        ${all.length ? html`<div class="tm-list">${all.map(card)}</div>` : html`
+          <div class="timer-empty">
+            <ha-icon icon="mdi:timer-off-outline"></ha-icon>
+            <p>${msg('No timers running')}</p>
+            <p class="timer-empty-hint">${msg("Start one from a recipe step, a quick timer above, or by voice.")}</p>
+          </div>
+        `}
+
+        ${this._renderTimerAddSection()}
       </div>
     `;
   }
@@ -1610,7 +1767,7 @@ class RecipeManagerCard extends LitElement {
           title="${msg('Timers')}">
           <ha-icon icon="mdi:timer-outline"></ha-icon>
           <span>${msg('Timers')}</span>
-          ${this._timers.length ? html`<span class="rm-bn-badge">${this._timers.length}</span>` : ''}
+          ${this._timerCount ? html`<span class="rm-bn-badge">${this._timerCount}</span>` : ''}
         </button>
       </nav>
     `;
@@ -1646,7 +1803,8 @@ class RecipeManagerCard extends LitElement {
   render() {
     const wide = this._wide;
     return html`
-      <ha-card class="rm-card ${wide ? 'rm-wide' : ''}">
+      <ha-card class="rm-card ${wide ? 'rm-wide' : ''} ${this._overlayOpen ? 'rm-overlay-open' : ''}"
+        @rm-overlay=${e => { this._overlayOpen = !!e.detail?.open; }}>
         ${wide ? this._renderSidebar() : ''}
         <div class="rm-main">
           ${this._renderHeader()}
@@ -2652,6 +2810,60 @@ class RecipeManagerCard extends LitElement {
     :host([data-ui="compact"]) .text-btn { color: var(--rm-ink); }
     :host([data-ui="fresh"]) .alarm-btn.accent,
     :host([data-ui="compact"]) .alarm-btn.accent { color: var(--rm-ink); }
+
+    /* Timers view (Fresh + Compact): quick chips, one card per timer */
+    .tm-view { gap: 14px; }
+    .tm-quick { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tm-chip {
+      min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--rm-border);
+      background: var(--rm-bg-surface); color: var(--rm-text); font: inherit; font-size: 14px; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    }
+    :host([data-ui="compact"]) .tm-chip { border-radius: 12px; border-color: transparent; }
+    .tm-chip ha-icon { --mdc-icon-size: 16px; }
+    .tm-chip.preset { padding: 0; gap: 0; overflow: hidden; }
+    .tm-chip-main { background: none; border: none; color: inherit; font: inherit; padding: 0 4px 0 14px; min-height: 40px; cursor: pointer; }
+    .tm-chip-x { background: none; border: none; color: var(--rm-text-secondary); width: 36px; min-height: 40px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .tm-chip.toggle input { display: none; }
+    .tm-chip.toggle.on { background: var(--rm-accent-soft); border-color: var(--rm-accent); color: var(--rm-accent-text); }
+    .tm-list { display: grid; gap: 12px; }
+    .tm-card { padding: 16px; border-radius: var(--rm-radius-card); border: 1px solid var(--rm-border); background: var(--rm-bg-surface); display: grid; gap: 12px; }
+    :host([data-ui="compact"]) .tm-card { border-color: transparent; }
+    .tm-card.done { background: var(--rm-accent); color: var(--rm-ink); border-color: var(--rm-accent); }
+    .tm-row { display: flex; align-items: center; gap: 10px; }
+    .tm-mid { flex: 1; min-width: 0; }
+    .tm-name { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--rm-text-secondary); }
+    .tm-name ha-icon { --mdc-icon-size: 14px; flex: none; }
+    .tm-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tm-card.done .tm-name, .tm-card.done .tm-sub { color: inherit; }
+    .tm-clock { font-size: 36px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+    .tm-sub { font-size: 12.5px; font-weight: 500; color: var(--rm-text-secondary); }
+    .tm-bar { height: 8px; border-radius: 99px; background: var(--rm-bg-elevated); overflow: hidden; }
+    .tm-bar i { display: block; height: 100%; border-radius: 99px; background: var(--rm-accent); transition: width 0.8s linear; }
+    .tm-card.done .tm-bar { background: color-mix(in srgb, var(--rm-ink) 28%, transparent); }
+    .tm-card.done .tm-bar i { background: var(--rm-ink); }
+    .tm-btn {
+      flex: none; width: 44px; height: 44px; padding: 0; border: none; border-radius: 50%;
+      background: var(--rm-accent-soft); color: var(--rm-accent-text);
+      display: flex; align-items: center; justify-content: center; cursor: pointer; font: inherit; font-weight: 700;
+    }
+    .tm-btn.text { width: auto; padding: 0 14px; border-radius: 999px; }
+    .tm-card.done .tm-btn { background: var(--rm-ink); color: var(--rm-accent); }
+    .tm-btn:focus-visible, .tm-chip:focus-visible, .tm-chip-main:focus-visible { outline: 2px solid var(--rm-accent); outline-offset: 2px; }
+    :host([data-ui="fresh"]) .tm-view .timer-add-section,
+    :host([data-ui="compact"]) .tm-view .timer-add-section {
+      border-top: none; padding: 16px; background: var(--rm-bg-surface);
+      border: 1px solid var(--rm-border); border-radius: var(--rm-radius-card);
+    }
+    :host([data-ui="compact"]) .tm-view .timer-add-section { border-color: transparent; }
+    :host([data-ui="fresh"]) .timer-input,
+    :host([data-ui="compact"]) .timer-input { border-radius: 12px; min-height: 44px; }
+    :host([data-ui="fresh"]) .alarm-bubble,
+    :host([data-ui="compact"]) .alarm-bubble { border-radius: 28px; background: var(--rm-bg-surface); }
+
+    /* A sheet from the grid or planner covers the phone nav and + button */
+    ha-card.rm-overlay-open .rm-bottom-nav,
+    ha-card.rm-overlay-open .rm-fab { display: none; }
   `;
 }
 

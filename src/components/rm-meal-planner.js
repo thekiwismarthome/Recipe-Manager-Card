@@ -40,6 +40,9 @@ class RmMealPlanner extends LitElement {
   }
 
   updated(changedProps) {
+    if (changedProps.has('_showPicker')) {
+      this.dispatchEvent(new CustomEvent('rm-overlay', { detail: { open: this._showPicker }, bubbles: true, composed: true }));
+    }
     if ((changedProps.has('api') || changedProps.has('_weekStart')) && this.api) {
       this._loadPlan();
     }
@@ -108,7 +111,12 @@ class RmMealPlanner extends LitElement {
   }
 
   _mealIcon(mealType) {
-    return { breakfast: 'mdi:coffee-outline', lunch: 'mdi:silverware-fork-knife', dinner: 'mdi:weather-night', snack: 'mdi:cookie-outline' }[mealType] || 'mdi:food';
+    return { breakfast: 'mdi:weather-sunny', lunch: 'mdi:silverware-fork-knife', dinner: 'mdi:weather-night', snack: 'mdi:coffee-outline' }[mealType] || 'mdi:food';
+  }
+
+  // Each meal has its own colour (same as the Shopping List Manager hues)
+  _mealHue(mealType) {
+    return { breakfast: '--rm-h3', lunch: '--rm-h2', dinner: '--rm-h4', snack: '--rm-h6' }[mealType] || '--rm-accent';
   }
 
   _formatMinutes(m) {
@@ -351,7 +359,7 @@ class RmMealPlanner extends LitElement {
     if (!entries.length) {
       return html`
         <div class="slot">
-          <span class="slot-tile"><ha-icon icon="${this._mealIcon(mealType)}"></ha-icon></span>
+          <span class="slot-tile" style="--hue: var(${this._mealHue(mealType)})"><ha-icon icon="${this._mealIcon(mealType)}"></ha-icon></span>
           <div class="slot-mid">
             <div class="slot-eyebrow">${label}</div>
             <div class="slot-name muted">${msg('Nothing planned')}</div>
@@ -370,8 +378,8 @@ class RmMealPlanner extends LitElement {
       return html`
         <div class="slot">
           <button class="slot-open" @click=${() => this._openRecipeDetail(entry)}>
-            <span class="slot-thumb">
-              ${recipe?.image_url ? html`<img src="${recipe.image_url}" alt="" />` : html`<ha-icon icon="mdi:food"></ha-icon>`}
+            <span class="slot-thumb ${recipe?.image_url ? '' : 'no-img'}" style="--hue: var(${this._mealHue(mealType)})">
+              ${recipe?.image_url ? html`<img src="${recipe.image_url}" alt="" />` : html`<ha-icon icon="${this._mealIcon(mealType)}"></ha-icon>`}
             </span>
             <span class="slot-mid">
               <span class="slot-eyebrow">${i === 0 ? label : ''}</span>
@@ -880,8 +888,9 @@ class RmMealPlanner extends LitElement {
     .slot-tile, .slot-thumb {
       flex: none; width: 44px; height: 44px; border-radius: 14px; overflow: hidden;
       display: flex; align-items: center; justify-content: center;
-      background: var(--rm-accent-soft); color: var(--rm-accent-text);
+      background: color-mix(in srgb, var(--hue, var(--rm-accent)) 18%, var(--rm-bg-surface)); color: var(--hue, var(--rm-accent-text));
     }
+    :host([ui-style="compact"]) .slot-tile, :host([ui-style="compact"]) .slot-thumb.no-img { width: 40px; height: 40px; border-radius: 12px; background: var(--hue, var(--rm-accent)); color: var(--rm-bg-main); }
     .slot-thumb img { width: 100%; height: 100%; object-fit: cover; }
     .slot-tile ha-icon, .slot-thumb ha-icon { --mdc-icon-size: 22px; }
     .slot-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 0; border: none; background: transparent; text-align: left; cursor: pointer; color: var(--rm-text); font: inherit; }
