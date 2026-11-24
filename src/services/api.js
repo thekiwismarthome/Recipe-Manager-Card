@@ -1,3 +1,5 @@
+import { parseAmount } from './ingredient-amount.js';
+
 /**
  * Recipe Manager WebSocket API service.
  * Mirrors the pattern from Shopping List Manager's api.js.
@@ -47,16 +49,10 @@ function _slmBuildNote(recipeName, ing, cleanName) {
  * Handles ASCII fractions ("1/2"), Unicode fractions ("½"), mixed numbers ("1 1/2").
  */
 function _slmParseQty(amount) {
-  if (!amount) return 1;
-  const fracMap = { '½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 1/3, '⅔': 2/3,
-                    '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875 };
-  let s = String(amount).trim();
-  for (const [c, v] of Object.entries(fracMap)) s = s.replace(c, String(v));
-  const mixed = s.match(/^(\d+)\s+(\d+)\/(\d+)$/);
-  if (mixed) return parseInt(mixed[1]) + parseInt(mixed[2]) / parseInt(mixed[3]);
-  const frac = s.match(/^(\d+)\/(\d+)$/);
-  if (frac) return parseInt(frac[1]) / parseInt(frac[2]);
-  return parseFloat(s) || 1;
+  const value = parseAmount(amount);
+  // SLM requires a numeric quantity; retain the existing fallback for
+  // amounts that are descriptive rather than numeric.
+  return value === null ? 1 : value;
 }
 
 export class RecipeManagerAPI {
